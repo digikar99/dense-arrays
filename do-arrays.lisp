@@ -6,7 +6,7 @@
 ;;
 ;; (let ((array (make-array '(1000000 1))))
 ;;   (declare (optimize speed))
-;;   (time (loop repeat 1000 do 
+;;   (time (loop repeat 1000 do
 ;;     (do-arrays 2 ((elt array t))
 ;;       (setf elt 1)))))
 ;;
@@ -80,7 +80,7 @@
                                      element-types svs))
              (symbol-macrolet (,@(map-collect `(,%1 (cl:aref ,%2 ,%3))
                                               elt-vars svs is))
-               ;; TODO: Add dimension correctness checks             
+               ;; TODO: Add dimension correctness checks
                (destructuring-bind ,dimensions (narray-dimensions ,(first array-vars))
                  (declare (type int32 ,@dimensions))
                  (destructuring-int32-lists
@@ -117,7 +117,7 @@
                                    element-types svs))
            (symbol-macrolet (,@(map-collect `(,%1 (cl:aref ,%2 ,%3))
                                             elt-vars svs is))
-             ;; TODO: Add dimension correctness checks                 
+             ;; TODO: Add dimension correctness checks
              (labels ((nest-loop (,dimensions ,@strides ,@offsets)
                         (let ((,d  (first ,dimensions))
                               ,@(map-collect `(,%1 (first ,%2)) ss strides)
@@ -165,7 +165,7 @@ the BINDINGS are assumed to be the first element of the BODY.
                       (push elt-var      elt-vars)
                       (push array        arrays)
                       (push element-type element-types)))
-          ;; Reverse because, see the test below 
+          ;; Reverse because, see the test below
           (values (nreverse elt-vars)
                   (nreverse arrays)
                   (nreverse element-types)))

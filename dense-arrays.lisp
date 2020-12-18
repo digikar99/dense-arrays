@@ -11,12 +11,10 @@
                              :array-rank
                              :make-array
                              :print-array
-                             :copy-array)))
+                             :copy-array
+                             :define-array-type)))
     `(uiop:define-package :dense-arrays
          (:mix :iterate :alexandria :cl :5am :trivial-types)
-       ;; TODO: Do away with array-storage-vector for portability by implementing
-       ;; initial-contents
-       #+sbcl (:import-from :sb-ext :array-storage-vector)
        (:export ,@export-symbols)
        (:shadow ,@export-symbols)))
 
@@ -26,6 +24,10 @@
 (in-suite :dense-arrays)
 
 (deftype int32 () `(signed-byte 32))
+(deftype uint64 () `(unsigned-byte 64))
+(deftype uint62 () `(unsigned-byte 62))
+
+;; TODO: Type uint64 vs int32 checkings
 
 (defmacro define-struct-with-required-slots (name-and-options &rest slot-descriptions)
   "Like DEFSTRUCT but SLOT-DESCRIPTIONS can also have a `:required t` as an option."
@@ -63,8 +65,28 @@
   (offsets      nil :required t :type list)
   (contiguous-p nil :required t)
   (total-size   nil :required t :type int32)
-  (rank         nil :required t)
+  (rank         nil :required t :type int32)
   (root-array   nil :required t))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *element-type->checker-fn* (make-hash-table)))
+
+(defun %array-* (array) (arrayp array))
+
+(defmacro define-array-type (element-type)
+  (let ((checker-fn-name (intern (uiop:strcat "%ARRAY-" (symbol-name element-type))
+                                 :dense-arrays)))
+    `(progn
+       (defun ,checker-fn-name (array)
+         (and (arrayp array)
+              (eq ',element-type (array-element-type array))))
+       (setf (gethash ',element-type *element-type->checker-fn*) ',checker-fn-name)
+       (deftype array (&optional (element-type '* elt-supplied-p))
+         (if elt-supplied-p
+             `(satisfies ,(gethash element-type *element-type->checker-fn*))
+             `(satisfies %array-*))))))
+
+(define-array-type bit)
 
 (defun dimensions->strides (dimensions)
   (cond ((null dimensions) ())
@@ -108,15 +130,15 @@
 
 (defun make-array (dimensions &rest args
                    &key (element-type t)
-                   
+
                      (initial-element nil initial-element-p)
                      (initial-contents nil initial-contents-p)
                      (constructor nil constructor-p)
-                     
+
                      (strides nil strides-p)
                      (adjustable nil adjustable-p)
                      (fill-pointer nil fill-pointer-p)
-                     
+
                      (displaced-to nil displaced-to-p)
                      (offsets nil offsets-p)
                      (displaced-index-offset 0 displaced-index-offset-p))
@@ -138,7 +160,7 @@
     (error "ADJUSTABLE has not been handled yet in DENSE-ARRAY"))
   ;; (when initial-contents-p
   ;;   (error "INITIAL_CONTENTS has not been handled yet in DENSE-ARRAY"))
-  
+
   (let* ((dimensions (if (listp dimensions)
                          dimensions
                          (list dimensions)))
@@ -168,26 +190,29 @@
     (cond (constructor-p
            (let ((row-major-index 0))
              (declare (type int32 row-major-index))
+             ;; To avoid repeated de-allocation of subscripts, we do this convoluted work
+             ;; Uncomment the 'print' to see what is happening
              (labels ((construct (r &optional (stride (first strides))
                                   &rest subscripts)
-                        (declare (optimize speed)
+                        (declare (optimize debug)
                                  (type int32 r stride))
+                        ;; (print r)
+                        ;; (princ (list row-major-index :stride stride subscripts))
                         (if (< r 0)
-                            (progn                              
-                              (setf (cl:aref displaced-to row-major-index)
-                                    (apply constructor subscripts))
-                              (incf row-major-index stride))
+                            (setf (cl:aref displaced-to row-major-index)
+                                  (apply constructor subscripts))
                             (loop :for i :of-type int32 :below (nth r dimensions)
                                   :with 1-r :of-type int32 := (1- r)
                                   :with s :of-type int32 := (nth r strides)
-                                  :do (apply #'construct 1-r
+                                  :do (apply #'construct
+                                             1-r
                                              s
                                              i
                                              subscripts)
+                                      (incf row-major-index s)
                                   :finally (decf row-major-index
                                                  (the int32 (* (the int32 (nth r dimensions))
-                                                               (the int32 (nth r strides)))))
-                                  (incf row-major-index 1)))))
+                                                               (the int32 (nth r strides)))))))))
                (construct (1- rank)))))
           (initial-contents-p
            (let ((row-major-index 0))
@@ -210,6 +235,12 @@
                       :total-size (apply #'* dimensions)
                       :root-array nil
                       :rank (length dimensions))))
+
+(def-test make-array ()
+  (is (equalp #(0 1 2 1 2 3)
+              (array-displaced-to (make-array '(2 3) :constructor #'+))))
+  (is (equalp #(0 1 2 3 1 2 3 4 2 3 4 5 1 2 3 4 2 3 4 5 3 4 5 6)
+              (array-displaced-to (make-array '(2 3 4) :constructor #'+)))))
 
 ;; trivial function definitions
 
@@ -298,10 +329,10 @@ Use NARRAY-DIMENSIONS to avoid the copy."
                            (t "~d"))))
     ;; Do this before just to save some horizontal space
     (declare (special *axis-number*))
-    (print-unreadable-object (array stream :type t :identity t)
+    (print-unreadable-object (array stream :identity t)
       (when *print-array*
         ;; header
-        (format stream "~A~S ~{~S~^x~}"
+        (format stream "DENSE-ARRAYS:ARRAY ~A~S ~{~S~^x~}"
                 (if (array-view-p array) "(VIEW) " "")
                 (array-element-type array)
                 (narray-dimensions array))
@@ -326,7 +357,7 @@ Use NARRAY-DIMENSIONS to avoid the copy."
                  (let ((string (format nil fmt-control object)))
                    (cond ((> (+ column (length string))
                              *print-right-margin*)
-                          (terpri stream)                                        
+                          (terpri stream)
                           (check-lines)
                           (incf lines)
                           (write-string string stream)
@@ -399,7 +430,7 @@ Use NARRAY-DIMENSIONS to avoid the copy."
                 (progn
                   (print-array 0
                                0
-                               indent)                    
+                               indent)
                   (terpri stream))
               (print-lines-exhausted (condition)
                 (write-string " ..." stream)
@@ -419,7 +450,7 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
         (print array)))
   nil)
 
-(def-test print-array () 
+(def-test print-array ()
   (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello)))
     (macrolet ((lines (n)
                  `(with-output-to-string (*standard-output*)
@@ -442,50 +473,3 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
       (is (= 5 (count #\newline (len 2))))
       (is (= 1 (count #\newline (level 0))))
       (is (= 3 (count #\newline (level 1)))))))
-
-(defun broadcast-array (array broadcast-dimensions)
-  (unless (arrayp array)
-    ;; Should probably warn if ARRAY is not an array
-    (setq array (make-array 1 :initial-element array)))
-  (with-slots (dim element-type strides offsets displaced-to) array
-    (multiple-value-bind (strides offsets)
-        (let* ((blen (length broadcast-dimensions))
-               (len  (length dim))
-               (dim  (append (make-list (- blen len)
-                                        :initial-element 1)
-                             dim))
-               (strides (append (make-list (- blen len)
-                                           :initial-element 0)
-                                strides))
-               (new-offsets nil)
-               (offsets offsets))
-          (values 
-           (loop :for s :in strides
-                 :for b :in broadcast-dimensions
-                 :for d :in dim
-                 :for o := (or (first offsets) 0)
-                 :collect
-                 (cond ((= b d)
-                        (push o new-offsets)
-                        (setq offsets (rest offsets))
-                        s)
-                       ((= d 1)
-                        (push 0 new-offsets)
-                        0)
-                       (t (error "~D of dim ~D cannot be broadcasted to dim ~D"
-                                 array dim broadcast-dimensions))))
-           (nreverse new-offsets)))
-      (let ((total-size (apply #'* broadcast-dimensions)))
-        (make-dense-array
-         :dim broadcast-dimensions
-         :element-type element-type
-         :strides strides
-         :offsets offsets
-         :displaced-to displaced-to
-         ;; TODO: Raises the question of semantics of array being contiguous
-         :contiguous-p (= (first strides)
-                          (/ total-size (first broadcast-dimensions)))
-         :total-size total-size
-         :root-array (or (array-root-array array) array)
-         :rank (length broadcast-dimensions))))))
-

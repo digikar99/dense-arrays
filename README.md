@@ -8,7 +8,6 @@
   - Yet to be optimized for speed and user-facing debugging
   - Yet to incorporate SIMD
   - Semantics of displaced-indexed-offset
-- Intended next feature: indexing using bit-arrays
 
 # What
 
@@ -26,17 +25,17 @@ CL-USER> (setq *print-length* 10) ; also intends to respect (*print-level* *prin
 
 ```lisp
 DENSE-ARRAYS-DEMO> (make-array '(2 10))
-#<ARRAY T 2x10
+#<DENSE-ARRAYS:ARRAY T 2x10
    (0 0 0 0 0 0 0 0 0 0)
    (0 0 0 0 0 0 0 0 0 0)
  {103C4A3643}>
 DENSE-ARRAYS-DEMO> (make-array '(2 100)) ; thanks to *print-length*
-#<ARRAY T 2x100
+#<DENSE-ARRAYS:ARRAY T 2x100
    (0 0 0 0 0 0 0 0 0 0 ...)
    (0 0 0 0 0 0 0 0 0 0 ...)
  {1042B69C93}>
 DENSE-ARRAYS-DEMO> (describe (make-array '(2 10))) ; may change
-#<ARRAY T 2x10 {1043053683}>
+#<DENSE-ARRAYS:ARRAY T 2x10 {1043053683}>
   [structure-object]
 
 Slots with :INSTANCE allocation:
@@ -53,38 +52,62 @@ Slots with :INSTANCE allocation:
 DENSE-ARRAYS-DEMO> (defparameter a (make-array '(4 10) :constructor #'+))
 A
 DENSE-ARRAYS-DEMO> (print-array a "~2d")
-#<ARRAY T 4x10
+#<DENSE-ARRAYS:ARRAY T 4x10
    ( 0  1  2  3  4  5  6  7  8  9)
    ( 1  2  3  4  5  6  7  8  9 10)
    ( 2  3  4  5  6  7  8  9 10 11)
    ( 3  4  5  6  7  8  9 10 11 12)
- {103CEB6BC3}> 
+ {103CEB6BC3}>
  ```
 
 **Slicing facilities**
 
 ```lisp
 DENSE-ARRAYS-DEMO> (aref a nil 1) ; The view indicates that mutating this array would change another original array*
-#<ARRAY (VIEW) T 4
+#<DENSE-ARRAYS:ARRAY (VIEW) T 4
    1 2 3 4
  {103D417A13}>
 DENSE-ARRAYS-DEMO> (aref a 1)
-#<ARRAY (VIEW) T 10
+#<DENSE-ARRAYS:ARRAY (VIEW) T 10
    1 2 3 4 5 6 7 8 9 10
  {103D426BB3}>
 DENSE-ARRAYS-DEMO> (aref a '(1 :stop 3) '(1 :stop 3))
-#<ARRAY (VIEW) T 2x2
+#<DENSE-ARRAYS:ARRAY (VIEW) T 2x2
    (2 3)
    (3 4)
  {103FE68543}>
-DENSE-ARRAYS-DEMO> (aref a '(1 :stop 3) '(1 :stop 8 :step 2))
-#<ARRAY (VIEW) T 2x4
+DENSE-ARRAYS-DEMO> (defparameter b (aref a '(1 :stop 3) '(1 :stop 8 :step 2)))
+B
+DENSE-ARRAYS-DEMO> b
+#<DENSE-ARRAYS:ARRAY (VIEW) T 2x4
    (2 4 6 8)
    (3 5 7 9)
- {1041CD3AD3}>
+ {1011617503}>
+DENSE-ARRAYS-DEMO> (aref b (make-array '(2 4) :initial-contents '((0 1 0 0) (1 1 0 0))
+                                       :element-type 'bit))
+#<DENSE-ARRAYS:ARRAY T 3
+   4 3 5
+ {1013D6FE23}>
+DENSE-ARRAYS-DEMO> (setf (aref b (make-array '(2 4)
+                                             :initial-contents '((0 1 0 0) (1 1 0 0))
+                                             :element-type 'bit))
+                         0)
+0
+DENSE-ARRAYS-DEMO> b
+#<DENSE-ARRAYS:ARRAY (VIEW) T 2x4
+   (2 0 6 8)
+   (0 0 7 9)
+ {1011617503}>
+DENSE-ARRAYS-DEMO> a
+#<DENSE-ARRAYS:ARRAY T 4x10
+   (0 1 2 3 4 5 6 7 8 9)
+   (1 2 3 0 5 6 7 8 9 10)
+   (2 0 4 0 6 7 8 9 10 11)
+   (3 4 5 6 7 8 9 10 11 12)
+ {10115A1073}>
 ```
 
-Planned for the future: Indexing using bit arrays and using SIMD operations wherever possible.
+Planned for the future: Using SIMD operations wherever possible.
 
 *The semantics do feel debatable: mutating the original array would also mutate the views 🤷‍♂️.
 
@@ -102,7 +125,7 @@ Evaluation took:
   100.00% CPU
   97,854,068 processor cycles
   8,313,888 bytes consed
-  
+
 NIL
 CL-USER> (let ((a (dense-arrays:make-array '(1000 1000))))
            (time (loop for i below 1000 do (dense-arrays:aref a nil i))))
@@ -112,7 +135,7 @@ Evaluation took:
   100.00% CPU
   486,648 processor cycles
   163,712 bytes consed
-  
+
 NIL
 ```
 

@@ -10,6 +10,8 @@
                "trivial-types"
                "uiop")
   :components ((:file "dense-arrays")
+               (:file "broadcast")
                (:file "do-arrays")
+               (:file "argwhere")
                (:file "aref")
                (:file "copy")))

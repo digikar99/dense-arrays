@@ -9,7 +9,7 @@
          (do-arrays ((elt1 array1)
                      (elt2 array2))
            (setf array= (funcall test elt1 elt2))
-           (unless array=               
+           (unless array=
              (return-from array= nil)))
          t)))
 
@@ -138,25 +138,67 @@
   "Returns a copy of the subscripted array."
   (declare (optimize speed)
            (dynamic-extent subscripts)
-           (type array array)))
+           (type array array))
+  ;; TODO: Optimize this
+  ;; TODO: Combining basic and advanced indexing - raise an issue if this is needed
+  ;; Reference: https://numpy.org/doc/stable/reference/arrays.indexing.html#advanced-indexing
+  (setq subscripts
+        (apply #'broadcast-arrays
+               (iter (for subscript in subscripts)
+                 (if (typep subscript '(array bit))
+                     (appending (nonzero subscript))
+                     (collect   subscript)))))
+  (cond
+    ((= (length subscripts) (array-rank array))
+     (let ((subscript (first subscripts)))
+       (declare (type array subscript))
+       (let ((result (make-array (array-dimensions subscript)
+                                 :element-type (array-element-type array)))
+             (rank   (array-rank subscript))
+             (dims   (narray-dimensions subscript)))
+         (declare (type int32 rank))
+         (labels ((ss-iter (depth ss-idx)
+                    (declare (type int32 depth))
+                    (if (= depth rank)
+                        (let ((ss-elt (mapcar (lambda (array)
+                                                (apply #'aref array ss-idx))
+                                              subscripts)))
+                          (setf (apply #'aref result ss-idx)
+                                (apply #'aref array ss-elt)))
+                        (loop :for i :from 0 :below (the int32 (nth depth dims))
+                              :do (setf (nth depth ss-idx) i)
+                                  (ss-iter (1+ depth) ss-idx)
+                              :finally (setf (nth depth ss-idx) 0)))
+                    nil))
+           (ss-iter 0 (make-list rank :initial-element 0))
+           result))))
+    (t
+     (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
 
 (defun (setf aref) (new-element/s array &rest subscripts)
   (declare (type array array)
            (dynamic-extent subscripts))
   (with-slots (displaced-to element-type strides offsets dim rank) array
     (declare (type (cl:simple-array * (*)) displaced-to))
-    (if (and (= rank (length subscripts))
-             (every #'integerp subscripts))
-        (setf (cl:aref displaced-to
-                       (let ((index 0))
-                         (declare (type int32 index))
-                         (loop :for stride :of-type int32 :in strides
-                               :for subscript :of-type int32 :in subscripts
-                               :for offset :of-type int32 :in offsets
-                               :do (incf index (* stride (+ offset subscript))))
-                         index))
-              new-element/s)
-        (apply #'(setf %aref-view) new-element/s array subscripts))))
+    (cond ((and (= rank (length subscripts))
+                (every #'integerp subscripts))
+           (setf (cl:aref displaced-to
+                          (let ((index 0))
+                            (declare (type int32 index))
+                            (loop :for stride :of-type int32 :in strides
+                                  :for subscript :of-type int32 :in subscripts
+                                  :for offset :of-type int32 :in offsets
+                                  :do (incf index (+ offset
+                                                     (* stride
+                                                        subscript))))
+                            index))
+                 new-element/s))
+          ((or (some #'cl:arrayp subscripts)
+               (some #'arrayp subscripts))
+           (apply #'(setf %aref) new-element/s array subscripts))
+          (t
+           (apply #'(setf %aref-view) new-element/s array subscripts))))
+  new-element/s)
 
 (defun (setf %aref-view) (new-array array &rest subscripts)
   ;; TODO: Optimize
@@ -165,7 +207,44 @@
     (do-arrays ((new (broadcast-array new-array (array-dimensions sub-array)))
                 (old sub-array))
       (setf old new)))
-  array)
+  new-array)
+
+(defun (setf %aref) (new-array array &rest subscripts)
+  (declare (optimize debug)
+           (dynamic-extent subscripts)
+           (type array array))
+  ;; TODO: Optimize this
+  (destructuring-bind (new-array &rest subscripts)
+      (apply #'broadcast-arrays
+             new-array
+             (iter (for subscript in subscripts)
+               (if (typep subscript '(array bit))
+                   (appending (nonzero subscript))
+                   (collect   subscript))))
+    (cond
+      ((= (length subscripts) (array-rank array))
+       (let ((subscript (first subscripts)))
+         (declare (type array subscript))
+         (let ((rank   (array-rank        new-array))
+               (dims   (narray-dimensions new-array)))
+           (declare (type int32 rank))
+           (labels ((ss-iter (depth ss-idx)
+                      (declare (type int32 depth))
+                      (if (= depth rank)
+                          (let ((ss-elt (mapcar (lambda (array)
+                                                  (apply #'aref array ss-idx))
+                                                subscripts)))
+                            (setf (apply #'aref array ss-elt)
+                                  (apply #'aref new-array ss-idx)))
+                          (loop :for i :from 0 :below (the int32 (nth depth dims))
+                                :do (setf (nth depth ss-idx) i)
+                                    (ss-iter (1+ depth) ss-idx)
+                                :finally (setf (nth depth ss-idx) 0)))
+                      nil))
+             (ss-iter 0 (make-list rank :initial-element 0))))))
+      (t
+       (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
+  new-array)
 
 (def-test aref ()
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+)))
@@ -173,7 +252,7 @@
     (is (= 9 (aref array 8 1)))
     (is (array= array (aref array)))
     (is (array= array (aref array nil)))
-    (is (array= array (aref array nil nil)))    
+    (is (array= array (aref array nil nil)))
     (is (array= (aref array 0)
                 (make-array 2 :constructor #'+)))
     (is (array= (aref array 0 nil)
@@ -187,20 +266,52 @@
   (is (array= (aref (make-array '(5 5) :constructor #'+) '(1) '(1))
               (make-array '(4 4) :constructor (lambda (x y) (+ 2 x y))))))
 
+(def-test advanced-aref ()
+  (is (array= (make-array '(2 2) :initial-contents '((2 6) (1 4)))
+              (aref (make-array '(2 3)
+                                :initial-contents '((1 2 3) (4 5 6)))
+                    (make-array '(2 2)
+                                :initial-contents '((0 1) (0 1)))
+                    (make-array '(2 2)
+                                :initial-contents '((1 2) (0 0))))))
+  (is (array= (make-array '(3) :initial-contents '(1 3 6))
+              (aref (make-array '(2 3)
+                                :initial-contents '((1 2 3) (4 5 6)))
+                    (make-array '(2 3)
+                                :element-type 'bit
+                                :initial-contents '((1 0 1) (0 0 1)))))))
+
 (def-test setf-aref ()
+  (is (array= (make-array '(2 3) :initial-contents '((0 1 2) (1 2 -1)))
+              (let ((a (make-array '(2 3) :constructor #'+)))
+                (setf (aref a 1 2) -1)
+                a)))
   (is (array= (make-array '(2 3 4) :initial-element 1)
-              (setf (aref (make-array '(2 3 4) :initial-element 0))
-                    1)))
+              (let ((a (make-array '(2 3 4) :initial-element 0)))
+                (setf (aref a) 1)
+                a)))
   (is (array= (make-array '(2 3) :initial-contents '((2 0 0) (3 0 0)))
-              (setf (aref (make-array '(2 3) :initial-element 0) nil 0)
-                    (make-array 2 :initial-contents '(2 3))))))
+              (let ((a (make-array '(2 3) :initial-element 0)))
+                (setf (aref a nil 0)
+                      (make-array 2 :initial-contents '(2 3)))
+                a))))
+
+(def-test setf-advanced-aref ()
+  (is (array= (make-array '(2 3) :initial-contents '((2 2 2) (4 5 2)))
+              (let ((a (make-array '(2 3)
+                                   :initial-contents '((1 2 3) (4 5 6)))))
+                (setf (aref a (make-array '(2 3)
+                                          :element-type 'bit
+                                          :initial-contents '((1 0 1) (0 0 1))))
+                      2)
+                a))))
 
 (defun row-major-aref (array index)
   "Return the element of ARRAY corresponding to the row-major INDEX.
 This is SETFable"
   (declare ;; (optimize speed)
-           (type array array)
-           (type int32 index))
+   (type array array)
+   (type int32 index))
   (if (array-contiguous-p array)
       (cl:aref (array-displaced-to array)
                (the int32 (apply #'+ index (array-offsets array))))
@@ -227,7 +338,7 @@ This is SETFable"
             (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
         (declare (type int32 row-major-index))
         (loop :for s  :of-type int32 :in (array-strides array)
-              :for as :of-type int32 :in apparant-strides              
+              :for as :of-type int32 :in apparant-strides
               :for o  :of-type int32 :in (array-offsets array)
               :do (incf row-major-index (+ o (* s index)))
                   (setf index (rem index as)))
