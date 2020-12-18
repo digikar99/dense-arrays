@@ -11,8 +11,7 @@
                              :array-rank
                              :make-array
                              :print-array
-                             :copy-array
-                             :define-array-type)))
+                             :copy-array)))
     `(uiop:define-package :dense-arrays
          (:mix :iterate :alexandria :cl :5am :trivial-types)
        (:export ,@export-symbols)
@@ -24,8 +23,12 @@
 (in-suite :dense-arrays)
 
 (deftype int32 () `(signed-byte 32))
+(deftype uint32 () `(unsigned-byte 32))
+(deftype int64 () `(signed-byte 64))
 (deftype uint64 () `(unsigned-byte 64))
 (deftype uint62 () `(unsigned-byte 62))
+(deftype float32 () `single-float)
+(deftype float64 () `double-float)
 
 ;; TODO: Type uint64 vs int32 checkings
 
@@ -48,10 +51,10 @@
                                      (cddr desc)))
                           desc))))
 
-(define-struct-with-required-slots (array (:conc-name array-)
-                                          (:predicate arrayp)
-                                          (:constructor make-dense-array)
-                                          (:copier copy-dense-array))
+(define-struct-with-required-slots (dense-array (:conc-name array-)
+                                                (:predicate arrayp)
+                                                (:constructor make-dense-array)
+                                                (:copier copy-dense-array))
   ;; TODO: Add more documentation with a proper example
   "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.
@@ -68,25 +71,35 @@
   (rank         nil :required t :type int32)
   (root-array   nil :required t))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *element-type->checker-fn* (make-hash-table)))
+(defvar *element-type->checker-fn* (make-hash-table :test 'equalp))
 
 (defun %array-* (array) (arrayp array))
 
 (defmacro define-array-type (element-type)
-  (let ((checker-fn-name (intern (uiop:strcat "%ARRAY-" (symbol-name element-type))
-                                 :dense-arrays)))
+  (let ((checker-fn-name ))
     `(progn
-       (defun ,checker-fn-name (array)
-         (and (arrayp array)
-              (eq ',element-type (array-element-type array))))
+
        (setf (gethash ',element-type *element-type->checker-fn*) ',checker-fn-name)
        (deftype array (&optional (element-type '* elt-supplied-p))
          (if elt-supplied-p
              `(satisfies ,(gethash element-type *element-type->checker-fn*))
              `(satisfies %array-*))))))
 
-(define-array-type bit)
+(deftype array (&optional (element-type '* elt-supplied-p))
+  (if elt-supplied-p
+      (let ((element-type (type-expand (upgraded-array-element-type element-type))))
+        (unless (gethash element-type *element-type->checker-fn*)
+          (let ((fn-sym (make-symbol (concatenate 'string
+                                                  "ARRAY-"
+                                                  (let ((*package* (find-package :cl)))
+                                                    (write-to-string element-type))))))
+            (compile fn-sym
+                     `(lambda (array)
+                        (and (arrayp array)
+                             (type= ',element-type (array-element-type array)))))
+            (setf (gethash element-type *element-type->checker-fn*) fn-sym)))
+        `(satisfies ,(gethash element-type *element-type->checker-fn*)))
+      'dense-array))
 
 (defun dimensions->strides (dimensions)
   (cond ((null dimensions) ())
@@ -311,7 +324,7 @@ Use NARRAY-DIMENSIONS to avoid the copy."
 (defvar *array-element-print-format* nil
   "The format constrol string used to print the elements of DENSE-ARRAYS:ARRAY.")
 
-(defmethod print-object ((array dense-arrays:array) stream)
+(defmethod print-object ((array dense-array) stream)
   ;; (print (type-of array))
   (let ((*print-right-margin* (or *print-right-margin* 80))
         (sv     (array-displaced-to array))

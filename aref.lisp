@@ -136,7 +136,7 @@
 
 (defun %aref (array &rest subscripts)
   "Returns a copy of the subscripted array."
-  (declare (optimize speed)
+  (declare ;; (optimize speed)
            (dynamic-extent subscripts)
            (type array array))
   ;; TODO: Optimize this
@@ -145,7 +145,8 @@
   (setq subscripts
         (apply #'broadcast-arrays
                (iter (for subscript in subscripts)
-                 (if (typep subscript '(array bit))
+                 ;; TYPE-EXPAND is required for CCL and ECL
+                 (if (typep subscript (type-expand '(array bit)))
                      (appending (nonzero subscript))
                      (collect   subscript)))))
   (cond
@@ -210,7 +211,7 @@
   new-array)
 
 (defun (setf %aref) (new-array array &rest subscripts)
-  (declare (optimize debug)
+  (declare ;; (optimize speed)
            (dynamic-extent subscripts)
            (type array array))
   ;; TODO: Optimize this
@@ -218,7 +219,7 @@
       (apply #'broadcast-arrays
              new-array
              (iter (for subscript in subscripts)
-               (if (typep subscript '(array bit))
+               (if (typep subscript (type-expand '(array bit)))
                    (appending (nonzero subscript))
                    (collect   subscript))))
     (cond
