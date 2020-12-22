@@ -5,19 +5,25 @@
                              :array-element-type
                              :array-total-size
                              :array-displacement
-                             :1d-storage-array
+                             :array-displaced-to
+                             :array=
                              :aref
                              :row-major-aref
                              :array-rank
                              :make-array
                              :print-array
-                             :copy-array)))
+                             :copy-array
+                             :do-arrays)))
     `(uiop:define-package :dense-arrays
          (:mix :iterate :alexandria :cl :5am :trivial-types)
        (:export ,@export-symbols)
        (:shadow ,@export-symbols)))
 
 (in-package :dense-arrays)
+
+(trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
+(trivial-package-local-nicknames:add-package-local-nickname :env :introspect-environment)
+
 
 (def-suite :dense-arrays)
 (in-suite :dense-arrays)
@@ -59,7 +65,7 @@
   "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.
 - OFFSETS is a list of offsets along each dimension."
-  (displaced-to nil :required t)
+  (displaced-to nil :required t :type (cl:simple-array * 1))
   (element-type nil :required t)
   (dim          nil :required t :read-only t)
    ;; DIM is actually a read-only slot; however, in TRANSPOSE, for performance reasons,
@@ -71,34 +77,40 @@
   (rank         nil :required t :type int32)
   (root-array   nil :required t))
 
-(defvar *element-type->checker-fn* (make-hash-table :test 'equalp))
+(defvar *element-type->checker-fn-ht* (make-hash-table))
+(defvar *checker-fn->element-and-rank* (make-hash-table))
 
-(defun %array-* (array) (arrayp array))
+(defun checker-fn-sym (element-type rank)
+  (when-let (inner-ht (gethash element-type *element-type->checker-fn-ht*))
+    (gethash rank inner-ht)))
+(defun (setf checker-fn-sym) (fn-sym element-type rank)
+  (when (null (gethash element-type *element-type->checker-fn-ht*))
+    (setf (gethash element-type *element-type->checker-fn-ht*) (make-hash-table)))
+  (setf (gethash rank (gethash element-type *element-type->checker-fn-ht*))
+        fn-sym)
+  (setf (gethash fn-sym *checker-fn->element-and-rank*) (list element-type rank)))
 
-(defmacro define-array-type (element-type)
-  (let ((checker-fn-name ))
-    `(progn
-
-       (setf (gethash ',element-type *element-type->checker-fn*) ',checker-fn-name)
-       (deftype array (&optional (element-type '* elt-supplied-p))
-         (if elt-supplied-p
-             `(satisfies ,(gethash element-type *element-type->checker-fn*))
-             `(satisfies %array-*))))))
-
-(deftype array (&optional (element-type '* elt-supplied-p))
+(deftype array (&optional (element-type '* elt-supplied-p) (rank '*))  
+  (check-type rank (or (eql *) uint32))
   (if elt-supplied-p
       (let ((element-type (type-expand (upgraded-array-element-type element-type))))
-        (unless (gethash element-type *element-type->checker-fn*)
-          (let ((fn-sym (make-symbol (concatenate 'string
-                                                  "ARRAY-"
-                                                  (let ((*package* (find-package :cl)))
-                                                    (write-to-string element-type))))))
+        (unless (checker-fn-sym element-type rank)
+          (let ((fn-sym (intern (concatenate 'string
+                                             "%ARRAY-"
+                                             (let ((*package* (find-package :cl)))
+                                               (write-to-string element-type))
+                                             "-" (write-to-string rank)
+                                             "-P")
+                                :dense-arrays)))
             (compile fn-sym
                      `(lambda (array)
                         (and (arrayp array)
-                             (type= ',element-type (array-element-type array)))))
-            (setf (gethash element-type *element-type->checker-fn*) fn-sym)))
-        `(satisfies ,(gethash element-type *element-type->checker-fn*)))
+                             (type= ',element-type (array-element-type array))
+                             ,(if (eq rank '*)
+                                  t
+                                  `(= ',rank (array-rank array))))))
+            (setf (checker-fn-sym element-type rank) fn-sym)))
+        `(satisfies ,(checker-fn-sym element-type rank)))
       'dense-array))
 
 (defun dimensions->strides (dimensions)
@@ -171,22 +183,18 @@
     (error "FILL-POINTER has not been handled yet in DENSE-ARRAY"))
   (when adjustable-p
     (error "ADJUSTABLE has not been handled yet in DENSE-ARRAY"))
-  ;; (when initial-contents-p
-  ;;   (error "INITIAL_CONTENTS has not been handled yet in DENSE-ARRAY"))
 
   (let* ((dimensions (if (listp dimensions)
                          dimensions
                          (list dimensions)))
          (displaced-vector-initial-element
-           (cond (constructor-p
-                  (ecase element-type
+           (cond (initial-element-p initial-element)
+                 (t
+                  (case element-type
                     ;; TODO: Include more types?
-                    (single-float 0.0)
+                    (single-float 0.0s0)
                     (double-float 0.0d0)
-                    (t 0)))
-                 (initial-element-p initial-element)
-                 (initial-contents-p 0)
-                 (t 0)))
+                    (t 0)))))
          (rank (length dimensions))
          (total-size (apply #'* dimensions))
          (displaced-to (cond (displaced-to displaced-to)
@@ -208,7 +216,8 @@
              (labels ((construct (r &optional (stride (first strides))
                                   &rest subscripts)
                         (declare (optimize debug)
-                                 (type int32 r stride))
+                                 (type int32 r stride)
+                                 (ignorable stride))
                         ;; (print r)
                         ;; (princ (list row-major-index :stride stride subscripts))
                         (if (< r 0)
@@ -232,12 +241,16 @@
              (declare (type (signed-byte 31) row-major-index)
                       (optimize (speed 1)))
              (labels ((set-displaced-to (elt)
-                        (if (listp elt)
-                            (loop :for e :in elt
-                                  :do (set-displaced-to e))
-                            (progn
-                              (setf (cl:aref displaced-to row-major-index) elt)
-                              (incf row-major-index)))))
+                        (typecase elt
+                          (list
+                           (loop :for e :in elt
+                                 :do (set-displaced-to e)))
+                          (cl:vector
+                           (loop :for e :across elt
+                                 :do (set-displaced-to e)))
+                          (t
+                           (setf (cl:aref displaced-to row-major-index) elt)
+                           (incf row-major-index)))))
                (set-displaced-to initial-contents)))))
     (make-dense-array :displaced-to displaced-to
                       :element-type (cl:array-element-type displaced-to)
@@ -253,7 +266,10 @@
   (is (equalp #(0 1 2 1 2 3)
               (array-displaced-to (make-array '(2 3) :constructor #'+))))
   (is (equalp #(0 1 2 3 1 2 3 4 2 3 4 5 1 2 3 4 2 3 4 5 3 4 5 6)
-              (array-displaced-to (make-array '(2 3 4) :constructor #'+)))))
+              (array-displaced-to (make-array '(2 3 4) :constructor #'+))))
+  (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
+    (is (typep a '(array int32)))
+    (is (typep a '(array (signed-byte 32))))))
 
 ;; trivial function definitions
 
@@ -293,6 +309,11 @@ Use NARRAY-DIMENSIONS to avoid the copy."
            ;; (optimize speed)
            (type int32 axis-number))
   (elt (array-offsets array) axis-number))
+
+(defun 1d-storage-array (array)
+  "Returns the storage-vector underlying the ARRAY. This is equivalent to ARRAY-DISPLACED-TO."
+  (declare (type array array))
+  (array-displaced-to array))
 
 (defun array-view-p (array)
   "Returns T if the ARRAY is a VIEW, otherwise returns NIL"

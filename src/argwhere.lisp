@@ -11,7 +11,7 @@
         (dims      (narray-dimensions bit-array)))
     (declare (type (unsigned-byte 62) elt-count)
              (type int32 rank))
-    (do-arrays ((a bit-array))
+    (do-arrays ((a bit-array bit))
       (unless (zerop (the bit a))
         (setq elt-count (+ 1 elt-count))))
     (let ((index-array (make-array (list elt-count rank)
@@ -44,7 +44,7 @@
         (dims      (narray-dimensions bit-array)))
     (declare (type (unsigned-byte 62) elt-count)
              (type int32 rank))
-    (do-arrays ((a bit-array))
+    (do-arrays ((a bit-array bit))
       (unless (zerop (the bit a))
         (setq elt-count (+ 1 elt-count))))
     (let ((index-arrays (loop :repeat rank

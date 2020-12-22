@@ -16,9 +16,7 @@
 (defun aref (array &rest subscripts)
   ;; DONE: Handle nested aref
   ;; DONE: Handle displaced-index-offsets
-  ;; TODO: Handle non-integer subscripts
-  ;; TODO: Optimize single-index aref
-  ;; TODO [hard?]: Introduce parametric types in CL.
+  ;; DONE: (partially) Introduce parametric types in CL.
   ;;  In the special case where this reduces to CL:AREF, this function is over 20 times slower.
   ;;  However, I do not see a way of optimizing this even using compiler-macros without
   ;;  parametric user-defined types (for array). However, perhaps, due to
@@ -27,26 +25,23 @@
   (declare (optimize speed)
            (type array array)
            (dynamic-extent subscripts))
-  (with-slots (displaced-to element-type strides offsets dim rank) array
-    (declare (type (cl:simple-array * (*)) displaced-to)
-             (type int32 rank))
-    (cond ((and (= rank (length subscripts))
-                (every #'integerp subscripts))
-           (cl:aref displaced-to
-                    (let ((index 0))
-                      (declare (type int32 index))
-                      (loop :for stride :of-type int32 :in strides
-                            :for subscript :of-type int32 :in subscripts
-                            :for offset :of-type int32 :in offsets
-                            :do (incf index (+ offset
-                                               (* stride
-                                                  subscript))))
-                      index)))
-          ((or (some #'cl:arrayp subscripts)
-               (some #'arrayp subscripts))
-           (apply #'%aref array subscripts))
-          (t
-           (apply #'%aref-view array subscripts)))))
+  (cond ((and (= (array-rank array) (length subscripts))
+              (every #'integerp subscripts))
+         (cl:aref (the (cl:simple-array * 1) (array-displaced-to array))
+                  (let ((index 0))
+                    (declare (type int32 index))
+                    (loop :for stride :of-type int32 :in (array-strides array)
+                          :for subscript :of-type int32 :in subscripts
+                          :for offset :of-type int32 :in (array-offsets array)
+                          :do (incf index (+ offset
+                                             (* stride
+                                                subscript))))
+                    index)))
+        ((or (some #'cl:arrayp subscripts)
+             (some #'arrayp subscripts))
+         (apply #'%aref array subscripts))
+        (t
+         (apply #'%aref-view array subscripts))))
 
 
 (declaim (inline normalize-index))
@@ -224,25 +219,23 @@
                    (collect   subscript))))
     (cond
       ((= (length subscripts) (array-rank array))
-       (let ((subscript (first subscripts)))
-         (declare (type array subscript))
-         (let ((rank   (array-rank        new-array))
-               (dims   (narray-dimensions new-array)))
-           (declare (type int32 rank))
-           (labels ((ss-iter (depth ss-idx)
-                      (declare (type int32 depth))
-                      (if (= depth rank)
-                          (let ((ss-elt (mapcar (lambda (array)
-                                                  (apply #'aref array ss-idx))
-                                                subscripts)))
-                            (setf (apply #'aref array ss-elt)
-                                  (apply #'aref new-array ss-idx)))
-                          (loop :for i :from 0 :below (the int32 (nth depth dims))
-                                :do (setf (nth depth ss-idx) i)
-                                    (ss-iter (1+ depth) ss-idx)
-                                :finally (setf (nth depth ss-idx) 0)))
-                      nil))
-             (ss-iter 0 (make-list rank :initial-element 0))))))
+       (let ((rank   (array-rank        new-array))
+             (dims   (narray-dimensions new-array)))
+         (declare (type int32 rank))
+         (labels ((ss-iter (depth ss-idx)
+                    (declare (type int32 depth))
+                    (if (= depth rank)
+                        (let ((ss-elt (mapcar (lambda (array)
+                                                (apply #'aref array ss-idx))
+                                              subscripts)))
+                          (setf (apply #'aref array ss-elt)
+                                (apply #'aref new-array ss-idx)))
+                        (loop :for i :from 0 :below (the int32 (nth depth dims))
+                              :do (setf (nth depth ss-idx) i)
+                                  (ss-iter (1+ depth) ss-idx)
+                              :finally (setf (nth depth ss-idx) 0)))
+                    nil))
+           (ss-iter 0 (make-list rank :initial-element 0)))))
       (t
        (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
   new-array)
