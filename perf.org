@@ -1,0 +1,224 @@
+* Motivations
+
+  I keep wishing julia - or python - had CL features: SLIME-esque super-interactive development, dynamic variables, (easy) stack inspection, AOT compile-time warnings. Once you know these things, it's a PITA to live without them.
+
+  OTOH, making something as exhaustive as numpy or tensorflow in common lisp would be discarding all the human resources that went into these projects over the last decade. There also have been effortts to access python libraries from common lisp; while it works out for most things, some things remain. And one is still left wanting for more things /on top of the things in the first paragraph/:
+
+  - numpy does not show dimensions, and elements and element-types at the same time; julia does
+  - neither show an id
+  - neither indicate whether the array is a "fresh" one or a "view"
+  - =a:b:c= mean different things in numpy and julia
+
+  As such, ideally, I'd want to do the simple quick things in common lisp, and hand over the heavy things to, say, py4cl2.
+
+* Performance for simple aref
+
+| Type                    | Time (sec) |
+|-------------------------+------------|
+| Native CL (SBCL)        |       0.12 |
+| Python (unidiomatic)    |       8.34 |
+| Python (idiomatic/SIMD) |       0.03 |
+| aref (unoptimized)      |       1.35 |
+| aref (optimized)        |       0.41 |
+| do-arrays (optimized)   |       0.15 |
+
+All lisp performances are in the absence of SIMD.
+
+** Benchmark Code
+
+#+BEGIN_SRC lisp
+(in-package :dense-arrays)
+(defmacro timeit (&body body)
+  `(time (loop :repeat 1000
+               :do (loop :for i :of-type (unsigned-byte 32) :below 100
+                         :do (loop :for j :of-type (unsigned-byte 32) :below 100
+                                   :do ,@body)))))
+#+END_SRC
+
+*** Native CL
+
+#+BEGIN_SRC lisp
+;; 0.12 seconds of real time
+(let ((a (cl:make-array '(100 100) :element-type 'double-float
+                                   :initial-element 0.0d0))
+      (b 0.0d0))
+  (declare (optimize speed)
+           (type (cl:array double-float) a)
+           (type double-float b))
+  (timeit (incf b (cl:aref a i j)))
+  b)
+#+END_SRC
+
+*** Python (unidiomatic)
+
+#+BEGIN_SRC python
+# 8.34 - yes this is unsuited for performance
+import numpy as np
+import time
+def timeit(T):
+    total = 0.0
+    start = time.time()
+    for t in range(T):
+        for i in range(100):
+            for j in range(100):
+                total += a[i,j]
+    return total, time.time()-start
+timeit(1000)[1]
+#+END_SRC
+
+*** Python (idiomatic)
+
+#+BEGIN_SRC python
+# 0.03 - this is suited for performance!
+import numpy as np
+import time
+def timeit(T):
+    total = 0.0
+    start = time.time()
+    for i in range(T): total += np.sum(a)
+    return total, time.time()-start
+timeit(1000)[1]
+#+END_SRC
+
+*** aref (unoptimized)
+
+#+BEGIN_SRC lisp
+;; 1.35 seconds of real time
+(let ((a (make-array '(100 100) :element-type 'double-float
+                                :initial-element 0.0d0))
+      (b 0.0d0))
+  (declare (type (array double-float) a)
+           (type double-float b))
+  (timeit (incf b (aref a i j)))
+  b)
+#+END_SRC
+
+*** aref (optimized)
+
+#+BEGIN_SRC lisp
+;; 0.41 seconds of real time
+(let ((a (make-array '(100 100) :element-type 'double-float
+                                :initial-element 0.0d0))
+      (b 0.0d0))
+  (declare (optimize speed)
+           (type (array double-float) a)
+           (type double-float b))
+  (timeit (incf b (aref a i j)))
+  b)
+#+END_SRC
+
+*** do-arrays
+
+#+BEGIN_SRC lisp
+;; do-arrays - 0.15 seconds of real time:
+(let ((a (make-array '(100 100) :element-type 'double-float
+                                :initial-element 0.0d0))
+      (b 0.0d0))
+  (declare (optimize speed)
+           (type (array double-float) a)
+           (type double-float b))
+  (time (loop repeat 1000
+              do (do-arrays ((a-elt a double-float))
+                   (declare (type double-float b))
+                   (incf b a-elt))))
+  b)
+#+END_SRC
+
+
+* Compiler Notes Demonstration
+
+  Further improvements should be possible - either wait for them, raise an issue - or even better, raise a pull request!
+
+** aref
+
+#+BEGIN_SRC lisp
+DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
+                         (i 0)
+                         (j 0))
+                     (aref a i j))
+0
+DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
+                         (i 0)
+                         (j 0))
+                     (declare (optimize speed))
+                     (aref a i j))
+; Unable to (fully) optimize (AREF A I J) because:
+;   Type of A is not declared
+0
+DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
+                         (i 0)
+                         (j 0))
+                     (declare (optimize speed)
+                              (type (array t) a))
+                     (aref a i j))
+; Unable to (fully) optimize (AREF A I J) because:
+;   Rank of array A is not declared
+0
+DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
+                         (i 0)
+                         (j 0))
+                     (declare (optimize speed)
+                              (type (array t 2) a))
+                     (aref a i j))
+; Unable to (fully) optimize (AREF A I J) because:
+;   Type of subscripts (I J) were derived to be non-integers (T T)
+0
+DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
+                         (i 0)
+                         (j 0))
+                     (declare (optimize speed)
+                              (type (array t 2) a)
+                              (type uint32 i j))
+                     (aref a i j))
+0
+#+END_SRC
+
+** do-arrays
+
+#+BEGIN_SRC lisp
+DENSE-ARRAYS-PLUS> (do-arrays ((a (make-array '(2 3)))
+                               (b (make-array '(2 3))))
+                     (print (list a b)))
+
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+NIL
+DENSE-ARRAYS-PLUS> (locally (declare (optimize speed))
+                     (do-arrays ((a (make-array '(2 3)))
+                                 (b (make-array '(2 3))))
+                       (print (list a b))))
+; Unable to optimize
+;   (DO-ARRAYS ((A (MAKE-ARRAY '(2 3))) (B (MAKE-ARRAY '(2 3))))
+;     (PRINT (LIST A B)))
+; because element-type (third argument) is not provided in
+;   (A (MAKE-ARRAY '(2 3)))
+; Unable to optimize
+;   (DO-ARRAYS ((A (MAKE-ARRAY '(2 3))) (B (MAKE-ARRAY '(2 3))))
+;     (PRINT (LIST A B)))
+; because element-type (third argument) is not provided in
+;   (B (MAKE-ARRAY '(2 3)))
+
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+NIL
+DENSE-ARRAYS-PLUS> (locally (declare (optimize speed))
+                     (do-arrays ((a (make-array '(2 3)) t)
+                                 (b (make-array '(2 3)) t))
+                       (print (list a b))))
+
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+(0 0)
+NIL
+#+END_SRC

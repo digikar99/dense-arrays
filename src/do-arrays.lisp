@@ -121,6 +121,7 @@
                                  element-types svs))
          (symbol-macrolet (,@(map-collect `(,%1 (cl:aref ,%2 ,%3))
                                           elt-vars svs is))
+           ;; TODO: A proper let form would aid debugging, but doesn't allow setf-ing
            (labels ((nest-loop (,dimensions ,@strides ,@offsets)
                       (let ((,d  (first ,dimensions))
                             ,@(map-collect `(,%1 (first ,%2)) ss strides)
@@ -198,7 +199,7 @@ Either of the two cases might be faster depending on the number of dimensions."
            ,(unless (zerop (env:policy-quality 'safety env))
               `(assert (every (lm a (equalp (narray-dimensions ,(first array-vars))
                                             (narray-dimensions a)))
-                              (list ,@array-vars))
+                              (list ,@(rest array-vars)))
                        ()
                        "~&Expected arrays to have the same dimensions but they are:~%  ~{~S~^~%  ~}"
                        (mapcar (lm array-var (narray-dimensions array-var))

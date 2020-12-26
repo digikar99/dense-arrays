@@ -1,15 +1,130 @@
 # Status
 
-[Last update: 07th December 2020]
+[Last update: 27th December 2020]
 
 - Under Construction:
   - The API may change
   - The package and system names may change. Therefore, please use package-local-nicknames to avoid global symbol replacements.
-  - Yet to be optimized for speed and user-facing debugging
-  - Yet to incorporate SIMD
+  - Yet to incorporate SIMD; but see [how fast we can get](./perf.org)
   - Semantics of displaced-indexed-offset
 
 # What
+
+A *better* dense array - it *looks* better, and provides copy-free slicing facilities.
+
+From the name, one might guess that one could also make sparse-arrays. I think it should be possible to abstract this system to an abstract array package in line with Julia - or at the least provide interchangeable backends. But, until then, this is what we have!
+
+```lisp
+DENSE-ARRAYS-DEMO> (make-array '(2 3 4) :constructor #'+)
+#<DENSE-ARRAYS:ARRAY T 2x3x4
+   ((0 1 2 3)
+    (1 2 3 4)
+    (2 3 4 5))
+   ((1 2 3 4)
+    (2 3 4 5)
+    (3 4 5 6))
+ {1037AA2DA3}>
+DENSE-ARRAYS-DEMO> (aref * 1 '(0 :step 2))
+#<DENSE-ARRAYS:ARRAY (VIEW) T 2x4
+   (1 2 3 4)
+   (3 4 5 6)
+ {103840E153}>
+```
+
+- **Looks:** I wanted to gear this towards prototyping. Most everything one needs to know about the arrays is available at a glance: the element-type, the dimensions, its contents, whether the array is "continuous/original" or just a view into another, and its id. One may also obtain a still better representation using `print-array`.
+- **Slicing:**
+    - Quick, tell me what `2:10:4` represents! It depends on the context - it means something in numpy and something else in julia; we get rid of this, and instead use the more unambiguous representation `'(start :stop stop :step step)`. Perhaps, longer to type - lisp is - but better readability!
+    - Other than this, slicing facilities are also provided using bit and integer arrays similar to numpy.
+- **Speed and compiler-notes:** An effort has been made to provide speed-optimizing compiler notes for `aref` and `do-arrays`. See [perf.org](./perf.org) for more details.
+
+### Couldn't I have just used Common Lisp arrays?
+
+```lisp
+CL-USER> (let ((a (make-array '(1000 1000))))
+           (time (loop for i below 1000 do (select:select a t i))))
+Evaluation took:
+  0.044 seconds of real time
+  0.044320 seconds of total run time (0.044315 user, 0.000005 system)
+  100.00% CPU
+  97,854,068 processor cycles
+  8,313,888 bytes consed
+
+NIL
+CL-USER> (let ((a (dense-arrays:make-array '(1000 1000))))
+           (time (loop for i below 1000 do (dense-arrays:aref a nil i))))
+Evaluation took:
+  0.000 seconds of real time
+  0.000222 seconds of total run time (0.000208 user, 0.000014 system)
+  100.00% CPU
+  486,648 processor cycles
+  163,712 bytes consed
+
+NIL
+```
+
+
+In these, we obtain the speed boost by merely allocating the "view" object, instead of copying over the entire subsection of the array.
+
+To enable copy-free slicing, one needs the concept of offsets and strides which are outside the scope of the ANSI standard. Technically, one could get implementors to maintain this separate array object, but hey, if you could implement this *over* the ANSI standard, why not?!
+
+On my machine, dense-arrays-plus works on SBCL and CCL - and to some extent on ECL as well. I'm not setting up CI just yet to save myself some CI-debug-time. In particular, three systems are provided
+
+- `dense-arrays`: the super bare essentials
+- `dense-arrays-plus-lite`: some utilities
+- `dense-arrays-plus`: more utilities
+
+Minimalists would want to stick to the first two. The last one also introduces
+
+- `shape` as an alias for `array-dimensions`
+- `int32 uint32 uint8` types as aliases for their common lisp counterparts
+- integration with [py4cl2](#py4cl2): simply set `py4cl2:*array-type*` to `:dense-arrays` when you want to use py4cl2 with dense-arrays.
+- and perhaps more things!
+
+Development of the following systems could aid for further minimalism of the first two systems:
+
+- trivial-form-type: For form-type, there is a full dependency on [compiler-macros](https://github.com/Bike/compiler-macro)
+- trivial-coerce: For coerce, plus-lite version is dependent on [generic-cl](https://github.com/alex-gutev/generic-cl)
+
+# API as of this commit
+
+- dense-arrays:
+    - copy-array
+    - aref
+    - do-arrays
+    - array-dimensions
+    - array-displaced-to
+    - array
+    - array-dimension
+    - array-rank
+    - narray-dimensions
+    - array=
+    - array-displacement
+    - array-element-type
+    - array-total-size
+    - row-major-aref
+    - make-array
+    - arrayp
+    - print-array
+
+- dense-arrays-plus-lite:
+    - zeros
+    - ones-like
+    - \*element-type-alist\*
+    - rand-like
+    - rand
+    - as-cl-array
+    - ones
+    - asarray
+    - zeros-like
+    - transpose
+
+- dense-arrays-plus-
+    - uint32
+    - uint8
+    - shape
+    - int32
+    -
+# Demonstration
 
 ```lisp
 CL-USER> (uiop:define-package :dense-arrays-demo
@@ -109,42 +224,14 @@ DENSE-ARRAYS-DEMO> a
 
 Planned for the future: Using SIMD operations wherever possible.
 
+Tests are also littered throughout out the system and may serve as examples, for instance [plus/py4cl2.lisp](plus/py4cl2.lisp).
+
 *The semantics do feel debatable: mutating the original array would also mutate the views 🤷‍♂️.
-
-
-# Why
-
-Common Lisp arrays provide no fast way to do this, amongst other things:
-
-```lisp
-CL-USER> (let ((a (make-array '(1000 1000))))
-           (time (loop for i below 1000 do (select:select a t i))))
-Evaluation took:
-  0.044 seconds of real time
-  0.044320 seconds of total run time (0.044315 user, 0.000005 system)
-  100.00% CPU
-  97,854,068 processor cycles
-  8,313,888 bytes consed
-
-NIL
-CL-USER> (let ((a (dense-arrays:make-array '(1000 1000))))
-           (time (loop for i below 1000 do (dense-arrays:aref a nil i))))
-Evaluation took:
-  0.000 seconds of real time
-  0.000222 seconds of total run time (0.000208 user, 0.000014 system)
-  100.00% CPU
-  486,648 processor cycles
-  163,712 bytes consed
-
-NIL
-```
-
-In these, we obtain the speed boost by merely allocating the "view" object, instead of copying over the entire subsection of the array.
 
 # Usage
 
 1. Clone into `$QUICKLISP_HOME/local-projects`. (See `ql:*local-project-directories*`.)
-2. `(ql:quickload "dense-arrays")`
-3. Optionally: `(5am:run :dense-arrays)`
+2. `(ql:quickload "dense-arrays")` - or dense-arrays-plus or dense-arrays-plus-lite
+3. Optionally: `(asdf:test-system "dense-arrays")`- or dense-arrays-plus or dense-arrays-plus-lite
 
-Feel free to raise an issue if there's an issue!
+Feel free to raise an issue!

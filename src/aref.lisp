@@ -14,14 +14,7 @@
          t)))
 
 (defun aref (array &rest subscripts)
-  ;; DONE: Handle nested aref
-  ;; DONE: Handle displaced-index-offsets
   ;; DONE: (partially) Introduce parametric types in CL.
-  ;;  In the special case where this reduces to CL:AREF, this function is over 20 times slower.
-  ;;  However, I do not see a way of optimizing this even using compiler-macros without
-  ;;  parametric user-defined types (for array). However, perhaps, due to
-  ;;  the function-call-overhead in python, this is about 2 times faster in that special-case.
-  ;;  In fact this is 2-2.5 times faster than python-numpy in either case.
   (declare (optimize speed)
            (type array array)
            (dynamic-extent subscripts))
