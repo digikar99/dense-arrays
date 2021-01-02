@@ -1,6 +1,6 @@
 * Motivations
 
-  I keep wishing julia - or python - had CL features: SLIME-esque super-interactive development, dynamic variables, (easy) stack inspection, AOT compile-time warnings. Once you know these things, it's a PITA to live without them.
+  I keep wishing julia - or python - had CL features: SLIME-esque super-interactive development (including =C-c C-o= and =C-c M-o=), dynamic variables, (easy) stack inspection, AOT compile-time warnings, semantics of =print=, structural editing, the =iterate= library (or at least the =loop= macro). Once one knows these things, it tends to be a PITA to live without them. Some of these - like =print=, =loop= and =iterate= - do not totally depend on the language, the others /do/.
 
   OTOH, making something as exhaustive as numpy or tensorflow in common lisp would be discarding all the human resources that went into these projects over the last decade. There also have been effortts to access python libraries from common lisp; while it works out for most things, some things remain. And one is still left wanting for more things /on top of the things in the first paragraph/:
 

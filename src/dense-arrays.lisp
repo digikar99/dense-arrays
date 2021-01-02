@@ -11,6 +11,7 @@
                              :row-major-aref
                              :array-rank
                              :make-array
+                             :*array-element-print-format*
                              :print-array
                              :copy-array
                              :do-arrays)))
@@ -245,6 +246,9 @@
                           (list
                            (loop :for e :in elt
                                  :do (set-displaced-to e)))
+                          (string
+                           (setf (cl:aref displaced-to row-major-index) elt)
+                           (incf row-major-index))
                           (cl:vector
                            (loop :for e :across elt
                                  :do (set-displaced-to e)))
@@ -267,6 +271,8 @@
               (array-displaced-to (make-array '(2 3) :constructor #'+))))
   (is (equalp #(0 1 2 3 1 2 3 4 2 3 4 5 1 2 3 4 2 3 4 5 3 4 5 6)
               (array-displaced-to (make-array '(2 3 4) :constructor #'+))))
+  (is (equalp #("hello" "goodbye")
+              (array-displaced-to (make-array 2 :initial-contents '("hello" "goodbye")))))
   (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
     (is (typep a '(array int32)))
     (is (typep a '(array (signed-byte 32))))))
@@ -354,13 +360,11 @@ Use NARRAY-DIMENSIONS to avoid the copy."
         (lines  3)
         (*axis-number* 0)
         (indent 3)
-        (fmt-control (cond (*array-element-print-format*
-                            *array-element-print-format*)
-                           ((type= 'double-float (array-element-type array))
-                            "~,15,3e")
-                           ((type= 'single-float (array-element-type array))
-                            "~,7,2e")
-                           (t "~d"))))
+        (fmt-control (or *array-element-print-format*
+                         (switch ((array-element-type array) :test #'type=)
+                           ('double-float "~,15,3@e")
+                           ('single-float "~,7,2@e")
+                           (t             "~s")))))
     ;; Do this before just to save some horizontal space
     (declare (special *axis-number*))
     (print-unreadable-object (array stream :identity t)

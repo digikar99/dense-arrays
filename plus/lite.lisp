@@ -39,8 +39,10 @@ See the definition of ASARRAY for an example of usage.")
 (defun dimensions (array-like)
   "Consequences of ARRAY-LIKE having elements of different dimensions is undefined."
   (typecase array-like
-    (sequence (cons (length array-like)
-                    (dimensions (elt array-like 0))))
+    (string   nil)
+    (sequence (let ((len (length array-like)))
+                (cons len
+                      (when (> len 0) (dimensions (elt array-like 0))))))
     (cl:array (cl:array-dimensions array-like))
     (array    (array-dimensions array-like))
     (t        ())))
@@ -48,7 +50,10 @@ See the definition of ASARRAY for an example of usage.")
 (defun element-type (array-like)
   "Consequences of ARRAY-LIKE having elements of different element-type is undefined."
   (typecase array-like
-    (sequence (element-type (elt array-like 0)))
+    (string   t)
+    (sequence (if (> (length array-like) 0)
+                  (element-type (elt array-like 0))
+                  'null))
     (cl:array (cl:array-element-type array-like))
     (array    (array-element-type array-like))
     (t        t)))
@@ -68,7 +73,12 @@ See the definition of ASARRAY for an example of usage.")
 
 (defmethod traverse ((object t))
   (setf (cl:aref *storage-vector* *index*)
-        (generic-cl:coerce object (cl:array-element-type *storage-vector*)))
+        ;; TODO: Abstract this out into a "trivial-coerce" package
+        (trivial-coerce:coerce object (cl:array-element-type *storage-vector*)))
+  (incf *index*))
+
+(defmethod traverse ((object string))
+  (setf (cl:aref *storage-vector* *index*) object)
   (incf *index*))
 
 (macrolet ((def-stub (type)
@@ -81,11 +91,12 @@ See the definition of ASARRAY for an example of usage.")
   (loop :for i :from 0 :below (cl:array-total-size object)
         :do (traverse (cl:row-major-aref object i))))
 
+
+
 (defmethod traverse ((object dense-arrays::dense-array))
   (do-arrays ((a object))
     (traverse a)))
 
-;; TODO: Implement generic-cl:coerce for this
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
 (defun asarray (array-like &optional
@@ -112,7 +123,9 @@ See the definition of ASARRAY for an example of usage.")
   (is (eq t (array-element-type
              (let ((*element-type-alist* (list (cons (find-package :cl) t)))
                    (*package*            (find-package :cl)))
-               (asarray '(1 2 3)))))))
+               (asarray '(1 2 3))))))
+  (is (array= (make-array 2 :initial-contents '("hello" "goodbye"))
+              (asarray '("hello" "goodbye")))))
 
 ;; MISC ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

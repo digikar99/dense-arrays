@@ -2,11 +2,13 @@
   :depends-on ("dense-arrays-plus-lite"
                "fiveam"
                "generic-cl"
-               "py4cl2")
+               "py4cl2"
+               "reader")
   :pathname #P"plus/"
   :components ((:file "package")
                (:file "py4cl2")
-               (:file "generic-cl"))
+               (:file "generic-cl")
+               (:file "reader"))
   :perform (test-op (o c)
              (declare (ignore o c))
              (eval (read-from-string "(5AM:RUN :DENSE-ARRAYS)"))
