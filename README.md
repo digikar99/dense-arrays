@@ -5,8 +5,9 @@
 - Under Construction:
   - The API may change
   - The package and system names may change. Therefore, please use package-local-nicknames to avoid global symbol replacements.
-  - Yet to incorporate SIMD; but see [how fast we can get](./perf.org)
   - Semantics of displaced-indexed-offset
+
+Original plan included incorporation of SIMD into `do-arrays`; but I do not see a good way to do this. Instead these facilities may be provided in a separate system either using sb-simd (once constructed!) or BLAS/LAPACK/Intel-MKL/etc. Towards this, integration with [static-vectors](https://github.com/sionescu/static-vectors) is also provided to combat moving-GC based implementations. See [how fast we can get](./perf.org) in the absence of SIMD operations.
 
 # What
 
@@ -67,11 +68,12 @@ In these, we obtain the speed boost by merely allocating the "view" object, inst
 
 To enable copy-free slicing, one needs the concept of offsets and strides which are outside the scope of the ANSI standard. Technically, one could get implementors to maintain this separate array object, but hey, if you could implement this *over* the ANSI standard, why not?!
 
-On my machine, dense-arrays-plus works on SBCL and CCL - and to some extent on ECL as well. I'm not setting up CI just yet to save myself some CI-debug-time. In particular, three systems are provided
+On my machine, dense-arrays-plus works on SBCL and CCL - and to some extent on ECL as well. I'm not setting up CI just yet to save myself some CI-debug-time. In particular, the following systems are provided
 
 - `dense-arrays`: the super bare essentials
 - `dense-arrays-plus-lite`: some utilities
-- `dense-arrays-plus`: more utilities
+- `dense-arrays+static-vectors`: provides `*use-static-vectors*` and `*use-static-vectors-alist*` and adds a `:static` keyword to make-array to enable usage of [static-vectors](https://github.com/sionescu/static-vectors) in the background
+- `dense-arrays-plus`: more utilities as well as static-vectors
 
 Minimalists would want to stick to the first two. The last one also introduces
 
@@ -80,51 +82,56 @@ Minimalists would want to stick to the first two. The last one also introduces
 - integration with [py4cl2](#py4cl2): simply set `py4cl2:*array-type*` to `:dense-arrays` when you want to use py4cl2 with dense-arrays.
 - and perhaps more things!
 
-Development of the following systems could aid for further minimalism of the first two systems:
+Development of the following system could aid for further minimalism of the first two systems:
 
 - trivial-form-type: For form-type, there is a full dependency on [compiler-macros](https://github.com/Bike/compiler-macro)
-- trivial-coerce: For coerce, plus-lite version is dependent on [generic-cl](https://github.com/alex-gutev/generic-cl)
 
-# API as of this commit
+> `dense-arrays+static-vectors` system is currently "especially unstable" because we might move towards abstracting its functionality to provide more interchangeable backends.
+
+# Exported Symbols as of this commit
 
 - dense-arrays:
-    - copy-array
-    - aref
-    - do-arrays
-    - array-dimensions
-    - array-displaced-to
     - array
+    - arrayp
+    - make-array
+    - aref
+    - row-major-aref
+    - copy-array
+    - do-arrays
+    - array=
+    - print-array
+    - array-dimensions
+    - narray-dimensions
+    - array-displaced-to
     - array-dimension
     - array-rank
-    - narray-dimensions
-    - array=
     - array-displacement
     - array-element-type
     - array-total-size
-    - row-major-aref
-    - make-array
-    - arrayp
-    - print-array
+    - \*array-element-print-format\*
+    - \*use-static-vectors\*
+    - \*use-static-vectors-alist*\
 
 - dense-arrays-plus-lite:
-    - zeros
-    - ones-like
-    - \*element-type-alist\*
-    - rand-like
-    - rand
+    - asarray
     - as-cl-array
     - ones
-    - asarray
+    - ones-like
+    - zeros
     - zeros-like
+    - rand
+    - rand-like
     - transpose
+    - \*element-type-alist\*
 
 - dense-arrays-plus-
     - uint32
     - uint8
-    - shape
     - int32
-    -
-# Demonstration
+    - shape
+    - size
+
+# Basic Demonstration
 
 ```lisp
 CL-USER> (uiop:define-package :dense-arrays-demo

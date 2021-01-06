@@ -5,7 +5,8 @@
    :make-dense-array
    :array-offsets
    :array-strides
-   :array-root-array)
+   :array-root-array
+   :unless-static-vectors)
   (:reexport :dense-arrays)
   (:export
    :asarray
@@ -62,8 +63,8 @@ See the definition of ASARRAY for an example of usage.")
   (is (equalp '(3)   (dimensions '(1 2 3))))
   (is (equalp '(1 3) (dimensions '(#(1 2 3)))))
   (is (equalp '(2 3 4)
-              (dimensions (list (make-array '(3 4))
-                                (make-array '(3 4))))))
+              (dimensions (list (make-array '(3 4) :element-type 'single-float)
+                                (make-array '(3 4) :element-type 'single-float)))))
   (is (equalp '(2 3 4)
               (dimensions (list (cl:make-array '(3 4))
                                 (cl:make-array '(3 4)))))))
@@ -115,17 +116,20 @@ See the definition of ASARRAY for an example of usage.")
 (def-test asarray ()
   (is (array= (make-array '(2 1 3) :initial-contents '(((1 2 3))
                                                      ((1 2 3)))
-                                 :element-type '(unsigned-byte 2))
+                                   :element-type '(unsigned-byte 2))
               (asarray '(#2a((1 2 3)) #2a((1 2 3))) '(integer 0 3))))
   (is (array= (make-array '(1 3) :initial-contents '((1 2 3))
                                  :element-type '(unsigned-byte 2))
               (asarray '(#(1 2 3)) '(integer 0 3))))
-  (is (eq t (array-element-type
-             (let ((*element-type-alist* (list (cons (find-package :cl) t)))
-                   (*package*            (find-package :cl)))
-               (asarray '(1 2 3))))))
-  (is (array= (make-array 2 :initial-contents '("hello" "goodbye"))
-              (asarray '("hello" "goodbye")))))
+  (is (alexandria:type= '(signed-byte 32)
+                        (array-element-type
+                         (let ((*element-type-alist* (list (cons (find-package :cl)
+                                                                 '(signed-byte 32))))
+                               (*package*            (find-package :cl)))
+                           (asarray '(1 2 3))))))
+  (unless-static-vectors (1)
+    (is (array= (make-array 2 :initial-contents '("hello" "goodbye"))
+                (asarray '("hello" "goodbye"))))))
 
 ;; MISC ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -180,10 +184,12 @@ See the definition of ASARRAY for an example of usage.")
     (assert (null (rest shape)))
     (setq shape (first shape)))
   (let ((a   (zeros shape :type type))
-        (lim (ecase type
-               ;; TODO: Handle more types
-               (double-float (random 1.0d0))
-               (t            (random 1.0s0)))))
+        (lim (random (alexandria:switch (type :test #'alexandria:type=)
+                       ('single-float 1.0e0)
+                       ('double-float 1.0d0)
+                       ('short-float  1.0s0)
+                       ('long-float   1.0l0)
+                       (t            (random 1.0))))))
     (do-arrays ((a-elt a))
       (setf a-elt (random lim)))
     a))

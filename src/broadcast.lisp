@@ -3,7 +3,7 @@
 (defun broadcast-array (array broadcast-dimensions)
   (unless (arrayp array)
     ;; Should probably warn if ARRAY is not an array
-    (setq array (make-array 1 :initial-element array)))
+    (setq array (make-array 1 :initial-element array :element-type (type-of array))))
   (with-slots (dim element-type strides offsets displaced-to) array
     (multiple-value-bind (strides offsets)
         (let* ((blen (length broadcast-dimensions))

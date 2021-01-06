@@ -25,9 +25,34 @@
 (trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
 (trivial-package-local-nicknames:add-package-local-nickname :env :introspect-environment)
 
-
 (def-suite :dense-arrays)
 (in-suite :dense-arrays)
+
+
+(defvar *use-static-vectors-alist* nil
+  "An ALIST mapping package to a boolean. If the boolean corresponding to *PACKAGE* is true,
+dense-arrays:make-array uses static-vectors to allocate the storage/displaced vector.
+Can be overriden by both
+  - binding *USE-STATIC-VECTORS*
+  - providing keyword arg :STATIC to DENSE-ARRAYS:MAKE-ARRAY")
+
+(defvar *use-static-vectors*)
+(setf (documentation '*use-static-vectors* 'variable)
+      "If T dense-arrays:make-array uses static-vectors to allocate the underlying
+storage/displaced vector. Can be overriden by providing keyword arg :STATIC
+to DENSE-ARRAYS:MAKE-ARRAY")
+
+(define-symbol-macro use-static-vectors-p
+    (if (boundp '*use-static-vectors*)
+        *use-static-vectors*
+        (cdr (assoc *package* *use-static-vectors-alist*))))
+
+(defvar *use-static-vectors*)
+
+(defmacro unless-static-vectors ((num-passes) &body body)
+  `(if use-static-vectors-p
+       (dotimes (i ,num-passes) (pass "Skipping for static vectors"))
+       (locally ,@body)))
 
 (deftype int32 () `(signed-byte 32))
 (deftype uint32 () `(unsigned-byte 32))
@@ -91,7 +116,7 @@
         fn-sym)
   (setf (gethash fn-sym *checker-fn->element-and-rank*) (list element-type rank)))
 
-(deftype array (&optional (element-type '* elt-supplied-p) (rank '*))  
+(deftype array (&optional (element-type '* elt-supplied-p) (rank '*))
   (check-type rank (or (eql *) uint32))
   (if elt-supplied-p
       (let ((element-type (type-expand (upgraded-array-element-type element-type))))
@@ -140,20 +165,6 @@
                   :for val :in (list ,@symbols)
                   :if val :collect sym))))
 
-(declaim (ftype (function ((or list fixnum) &key
-                                            (:element-type t)
-                                            (:initial-element *)
-                                            (:strides list)
-                                            (:offsets list)
-                                            (:displaced-index-offset int32)
-                                            (:constructor function-designator)
-                                            (:initial-contents *)
-                                            (:displaced-to simple-array)
-                                            (:adjustable *)
-                                            (:fill-pointer *))
-                          (values array &optional))
-                make-array))
-
 (defun make-array (dimensions &rest args
                    &key (element-type t)
 
@@ -199,9 +210,10 @@
          (rank (length dimensions))
          (total-size (apply #'* dimensions))
          (displaced-to (cond (displaced-to displaced-to)
-                             (t (cl:make-array total-size
-                                               :initial-element displaced-vector-initial-element
-                                               :element-type element-type))))
+                             (t (cl:make-array
+                                 total-size
+                                 :initial-element displaced-vector-initial-element
+                                 :element-type element-type))))
          (offsets (if displaced-index-offset
                       (nconc (list displaced-index-offset)
                              (make-list (1- rank) :initial-element 0))
@@ -256,26 +268,30 @@
                            (setf (cl:aref displaced-to row-major-index) elt)
                            (incf row-major-index)))))
                (set-displaced-to initial-contents)))))
-    (make-dense-array :displaced-to displaced-to
-                      :element-type (cl:array-element-type displaced-to)
-                      :dim dimensions
-                      :strides strides
-                      :offsets offsets
-                      :contiguous-p t
-                      :total-size (apply #'* dimensions)
-                      :root-array nil
-                      :rank (length dimensions))))
+    (let* ((array (make-dense-array :displaced-to displaced-to
+                                    :element-type (cl:array-element-type displaced-to)
+                                    :dim dimensions
+                                    :strides strides
+                                    :offsets offsets
+                                    :contiguous-p t
+                                    :total-size (apply #'* dimensions)
+                                    :root-array nil
+                                    :rank (length dimensions))))
+      array)))
 
 (def-test make-array ()
   (is (equalp #(0 1 2 1 2 3)
-              (array-displaced-to (make-array '(2 3) :constructor #'+))))
+              (array-displaced-to (make-array '(2 3) :constructor #'+ :element-type 'int32))))
   (is (equalp #(0 1 2 3 1 2 3 4 2 3 4 5 1 2 3 4 2 3 4 5 3 4 5 6)
-              (array-displaced-to (make-array '(2 3 4) :constructor #'+))))
-  (is (equalp #("hello" "goodbye")
-              (array-displaced-to (make-array 2 :initial-contents '("hello" "goodbye")))))
+              (array-displaced-to (make-array '(2 3 4)
+                                              :constructor #'+ :element-type 'int32))))
+
   (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
     (is (typep a '(array int32)))
-    (is (typep a '(array (signed-byte 32))))))
+    (is (typep a '(array (signed-byte 32)))))
+  (unless-static-vectors (1)
+   (is (equalp #("hello" "goodbye")
+               (array-displaced-to (make-array 2 :initial-contents '("hello" "goodbye")))))))
 
 ;; trivial function definitions
 
@@ -489,25 +505,26 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
   nil)
 
 (def-test print-array ()
-  (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello)))
-    (macrolet ((lines (n)
-                 `(with-output-to-string (*standard-output*)
-                    (let ((*print-lines* ,n))
-                      (print-array array "~D"))))
-               (len (n)
-                 `(with-output-to-string (*standard-output*)
-                    (let ((*print-length* ,n))
-                      (print-array array "~D"))))
-               (level (n)
-                 `(with-output-to-string (*standard-output*)
-                    (let ((*print-level* ,n))
-                      (print-array array "~D")))))
-      (is (<= (count #\newline (lines 3))
-              3))
-      (is (<= (count #\newline (lines 2))
-              2))
-      (is (>= 3 (count #\newline (len 0))))
-      (is (>= 4 (count #\newline (len 1))))
-      (is (= 5 (count #\newline (len 2))))
-      (is (= 1 (count #\newline (level 0))))
-      (is (= 3 (count #\newline (level 1)))))))
+  (unless-static-vectors (7)
+   (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello)))
+     (macrolet ((lines (n)
+                  `(with-output-to-string (*standard-output*)
+                     (let ((*print-lines* ,n))
+                       (print-array array "~D"))))
+                (len (n)
+                  `(with-output-to-string (*standard-output*)
+                     (let ((*print-length* ,n))
+                       (print-array array "~D"))))
+                (level (n)
+                  `(with-output-to-string (*standard-output*)
+                     (let ((*print-level* ,n))
+                       (print-array array "~D")))))
+       (is (<= (count #\newline (lines 3))
+               3))
+       (is (<= (count #\newline (lines 2))
+               2))
+       (is (>= 3 (count #\newline (len 0))))
+       (is (>= 4 (count #\newline (len 1))))
+       (is (= 5 (count #\newline (len 2))))
+       (is (= 1 (count #\newline (level 0))))
+       (is (= 3 (count #\newline (level 1))))))))

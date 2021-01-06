@@ -210,7 +210,7 @@ Either of the two cases might be faster depending on the number of dimensions."
 
 (def-test do-arrays ()
   (is (equalp '((2 3) (1 2) (0 1) 2 1)
-              (let ((a (make-array '(2 3) :constructor #'+))
+              (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32))
                     (elt))
                 (do-arrays 1 ((c (progn
                                    (push 1 elt)
@@ -221,7 +221,7 @@ Either of the two cases might be faster depending on the number of dimensions."
                   (push (list c d) elt))
                 elt)))
   (is (equalp '((1 2) (0 1) 2 1)
-              (let ((a (make-array '(2 3) :constructor #'+))
+              (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32))
                     (elt))
                 (do-arrays 1 ((c (progn
                                    (push 1 elt)
@@ -231,8 +231,8 @@ Either of the two cases might be faster depending on the number of dimensions."
                                    (aref a nil 1))))
                   (push (list c d) elt))
                 elt)))
-  (is (array= (make-array '(2 3) :initial-element 1)
-              (let ((a (make-array '(2 3))))
+  (is (array= (make-array '(2 3) :initial-element 1 :element-type 'int32)
+              (let ((a (make-array '(2 3) :element-type 'int32)))
                 (do-arrays ((a a))
                   (setf a 1))
                 a))))

@@ -3,8 +3,9 @@
   (:import-from
    :dense-arrays
    :array-strides
-   :array-stride)
-  (:reexport :dense-arrays-plus-lite)
+   :array-stride
+   :unless-static-vectors)
+  (:reexport :dense-arrays :dense-arrays-plus-lite)
   (:export
    :shape
    :size
