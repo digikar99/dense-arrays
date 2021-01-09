@@ -39,14 +39,14 @@
                    (once-only (array)
                      `(cond ((and (= (array-rank ,array) ,(length subscripts))
                                   ,@(mapcar (lm ss `(integerp ,ss)) subscripts))
-                             (destructuring-int32-lists ((,os (array-offsets ,array))
-                                                         (,ss (array-strides ,array))
-                                                         (,ds (narray-dimensions ,array)))
+                             (destructuring-lists ((size      ,os (array-offsets ,array))
+                                                   (int-index ,ss (array-strides ,array))
+                                                   (size      ,ds (narray-dimensions ,array)))
                                (cl:aref (the (cl:simple-array ,elt-type)
                                              (array-displaced-to ,array))
-                                        (the uint62 (+ ,@os
+                                        (the size (+ ,@os
                                                        ,@(mapcar (lm ss ds sub
-                                                                     `(the uint62
+                                                                     `(the size
                                                                            (* ,ss
                                                                               (normalize-index
                                                                                ,sub
@@ -60,14 +60,14 @@
                  (optim-expansion
                    (once-only (array)
                      `(the ,elt-type
-                           (destructuring-int32-lists ((,os (array-offsets ,array))
-                                                       (,ss (array-strides ,array))
-                                                       (,ds (narray-dimensions ,array)))
+                           (destructuring-lists ((size      ,os (array-offsets ,array))
+                                                 (int-index ,ss (array-strides ,array))
+                                                 (size      ,ds (narray-dimensions ,array)))
                              (cl:aref (the (cl:simple-array ,elt-type 1)
                                            (array-displaced-to ,array))
-                                      (the uint62 (+ ,@os
+                                      (the size (+ ,@os
                                                      ,@(mapcar (lm ss ds sub
-                                                                   `(the uint62
+                                                                   `(the size
                                                                          (* ,ss
                                                                             (normalize-index
                                                                              ,sub

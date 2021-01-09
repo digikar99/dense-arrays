@@ -101,7 +101,7 @@ timeit(1000)[1]
                                 :initial-element 0.0d0))
       (b 0.0d0))
   (declare (optimize speed)
-           (type (array double-float) a)
+           (type (array double-float 2) a)
            (type double-float b))
   (timeit (incf b (aref a i j)))
   b)
@@ -119,7 +119,7 @@ timeit(1000)[1]
            (type double-float b))
   (time (loop repeat 1000
               do (do-arrays ((a-elt a double-float))
-                   (declare (type double-float b))
+                   (declare (type double-float b a-elt))
                    (incf b a-elt))))
   b)
 #+END_SRC

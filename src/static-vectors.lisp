@@ -72,22 +72,21 @@
                       (dimensions->strides dimensions))))
     (cond (constructor-p
            (let ((row-major-index 0))
-             (declare (type int32 row-major-index))
+             (declare (type size row-major-index))
              ;; To avoid repeated de-allocation of subscripts, we do this convoluted work
              ;; Uncomment the 'print' to see what is happening
              (labels ((construct (r &optional (stride (first strides))
                                   &rest subscripts)
-                        (declare (optimize debug)
-                                 (type int32 r stride)
+                        (declare (type int-index r stride)
                                  (ignorable stride))
                         ;; (print r)
                         ;; (princ (list row-major-index :stride stride subscripts))
                         (if (< r 0)
                             (setf (cl:aref displaced-to row-major-index)
                                   (apply constructor subscripts))
-                            (loop :for i :of-type int32 :below (nth r dimensions)
-                                  :with 1-r :of-type int32 := (1- r)
-                                  :with s :of-type int32 := (nth r strides)
+                            (loop :for i :of-type size :below (nth r dimensions)
+                                  :with 1-r :of-type int-index := (1- r)
+                                  :with s :of-type size := (nth r strides)
                                   :do (apply #'construct
                                              1-r
                                              s
@@ -95,8 +94,8 @@
                                              subscripts)
                                       (incf row-major-index s)
                                   :finally (decf row-major-index
-                                                 (the int32 (* (the int32 (nth r dimensions))
-                                                               (the int32 (nth r strides)))))))))
+                                                 (the size (* (the size (nth r dimensions))
+                                                              (the size (nth r strides)))))))))
                (construct (1- rank)))))
           (initial-contents-p
            (let ((row-major-index 0))

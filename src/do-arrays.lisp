@@ -18,30 +18,22 @@
 ;;; rather than the bare destructuring-bind
 ;;; This is probably due to where the type declarations occur.
 
-;; The following is about twice as slow!
-;; (defmacro destructuring-int32-lists (bindings &body body)
-;;   (if (null bindings)
-;;       `(progn ,@body)
-;;       `(destructuring-bind ,@(first bindings)
-;;            (declare (type int32 ,@(first (first bindings))))
-;;          (destructuring-int32-lists ,(rest bindings) ,@body))))
-
-(defmacro destructuring-int32-lists (bindings &body body)
+(defmacro destructuring-lists (bindings &body body)
   (if (null bindings)
       `(progn ,@body)
-      (let ((variables (first (first bindings)))
-            (values    (second (first bindings)))
-            (values-sym (gensym "VALUES")))
-        `(let (,@(loop :for var :in variables
-                       :collect `(,var 0)))
-           (declare (type int32 ,@(first (first bindings))))
-           (let ((,values-sym ,values))
-             (declare (dynamic-extent ,values-sym)
-                      (ignorable ,values-sym))
-             ,@(loop :for var :in (first (first bindings))
-                     :for i :from 0
-                     :collect `(setq ,var (nth ,i ,values-sym))))
-           (destructuring-int32-lists ,(rest bindings) ,@body)))))
+      (destructuring-bind ((type variables values) &rest bindings) bindings
+        (let ((values-sym (gensym "VALUES")))
+          `(let (,@(loop :for var :in variables
+                         :collect `(,var 0)))
+             (declare (type ,type ,@variables))
+             (let ((,values-sym ,values))
+               (declare (dynamic-extent ,values-sym)
+                        (ignorable ,values-sym))
+               ;; Using destructuring-bind here is slower
+               ,@(loop :for var :in variables
+                       :for i :from 0
+                       :collect `(setq ,var (nth ,i ,values-sym))))
+             (destructuring-lists ,bindings ,@body))))))
 
 (defmacro map-collect (format &rest list-vars)
   "(map-collect `(c ,%1) '(1 2 3)) ;=> ((C 1) (C 2) (C 3))"
@@ -76,24 +68,26 @@
                                               (mapcar #'rest all-strides)
                                               (mapcar #'rest all-offsets)))
                           ,@(map-collect `(incf ,%1 ,%2) is strides)
-                          :finally ,@(map-collect `(decf ,%1 (+ ,%2 (the int32 (* ,d ,%3))))
+                          :finally ,@(map-collect `(decf ,%1 (+ ,%2 (the-int-index (* ,d ,%3))))
                                                   is offsets strides)))))
         `(let (,@(map-collect `(,%1 (array-displaced-to ,%2))
                               svs array-vars)
                ,@(map-collect `(,%1 0) is))
-           (declare (type int32 ,@is)
+           (declare (type int-index ,@is)
                     ;; (optimize speed) ; check before finalizing
                     ,@(map-collect `(type (cl:simple-array ,%1 1) ,%2)
                                    element-types svs))
            (symbol-macrolet (,@(map-collect `(,%1 (cl:aref ,%2 ,%3))
                                             elt-vars svs is))
              (destructuring-bind ,dimensions (narray-dimensions ,(first array-vars))
-               (declare (type int32 ,@dimensions))
-               (destructuring-int32-lists
-                   (,@(map-collect `(,%1 (array-strides ,%2))
-                                   all-strides array-vars)
-                    ,@(map-collect `(,%1 (array-offsets ,%2))
-                                   all-offsets array-vars))
+               (declare (type size ,@dimensions))
+               (destructuring-lists
+                   (,@(mapcar (lm strides array-var
+                                  `(int-index ,strides (array-strides ,array-var)))
+                              all-strides array-vars)
+                    ,@(mapcar (lm offsets array-var
+                                 `(size ,offsets (array-offsets ,array-var)))
+                             all-offsets array-vars))
                  ,(nest-loop dimensions all-strides all-offsets)))))))))
 
 (defun expand-do-arrays-without-rank (elt-vars array-vars element-types body)
@@ -115,18 +109,19 @@
              ,@(map-collect `(,%1 (array-offsets ,%2))
                             offsets array-vars)
              ,@(map-collect `(,%1 0) is))
-         (declare (type int32 ,@is)
+         (declare (type int-index ,@is)
                   ;; (optimize speed) ; check before finalizing
                   ,@(map-collect `(type (cl:simple-array ,%1 1) ,%2)
                                  element-types svs))
+         ;; TODO: A proper let form would aid debugging, but doesn't allow setf-ing
          (symbol-macrolet (,@(map-collect `(,%1 (cl:aref ,%2 ,%3))
                                           elt-vars svs is))
-           ;; TODO: A proper let form would aid debugging, but doesn't allow setf-ing
            (labels ((nest-loop (,dimensions ,@strides ,@offsets)
                       (let ((,d  (first ,dimensions))
                             ,@(map-collect `(,%1 (first ,%2)) ss strides)
                             ,@(map-collect `(,%1 (first ,%2)) os offsets))
-                        (declare (type int32 ,@ss ,@os ,d))
+                        (declare (type int-index ,@os ,@ss)
+                                 (type size ,d))
                         (if (null (rest ,dimensions))
                             (loop :initially ,@(map-collect `(incf ,%1 ,%2)
                                                             is os)
@@ -135,7 +130,7 @@
                                   ,@(map-collect `(incf ,%1 ,%2) is ss)
                                   :finally ,@(map-collect `(decf ,%1
                                                                (+ ,%2
-                                                                  (the int32 (* ,d ,%3))))
+                                                                  (the-int-index (* ,d ,%3))))
                                                           is os ss))
                             (loop :initially ,@(map-collect `(incf ,%1 ,%2)
                                                             is os)
@@ -146,12 +141,12 @@
                                   ,@(map-collect `(incf ,%1 ,%2) is ss)
                                   :finally ,@(map-collect `(decf ,%1
                                                                (+ ,%2
-                                                                  (the int32 (* ,d ,%3))))
+                                                                  (the-int-index (* ,d ,%3))))
                                                           is os ss))))))
              (nest-loop ,dimensions ,@strides ,@offsets)))))))
 
 (defmacro do-arrays (&whole form rank/bindings &body body &environment env)
-  "  If the argument is an INT32, it'd be treated as the rank of the arrays. Then,
+  "  If the argument is of type SIZE, it'd be treated as the rank of the arrays. Then,
 the BINDINGS are assumed to be the first element of the BODY.
   Otherwise, the first argument is treated as if they are BINDINGS.
   Each BINDING is of the form (ELT-VAR ARRAY &OPTIONAL ELEMENT-TYPE).
@@ -171,7 +166,7 @@ Examples
         (print (list c d))))
 
 Either of the two cases might be faster depending on the number of dimensions."
-  (let* ((rankp    (typep rank/bindings 'int32))
+  (let* ((rankp    (typep rank/bindings 'size))
          (rank     (when rankp rank/bindings))
          (bindings (if rankp (first body) rank/bindings))
          (body     (if rankp (rest body) body)))

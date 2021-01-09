@@ -54,15 +54,23 @@ to DENSE-ARRAYS:MAKE-ARRAY")
        (dotimes (i ,num-passes) (pass "Skipping for static vectors"))
        (locally ,@body)))
 
+(deftype size () `(unsigned-byte 62))
+(deftype int-index () `(signed-byte 62))
+
+(defmacro the-size (form)
+  `(#+sbcl sb-ext:truly-the
+    #-sbcl the
+    size ,form))
+
+(defmacro the-int-index (form)
+  `(#+sbcl sb-ext:truly-the
+    #-sbcl the
+    int-index ,form))
+
 (deftype int32 () `(signed-byte 32))
 (deftype uint32 () `(unsigned-byte 32))
 (deftype int64 () `(signed-byte 64))
 (deftype uint64 () `(unsigned-byte 64))
-(deftype uint62 () `(unsigned-byte 62))
-(deftype float32 () `single-float)
-(deftype float64 () `double-float)
-
-;; TODO: Type uint64 vs int32 checkings
 
 (defmacro define-struct-with-required-slots (name-and-options &rest slot-descriptions)
   "Like DEFSTRUCT but SLOT-DESCRIPTIONS can also have a `:required t` as an option."
@@ -99,12 +107,12 @@ to DENSE-ARRAYS:MAKE-ARRAY")
   (strides      nil :required t)
   (offsets      nil :required t :type list)
   (contiguous-p nil :required t)
-  (total-size   nil :required t :type int32)
-  (rank         nil :required t :type int32)
+  (total-size   nil :required t :type size)
+  (rank         nil :required t :type size)
   (root-array   nil :required t))
 
-(defvar *element-type->checker-fn-ht* (make-hash-table))
-(defvar *checker-fn->element-and-rank* (make-hash-table))
+(defparameter *element-type->checker-fn-ht* (make-hash-table))
+(defparameter *checker-fn->element-and-rank* (make-hash-table))
 
 (defun checker-fn-sym (element-type rank)
   (when-let (inner-ht (gethash element-type *element-type->checker-fn-ht*))
@@ -117,7 +125,7 @@ to DENSE-ARRAYS:MAKE-ARRAY")
   (setf (gethash fn-sym *checker-fn->element-and-rank*) (list element-type rank)))
 
 (deftype array (&optional (element-type '* elt-supplied-p) (rank '*))
-  (check-type rank (or (eql *) uint32))
+  (check-type rank (or (eql *) size))
   (if elt-supplied-p
       (let ((element-type (type-expand (upgraded-array-element-type element-type))))
         (unless (checker-fn-sym element-type rank)
@@ -223,22 +231,22 @@ to DENSE-ARRAYS:MAKE-ARRAY")
                       (dimensions->strides dimensions))))
     (cond (constructor-p
            (let ((row-major-index 0))
-             (declare (type int32 row-major-index))
+             (declare (type size row-major-index))
              ;; To avoid repeated de-allocation of subscripts, we do this convoluted work
              ;; Uncomment the 'print' to see what is happening
              (labels ((construct (r &optional (stride (first strides))
                                   &rest subscripts)
                         (declare (optimize debug)
-                                 (type int32 r stride)
+                                 (type int-index r stride)
                                  (ignorable stride))
                         ;; (print r)
                         ;; (princ (list row-major-index :stride stride subscripts))
                         (if (< r 0)
                             (setf (cl:aref displaced-to row-major-index)
                                   (apply constructor subscripts))
-                            (loop :for i :of-type int32 :below (nth r dimensions)
-                                  :with 1-r :of-type int32 := (1- r)
-                                  :with s :of-type int32 := (nth r strides)
+                            (loop :for i :of-type size :below (nth r dimensions)
+                                  :with 1-r :of-type int-index := (1- r)
+                                  :with s :of-type size := (nth r strides)
                                   :do (apply #'construct
                                              1-r
                                              s
@@ -246,8 +254,8 @@ to DENSE-ARRAYS:MAKE-ARRAY")
                                              subscripts)
                                       (incf row-major-index s)
                                   :finally (decf row-major-index
-                                                 (the int32 (* (the int32 (nth r dimensions))
-                                                               (the int32 (nth r strides)))))))))
+                                                 (the size (* (the size (nth r dimensions))
+                                                              (the size (nth r strides)))))))))
                (construct (1- rank)))))
           (initial-contents-p
            (let ((row-major-index 0))
@@ -329,7 +337,7 @@ Use NARRAY-DIMENSIONS to avoid the copy."
   "Return the length of offset AXIS-NUMBER of ARRAY."
   (declare (type array array)
            ;; (optimize speed)
-           (type int32 axis-number))
+           (type size axis-number))
   (elt (array-offsets array) axis-number))
 
 (defun 1d-storage-array (array)
