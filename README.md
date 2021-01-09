@@ -30,11 +30,17 @@ DENSE-ARRAYS-DEMO> (aref * 1 '(0 :step 2))
    (1 2 3 4)
    (3 4 5 6)
  {103840E153}>
+DENSE-ARRAYS-DEMO> (aref ** 1 '(0 :step -2)) ; negative indices
+#<DENSE-ARRAYS:ARRAY (VIEW) T 2x4
+   (3 4 5 6)
+   (1 2 3 4)
+ {1017E628A3}>
+
 ```
 
 - **Looks:** I wanted to gear this towards prototyping. Most everything one needs to know about the arrays is available at a glance: the element-type, the dimensions, its contents, whether the array is "continuous/original" or just a view into another, and its id. One may also obtain a still better representation using `print-array`.
 - **Slicing:**
-    - Quick, tell me what `2:10:4` represents! It depends on the context - it means something in numpy and something else in julia; we get rid of this, and instead use the more unambiguous representation `'(start :stop stop :step step)`. Perhaps, longer to type - lisp is - but better readability!
+    - Quick, tell me what `2:10:4` represents! It depends on the context - it means something in numpy and something else in julia; we get rid of this, and instead use the more unambiguous representation `'(start :end end :step step)`. Perhaps, longer to type - lisp is - but better readability!
     - Other than this, slicing facilities are also provided using bit and integer arrays similar to numpy.
 - **Speed and compiler-notes:** An effort has been made to provide speed-optimizing compiler notes for `aref` and `do-arrays`. See [perf.org](./perf.org) for more details.
 
@@ -189,16 +195,21 @@ DENSE-ARRAYS-DEMO> (aref a nil 1) ; The view indicates that mutating this array 
 #<DENSE-ARRAYS:ARRAY (VIEW) T 4
    1 2 3 4
  {103D417A13}>
+DENSE-ARRAYS-DEMO> (aref a nil -1) ; negative indices start from the end
+#<DENSE-ARRAYS:ARRAY (VIEW) T 4
+   9 10 11 12
+ {1020A92133}>
+
 DENSE-ARRAYS-DEMO> (aref a 1)
 #<DENSE-ARRAYS:ARRAY (VIEW) T 10
    1 2 3 4 5 6 7 8 9 10
  {103D426BB3}>
-DENSE-ARRAYS-DEMO> (aref a '(1 :stop 3) '(1 :stop 3))
+DENSE-ARRAYS-DEMO> (aref a '(1 :end 3) '(1 :end 3))
 #<DENSE-ARRAYS:ARRAY (VIEW) T 2x2
    (2 3)
    (3 4)
  {103FE68543}>
-DENSE-ARRAYS-DEMO> (defparameter b (aref a '(1 :stop 3) '(1 :stop 8 :step 2)))
+DENSE-ARRAYS-DEMO> (defparameter b (aref a '(1 :end 3) '(1 :end 8 :step 2)))
 B
 DENSE-ARRAYS-DEMO> b
 #<DENSE-ARRAYS:ARRAY (VIEW) T 2x4
