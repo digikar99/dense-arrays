@@ -18,8 +18,8 @@
 | Native CL (SBCL)        |       0.12 |
 | Python (unidiomatic)    |       8.34 |
 | Python (idiomatic/SIMD) |       0.03 |
-| aref (unoptimized)      |       1.35 |
-| aref (optimized)        |       0.41 |
+| aref (unoptimized)      |       1.57 |
+| aref (optimized)        |       0.74 |
 | do-arrays (optimized)   |       0.15 |
 
 All lisp performances are in the absence of SIMD.
@@ -83,7 +83,7 @@ timeit(1000)[1]
 *** aref (unoptimized)
 
 #+BEGIN_SRC lisp
-;; 1.35 seconds of real time
+;; 1.57 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
@@ -96,7 +96,7 @@ timeit(1000)[1]
 *** aref (optimized)
 
 #+BEGIN_SRC lisp
-;; 0.41 seconds of real time
+;; 0.74 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))

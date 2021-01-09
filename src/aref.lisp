@@ -13,6 +13,14 @@
              (return-from array= nil)))
          t)))
 
+(declaim (inline normalize-index))
+(defun normalize-index (index dimension)
+  (declare (optimize speed)
+           (type int32 index dimension))
+  (the int32 (if (< index 0)
+                 (+ index dimension)
+                 index)))
+
 (defun aref (array &rest subscripts)
   ;; DONE: (partially) Introduce parametric types in CL.
   (declare (optimize speed)
@@ -23,12 +31,14 @@
          (cl:aref (the (cl:simple-array * 1) (array-displaced-to array))
                   (let ((index 0))
                     (declare (type int32 index))
+                    ;; TODO: Better error reporting for negative indices
                     (loop :for stride :of-type int32 :in (array-strides array)
                           :for subscript :of-type int32 :in subscripts
                           :for offset :of-type int32 :in (array-offsets array)
+                          :for dimension :of-type int32 :in (narray-dimensions array)
                           :do (incf index (+ offset
                                              (* stride
-                                                subscript))))
+                                                (normalize-index subscript dimension)))))
                     index)))
         ((or (some #'cl:arrayp subscripts)
              (some #'arrayp subscripts))
@@ -36,14 +46,6 @@
         (t
          (apply #'%aref-view array subscripts))))
 
-
-(declaim (inline normalize-index))
-(defun normalize-index (index dimension)
-  (declare (optimize speed)
-           (type int32 index dimension))
-  (if (< index 0)
-      (+ index dimension)
-      index))
 
 (define-condition invalid-index (error)
   ((index :accessor index :initarg :index))
@@ -68,7 +70,6 @@
               (offsets        offsets)
               (offset-carry   0))
           (declare (type int32 rank offset-carry))
-          ;; TODO: Use offset-carry
           (loop :repeat rank
                 :do
                    (let ((s  (car strides))
@@ -94,6 +95,11 @@
                            ((listp ss)
                             (destructuring-bind (&optional (start o) &key (stop d) (step 1)) ss
                               (declare (type int32 start stop step))
+                              (psetq start (normalize-index start d)
+                                     stop  (normalize-index stop  d))
+                              (when (< step 0)
+                                (psetq start (1- stop)
+                                       stop  (1- start)))
                               (push (ceiling (- stop start) step) new-dimensions)
                               (push (* s step) new-strides)
                               (push (+ o offset-carry (the int32 (* start s))) new-offsets)
@@ -174,12 +180,14 @@
            (setf (cl:aref displaced-to
                           (let ((index 0))
                             (declare (type int32 index))
+                            ;; TODO: Better error reporting for negative indices
                             (loop :for stride :of-type int32 :in strides
                                   :for subscript :of-type int32 :in subscripts
                                   :for offset :of-type int32 :in offsets
+                                  :for dimension :of-type int32 :in (narray-dimensions array)
                                   :do (incf index (+ offset
                                                      (* stride
-                                                        subscript))))
+                                                        (normalize-index subscript dimension)))))
                             index))
                  new-element/s))
           ((or (some #'cl:arrayp subscripts)
@@ -237,6 +245,7 @@
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))
     (is (= 9 (aref array 9 0)))
     (is (= 9 (aref array 8 1)))
+    (is (= 9 (aref array -2 -1)))
     (is (array= array (aref array)))
     (is (array= array (aref array nil)))
     (is (array= array (aref array nil nil)))
@@ -245,7 +254,10 @@
     (is (array= (aref array 0 nil)
                 (make-array 2 :constructor #'+ :element-type 'int32)))
     (is (array= (aref array nil 0)
-                (make-array 10 :constructor #'+ :element-type 'int32))))
+                (make-array 10 :constructor #'+ :element-type 'int32)))
+    (is (array= (make-array 5 :initial-contents '(5 4 3 2 1) :element-type 'int32)
+                (aref (make-array 5 :initial-contents '(1 2 3 4 5) :element-type 'int32)
+                      '(0 :step -1)))))
   (symbol-macrolet ((array (make-array '(2 3) :constructor #'+ :element-type 'int32)))
     (is (equalp '(2 2) (array-dimensions (aref array nil '(0 :step 2)))))
     (is (equalp '(1 3) (array-dimensions (aref array '(0 :step 2)))))
@@ -279,6 +291,10 @@
               (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32)))
                 (setf (aref a 1 2) -1)
                 a)))
+  (is (array= (make-array '(2 3) :initial-contents '((0 1 2) (1 2 -1)) :element-type 'int32)
+              (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32)))
+                (setf (aref a -1 -1) -1)
+                a)))
   (is (array= (make-array '(2 3 4) :initial-element 1 :element-type 'int32)
               (let ((a (make-array '(2 3 4) :initial-element 0 :element-type 'int32)))
                 (setf (aref a) 1)
@@ -286,6 +302,11 @@
   (is (array= (make-array '(2 3) :initial-contents '((2 0 0) (3 0 0)) :element-type 'int32)
               (let ((a (make-array '(2 3) :initial-element 0 :element-type 'int32)))
                 (setf (aref a nil 0)
+                      (make-array 2 :initial-contents '(2 3) :element-type 'int32))
+                a)))
+  (is (array= (make-array '(2 3) :initial-contents '((2 0 0) (3 0 0)) :element-type 'int32)
+              (let ((a (make-array '(2 3) :initial-element 0 :element-type 'int32)))
+                (setf (aref a nil -3)
                       (make-array 2 :initial-contents '(2 3) :element-type 'int32))
                 a))))
 

@@ -32,21 +32,26 @@
             ;; TODO: Check if the types are declared!
             (let*
                 ((subscript-types (mapcar (lm form (cm:form-type form env)) subscripts))
-                 (oo              (make-gensym-list (length subscripts) "OFFSET"))
+                 (os              (make-gensym-list (length subscripts) "OFFSET"))
                  (ss              (make-gensym-list (length subscripts) "STRIDE"))
+                 (ds              (make-gensym-list (length subscripts) "DIMENSION"))
                  (full-expansion
                    (once-only (array)
                      `(cond ((and (= (array-rank ,array) ,(length subscripts))
                                   ,@(mapcar (lm ss `(integerp ,ss)) subscripts))
-                             (destructuring-int32-lists ((,oo (array-offsets ,array))
-                                                         (,ss (array-strides ,array)))
+                             (destructuring-int32-lists ((,os (array-offsets ,array))
+                                                         (,ss (array-strides ,array))
+                                                         (,ds (narray-dimensions ,array)))
                                (cl:aref (the (cl:simple-array ,elt-type)
                                              (array-displaced-to ,array))
-                                        (the uint62 (+ ,@oo
-                                                       ,@(mapcar (lm ss sub
+                                        (the uint62 (+ ,@os
+                                                       ,@(mapcar (lm ss ds sub
                                                                      `(the uint62
-                                                                           (* ,ss ,sub)))
-                                                                 ss subscripts))))))
+                                                                           (* ,ss
+                                                                              (normalize-index
+                                                                               ,sub
+                                                                               ,ds))))
+                                                                 ss ds subscripts))))))
                             ((or ,@(mapcar (lm ss `(cl:arrayp ,ss)) subscripts)
                                  ,@(mapcar (lm ss `(arrayp ,ss)) subscripts))
                              (%aref ,array ,@subscripts))
@@ -55,14 +60,19 @@
                  (optim-expansion
                    (once-only (array)
                      `(the ,elt-type
-                           (destructuring-int32-lists ((,oo (array-offsets ,array))
-                                                       (,ss (array-strides ,array)))
+                           (destructuring-int32-lists ((,os (array-offsets ,array))
+                                                       (,ss (array-strides ,array))
+                                                       (,ds (narray-dimensions ,array)))
                              (cl:aref (the (cl:simple-array ,elt-type 1)
                                            (array-displaced-to ,array))
-                                      (the uint62 (+ ,@oo
-                                                     ,@(mapcar (lm ss sub `(the uint62
-                                                                                (* ,ss ,sub)))
-                                                               ss subscripts)))))))))
+                                      (the uint62 (+ ,@os
+                                                     ,@(mapcar (lm ss ds sub
+                                                                   `(the uint62
+                                                                         (* ,ss
+                                                                            (normalize-index
+                                                                             ,sub
+                                                                             ,ds))))
+                                                               ss ds subscripts)))))))))
               (return-from aref
                 (cond ((null exists)
                        (insufficient-declarations "Type of ~S is not declared" array)
