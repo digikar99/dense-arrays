@@ -126,26 +126,91 @@ to DENSE-ARRAYS:MAKE-ARRAY")
 
 (deftype array (&optional (element-type '* elt-supplied-p) (rank '*))
   (check-type rank (or (eql *) size))
-  (if elt-supplied-p
-      (let ((element-type (type-expand (upgraded-array-element-type element-type))))
-        (unless (checker-fn-sym element-type rank)
-          (let ((fn-sym (intern (concatenate 'string
-                                             "%ARRAY-"
-                                             (let ((*package* (find-package :cl)))
-                                               (write-to-string element-type))
-                                             "-" (write-to-string rank)
-                                             "-P")
-                                :dense-arrays)))
-            (compile fn-sym
-                     `(lambda (array)
-                        (and (arrayp array)
-                             (type= ',element-type (array-element-type array))
-                             ,(if (eq rank '*)
-                                  t
-                                  `(= ',rank (array-rank array))))))
-            (setf (checker-fn-sym element-type rank) fn-sym)))
-        `(satisfies ,(checker-fn-sym element-type rank)))
-      'dense-array))
+  (let ()
+    (unless (checker-fn-sym element-type rank)
+      (let ((fn-sym (intern (concatenate 'string
+                                         "%ARRAY-"
+                                         (let ((*package* (find-package :cl)))
+                                           (write-to-string element-type))
+                                         "-" (write-to-string rank)
+                                         "-P")
+                            :dense-arrays)))
+        (compile fn-sym
+                 `(lambda (array)
+                    (and (arrayp array)
+                         (type= ',element-type (array-element-type array))
+                         ,(if (eq rank '*)
+                              t
+                              `(= ',rank (array-rank array))))))
+        (setf (checker-fn-sym element-type rank) fn-sym)))
+    `(satisfies ,(checker-fn-sym element-type rank)))
+  'dense-array)
+
+(deftype array (&optional (element-type '* elt-supplied-p) (rank '* rankp))
+  (check-type rank (or (eql *) size))
+  (let* ((element-type (if elt-supplied-p
+                           (type-expand (upgraded-array-element-type element-type))
+                           element-type))
+         (elt-sym (intern (concatenate 'string
+                                       "%ARRAY-"
+                                       (let ((*package* (find-package :cl)))
+                                         (write-to-string element-type))
+                                       "-P")
+                          :dense-arrays))
+         (rank-sym (intern (concatenate 'string
+                                        "%ARRAY-"
+                                        (write-to-string rank)
+                                        "-P")
+                           :dense-arrays)))
+    ;; The above separation is required to better pass subtypep tests below.
+    (unless (checker-fn-sym element-type rank)
+      ;; This portion is used by compiler macros
+      ;; TODO: Determine if things are simpler without this
+      (let ((fn-sym (intern (concatenate 'string
+                                         "%ARRAY-"
+                                         (let ((*package* (find-package :cl)))
+                                           (write-to-string element-type))
+                                         "-" (write-to-string rank)
+                                         "-P")
+                            :dense-arrays)))
+        (compile fn-sym
+                 `(lambda (array)
+                    (and (arrayp array)
+                         (type= ',element-type (array-element-type array))
+                         ,(if (eq rank '*)
+                              t
+                              `(= ',rank (array-rank array))))))
+        (setf (checker-fn-sym element-type rank) fn-sym)))
+    (when (and elt-supplied-p (not (fboundp elt-sym)))
+      (compile elt-sym
+               `(lambda (array)
+                  (declare (type dense-array array))
+                  (type= ',element-type (array-element-type array)))))
+    (when (and rankp (not (fboundp rank-sym)))
+      (compile rank-sym
+               `(lambda (array)
+                  (declare (type dense-array array))
+                  (= ',rank (array-rank array)))))
+    (cond ((and rankp elt-supplied-p)
+           `(and dense-array
+                 (satisfies ,(checker-fn-sym element-type rank))
+                 (satisfies ,elt-sym)
+                 (satisfies ,rank-sym)))
+          (elt-supplied-p
+           `(and dense-array
+                 (satisfies ,(checker-fn-sym element-type rank))
+                 (satisfies ,elt-sym)))
+          (rankp ; never invoked though
+           `(and dense-array
+                 (satisfies ,(checker-fn-sym element-type rank))
+                 (satisfies ,rank-sym)))
+          (t
+           'dense-array))))
+
+(def-test array-type ()
+  (is (subtypep '(array single-float) 'array))
+  (is (subtypep '(array single-float 2) '(array single-float 2)))
+  (is (subtypep '(array single-float 2) 'array)))
 
 (defun dimensions->strides (dimensions)
   (cond ((null dimensions) ())

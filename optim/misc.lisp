@@ -8,11 +8,11 @@
 
 (defun compile-time-array-type (array env)  
   (let ((array-type
-          (cdr (when-let (type-information
-                          (assoc 'type
-                                 (nth-value 2
-                                            (env:variable-information array env))))
-                 type-information))))
+          (third (cdr (when-let (type-information
+                                 (assoc 'type
+                                        (nth-value 2
+                                                   (env:variable-information array env))))
+                        type-information)))))
     (when (and (listp array-type)
                (eq 'satisfies (first array-type)))
       (setq array-type (second array-type)))
