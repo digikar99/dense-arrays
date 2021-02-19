@@ -17,7 +17,8 @@
                "uiop")
   :serial t
   :components ((:module "src"
-                :components ((:file "dense-arrays")
+                :components ((:file "package")
+                             (:file "dense-arrays")
                              (:file "broadcast")
                              (:file "do-arrays")
                              (:file "argwhere")
