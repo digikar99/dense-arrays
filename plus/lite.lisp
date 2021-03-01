@@ -18,7 +18,8 @@
    :zeros-like
    :ones-like
    :rand-like
-   :as-cl-array))
+   :as-cl-array
+   :macro-map-array))
 
 (in-package :dense-arrays-plus-lite)
 
@@ -213,3 +214,20 @@ See the definition of ASARRAY for an example of usage.")
       (setf (cl:row-major-aref cl-array index) a)
       (incf index))
     cl-array))
+
+;; TODO: Write a functional version of this
+(defmacro macro-map-array (function &rest arrays)
+  (alexandria:with-gensyms (first r result)
+    (let ((array-syms (alexandria:make-gensym-list (length arrays) "ARRAY"))
+          (function   (cond ((eq 'quote (first function)) (second function))
+                            ((eq 'function (first function)) (second function))
+                            (t (error "Unexpected")))))
+      `(let ((,first ,(first arrays)))
+         (let ((,result (zeros-like ,first)))
+           (do-arrays ((,r ,result)
+                       (,(first array-syms) ,first)
+                       ,@(loop :for sym :in (rest array-syms)
+                               :for array-expr :in (rest arrays)
+                               :collect `(,sym ,array-expr)))
+             (setf ,r (,function ,@array-syms)))
+           ,result)))))
