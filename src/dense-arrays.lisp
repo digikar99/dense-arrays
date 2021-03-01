@@ -1,5 +1,10 @@
 (in-package :dense-arrays)
 
+(def-test array-type ()
+  (is (subtypep '(array single-float) 'array))
+  (is (subtypep '(array single-float 2) '(array single-float 2)))
+  (is (subtypep '(array single-float 2) 'array)))
+
 (defun dimensions->strides (dimensions)
   (cond ((null dimensions) ())
         ((null (rest dimensions))

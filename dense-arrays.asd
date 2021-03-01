@@ -17,7 +17,9 @@
                "uiop")
   :serial t
   :components ((:module "src"
+                        :serial t
                 :components ((:file "package")
+                             (:file "array-types")
                              (:file "dense-arrays")
                              (:file "broadcast")
                              (:file "do-arrays")
@@ -25,6 +27,7 @@
                              (:file "aref")
                              (:file "copy")))
                (:module "optim"
+                        :serial t
                 :components ((:file "misc")
                              (:file "aref"))))
   :perform (test-op (o c)

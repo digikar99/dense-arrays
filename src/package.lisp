@@ -140,7 +140,7 @@ to DENSE-ARRAYS:MAKE-ARRAY")
                                         (write-to-string rank)
                                         "-P")
                            :dense-arrays)))
-    ;; The above separation is required to better pass subtypep tests below.
+    ;; The above separation is required to better pass subtypep test in dense-arrays.lisp.
     (unless (checker-fn-sym element-type rank)
       ;; This portion is used by compiler macros
       ;; TODO: Determine if things are simpler without this
@@ -170,22 +170,53 @@ to DENSE-ARRAYS:MAKE-ARRAY")
                   (declare (type dense-array array))
                   (= ',rank (array-rank array)))))
     (cond ((and rankp elt-supplied-p)
+           (ensure-array-type-during-load `(array ,element-type ,rank))
            `(and dense-array
                  (satisfies ,(checker-fn-sym element-type rank))
                  (satisfies ,elt-sym)
                  (satisfies ,rank-sym)))
           (elt-supplied-p
+           (ensure-array-type-during-load `(array ,element-type))
            `(and dense-array
                  (satisfies ,(checker-fn-sym element-type rank))
                  (satisfies ,elt-sym)))
           (rankp ; never invoked though
+           (ensure-array-type-during-load `(array * ,rank))
            `(and dense-array
                  (satisfies ,(checker-fn-sym element-type rank))
                  (satisfies ,rank-sym)))
           (t
            'dense-array))))
 
-(def-test array-type ()
-  (is (subtypep '(array single-float) 'array))
-  (is (subtypep '(array single-float 2) '(array single-float 2)))
-  (is (subtypep '(array single-float 2) 'array)))
+(define-constant +array-types-doc+
+  ";;; This file is automatically managed by (DEFTYPE ARRAY ...) and
+;;; ENSURE-ARRAY-TYPE-DURING-LOAD. Please do not modify this file manually."
+  :test #'string=)
+
+(defvar *array-types* ())
+
+(defun ensure-array-type-during-load (array-type)
+  ;; The types would be present in a form canonicalized by DEFTYPE body above. 
+  (unless (member array-type *array-types* :test #'equalp)
+    (let ((*package* (find-package :dense-arrays)))
+      (with-open-file (f (asdf:component-pathname
+                          (asdf:find-component
+                           (asdf:find-component
+                            (asdf:find-system "dense-arrays")
+                            "src")
+                           "array-types"))
+                         :direction :output
+                         :if-does-not-exist :create
+                         :if-exists :append)
+        (unless *array-types*
+          (write '(cl:in-package :dense-arrays) :stream f)
+          (terpri f)
+          (write-string +array-types-doc+ f)
+          (terpri f)
+          (terpri f))
+        (write `(progn                
+                  (push ',array-type *array-types*)
+                  (trivial-types:type-expand ',array-type))
+               :stream f)
+        (terpri f)
+        (push array-type *array-types*)))))
