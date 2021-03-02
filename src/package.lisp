@@ -14,7 +14,8 @@
                              :*array-element-print-format*
                              :print-array
                              :copy-array
-                             :do-arrays)))
+                             :do-arrays
+                             :reset-array-types-cache)))
     `(uiop:define-package :dense-arrays
          (:mix :iterate :alexandria :cl :5am :trivial-types)
        (:export ,@export-symbols)
@@ -170,53 +171,65 @@ to DENSE-ARRAYS:MAKE-ARRAY")
                   (declare (type dense-array array))
                   (= ',rank (array-rank array)))))
     (cond ((and rankp elt-supplied-p)
-           (ensure-array-type-during-load `(array ,element-type ,rank))
+           (add-to-array-types-cache `(array ,element-type ,rank))
            `(and dense-array
                  (satisfies ,(checker-fn-sym element-type rank))
                  (satisfies ,elt-sym)
                  (satisfies ,rank-sym)))
           (elt-supplied-p
-           (ensure-array-type-during-load `(array ,element-type))
+           (add-to-array-types-cache `(array ,element-type))
            `(and dense-array
                  (satisfies ,(checker-fn-sym element-type rank))
                  (satisfies ,elt-sym)))
           (rankp ; never invoked though
-           (ensure-array-type-during-load `(array * ,rank))
+           (add-to-array-types-cache `(array * ,rank))
            `(and dense-array
                  (satisfies ,(checker-fn-sym element-type rank))
                  (satisfies ,rank-sym)))
           (t
            'dense-array))))
 
-(define-constant +array-types-doc+
+(define-constant +array-types-cache-doc+
   ";;; This file is automatically managed by (DEFTYPE ARRAY ...) and
 ;;; ENSURE-ARRAY-TYPE-DURING-LOAD. Please do not modify this file manually."
   :test #'string=)
 
-(defvar *array-types* ())
+(defvar *array-types-cache* ())
 
-(defun ensure-array-type-during-load (array-type)
-  ;; The types would be present in a form canonicalized by DEFTYPE body above. 
-  (unless (member array-type *array-types* :test #'equalp)
+(defun add-to-array-types-cache (array-type)
+  ;; The types would be present in a form canonicalized by DEFTYPE body above.
+  (unless (member array-type *array-types-cache* :test #'equalp)
     (let ((*package* (find-package :dense-arrays)))
       (with-open-file (f (asdf:component-pathname
                           (asdf:find-component
                            (asdf:find-component
                             (asdf:find-system "dense-arrays")
                             "src")
-                           "array-types"))
+                           "array-types-cache"))
                          :direction :output
                          :if-does-not-exist :create
                          :if-exists :append)
-        (unless *array-types*
+        (unless *array-types-cache*
           (write '(cl:in-package :dense-arrays) :stream f)
           (terpri f)
-          (write-string +array-types-doc+ f)
+          (write-string +array-types-cache-doc+ f)
           (terpri f)
           (terpri f))
-        (write `(progn                
-                  (push ',array-type *array-types*)
+        (write `(progn
+                  (push ',array-type *array-types-cache*)
                   (trivial-types:type-expand ',array-type))
                :stream f)
         (terpri f)
-        (push array-type *array-types*)))))
+        (push array-type *array-types-cache*)))))
+
+(defun reset-array-types-cache ()
+  (with-open-file (f (asdf:component-pathname
+                      (asdf:find-component
+                       (asdf:find-component
+                        (asdf:find-system "dense-arrays")
+                        "src")
+                       "array-types-cache"))
+                     :direction :output
+                     :if-does-not-exist :create
+                     :if-exists :supersede))
+  (setq *array-types-cache* nil))
