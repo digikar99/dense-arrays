@@ -137,7 +137,7 @@
         (apply #'broadcast-arrays
                (iter (for subscript in subscripts)
                  ;; TYPE-EXPAND is required for CCL and ECL
-                 (if (typep subscript (type-expand '(array bit)))
+                 (if (typep subscript (env:typexpand '(array bit)))
                      (appending (nonzero subscript))
                      (collect   subscript)))))
   (cond
@@ -215,7 +215,7 @@
       (apply #'broadcast-arrays
              new-array
              (iter (for subscript in subscripts)
-               (if (typep subscript (type-expand '(array bit)))
+               (if (typep subscript (env:typexpand '(array bit)))
                    (appending (nonzero subscript))
                    (collect   subscript))))
     (cond

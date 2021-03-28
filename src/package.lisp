@@ -128,7 +128,8 @@ to DENSE-ARRAYS:MAKE-ARRAY")
 (deftype array (&optional (element-type '* elt-supplied-p) (rank '* rankp))
   (check-type rank (or (eql *) size))
   (let* ((element-type (if elt-supplied-p
-                           (type-expand (upgraded-array-element-type element-type))
+                           (introspect-environment:typexpand
+                            (upgraded-array-element-type element-type))
                            element-type))
          (elt-sym (intern (concatenate 'string
                                        "%ARRAY-"
@@ -196,6 +197,9 @@ to DENSE-ARRAYS:MAKE-ARRAY")
 
 (defvar *array-types-cache* ())
 
+;;; FIXME: The caching system will break the day we have custom array types
+;;; Perhaps, then, we could just add a check to see if the element-type
+;;; is predefined.
 (defun add-to-array-types-cache (array-type)
   ;; The types would be present in a form canonicalized by DEFTYPE body above.
   ;; FIXME: array-types-cache file should depend on implementation?
@@ -216,10 +220,10 @@ to DENSE-ARRAYS:MAKE-ARRAY")
           (write-string +array-types-cache-doc+ f)
           (terpri f)
           (terpri f))
-        (write `(progn
-                  (push ',array-type *array-types-cache*)
-                  (trivial-types:type-expand ',array-type))
-               :stream f)
+        ;; We use FORMAT instead of WRITE because on compilers like SBCL,
+        ;; ENV or INTROSPECT-ENVIRONMENT translate to sbcl-specific symbols.
+        (format f "(PROGN~%  (PUSH '~S *ARRAY-TYPES-CACHE*)~%  (ENV:TYPEXPAND '~S))~%"
+                array-type array-type)
         (terpri f)
         (push array-type *array-types-cache*)))))
 
