@@ -30,7 +30,7 @@ DENSE-ARRAYS-DEMO> (aref * 1 '(0 :step 2))
    (1 2 3 4)
    (3 4 5 6)
  {103840E153}>
-DENSE-ARRAYS-DEMO> (aref ** 1 '(0 :step -2)) ; negative indices
+DENSE-ARRAYS-DEMO> (aref ** 1 '(-1 :step -2)) ; negative indices
 #<DENSE-ARRAYS:ARRAY (VIEW) T 2x4
    (3 4 5 6)
    (1 2 3 4)

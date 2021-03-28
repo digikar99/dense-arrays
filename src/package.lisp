@@ -198,6 +198,7 @@ to DENSE-ARRAYS:MAKE-ARRAY")
 
 (defun add-to-array-types-cache (array-type)
   ;; The types would be present in a form canonicalized by DEFTYPE body above.
+  ;; FIXME: array-types-cache file should depend on implementation?
   (unless (member array-type *array-types-cache* :test #'equalp)
     (let ((*package* (find-package :dense-arrays)))
       (with-open-file (f (asdf:component-pathname
