@@ -21,13 +21,14 @@
 (defmacro destructuring-lists (bindings &body body)
   (if (null bindings)
       `(progn ,@body)
-      (destructuring-bind ((type variables values) &rest bindings) bindings
+      (destructuring-bind ((type variables values &key (dynamic-extent t))
+                           &rest bindings) bindings
         (let ((values-sym (gensym "VALUES")))
           `(let (,@(loop :for var :in variables
                          :collect `(,var 0)))
              (declare (type ,type ,@variables))
              (let ((,values-sym ,values))
-               (declare (dynamic-extent ,values-sym)
+               (declare ,@(if dynamic-extent `((dynamic-extent ,values-sym)) nil)
                         (ignorable ,values-sym))
                ;; Using destructuring-bind here is slower
                ,@(loop :for var :in variables

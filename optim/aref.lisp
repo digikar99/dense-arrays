@@ -39,9 +39,12 @@
                    (once-only (array)
                      `(cond ((and (= (array-rank ,array) ,(length subscripts))
                                   ,@(mapcar (lm ss `(integerp ,ss)) subscripts))
-                             (destructuring-lists ((size      ,os (array-offsets ,array))
-                                                   (int-index ,ss (array-strides ,array))
-                                                   (size      ,ds (narray-dimensions ,array)))
+                             (destructuring-lists ((size      ,os (array-offsets ,array)
+                                                              :dynamic-extent nil)
+                                                   (int-index ,ss (array-strides ,array)
+                                                              :dynamic-extent nil)
+                                                   (size      ,ds (narray-dimensions ,array)
+                                                              :dynamic-extent nil))
                                (cl:aref (the (cl:simple-array ,elt-type)
                                              (array-displaced-to ,array))
                                         (the size (+ ,@os
@@ -58,20 +61,23 @@
                             (t
                              (%aref-view ,array ,@subscripts)))))
                  (optim-expansion
-                   (once-only (array)
-                     `(the ,elt-type
-                           (destructuring-lists ((size      ,os (array-offsets ,array))
-                                                 (int-index ,ss (array-strides ,array))
-                                                 (size      ,ds (narray-dimensions ,array)))
-                             (cl:aref (the (cl:simple-array ,elt-type 1)
-                                           (array-displaced-to ,array))
-                                      (the size (+ ,@os
+                   `(the ,elt-type
+                         ,(once-only (array)
+                            `(destructuring-lists ((size      ,os (array-offsets ,array)
+                                                              :dynamic-extent nil)
+                                                   (int-index ,ss (array-strides ,array)
+                                                              :dynamic-extent nil)
+                                                   (size      ,ds (narray-dimensions ,array)
+                                                              :dynamic-extent nil))
+                               (cl:aref (the (cl:simple-array ,elt-type 1)
+                                             (array-displaced-to ,array))
+                                        (the-size (+ ,@os
                                                      ,@(mapcar (lm ss ds sub
-                                                                   `(the size
-                                                                         (* ,ss
-                                                                            (normalize-index
-                                                                             ,sub
-                                                                             ,ds))))
+                                                                   `(the-size
+                                                                     (* ,ss
+                                                                        (normalize-index
+                                                                         ,sub
+                                                                         ,ds))))
                                                                ss ds subscripts)))))))))
               (return-from aref
                 (cond ((null exists)

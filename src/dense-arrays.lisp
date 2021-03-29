@@ -1,5 +1,7 @@
 (in-package :dense-arrays)
 
+(in-suite :dense-arrays)
+
 (def-test array-type ()
   (is (subtypep '(array single-float) 'array))
   (is (subtypep '(array single-float 2) '(array single-float 2)))
