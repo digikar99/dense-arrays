@@ -17,18 +17,16 @@
                              :do-arrays
                              :reset-array-types-cache)))
     `(uiop:define-package :dense-arrays
-         (:mix :iterate :alexandria :cl :5am :trivial-types)
+       (:mix :iterate :alexandria :cl :5am :trivial-types)
        (:export ,@export-symbols)
-       (:shadow ,@export-symbols)))
+       (:shadow ,@export-symbols)
+       (:local-nicknames (:cm :sandalphon.compiler-macro)
+                         (:env :introspect-environment))))
 
 (in-package :dense-arrays)
 
-(trivial-package-local-nicknames:add-package-local-nickname :cm :sandalphon.compiler-macro)
-(trivial-package-local-nicknames:add-package-local-nickname :env :introspect-environment)
-
 (def-suite :dense-arrays)
 (in-suite :dense-arrays)
-
 
 (defvar *use-static-vectors-alist* nil
   "An ALIST mapping package to a boolean. If the boolean corresponding to *PACKAGE* is true,

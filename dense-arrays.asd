@@ -4,7 +4,8 @@
   :description "Numpy like array objects for Common Lisp"
   :license "MIT"
   :version "0.0.0" ; alpha - no versioning maintained at the moment
-  :depends-on ("alexandria"
+  :depends-on ((:version "asdf" "3.3.4")
+               "alexandria"
                ;; TODO: replace compiler-macro with trivial-form-type
                ;; after making the latter
                "compiler-macro"
