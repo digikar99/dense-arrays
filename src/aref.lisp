@@ -166,7 +166,7 @@
   (:report (lambda (condition stream)
              (format stream "Index ~S is invalid" (index condition)))))
 
-(defun (setf aref) (new-element/s array &rest subscripts)
+(defpolymorph (setf aref) (new-element/s (array dense-array) &rest subscripts) t
   (declare (type dense-array array)
            (dynamic-extent subscripts))
   (with-slots (storage element-type strides offsets dimensions rank) array

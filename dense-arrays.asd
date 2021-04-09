@@ -27,11 +27,10 @@
                              (:file "argwhere")
                              (:file "aref")
                              (:file "copy")))
-               ;; (:module "optim"
-               ;;          :serial t
-               ;;  :components ((:file "misc")
-               ;;               (:file "aref")))
-               )
+               (:module "optim"
+                        :serial t
+                :components ((:file "misc")
+                             (:file "aref"))))
   :perform (test-op (o c)
              (declare (ignore o c))
              (eval (read-from-string "(5AM:RUN :DENSE-ARRAYS)"))))

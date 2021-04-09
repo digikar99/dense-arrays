@@ -1,43 +1,38 @@
 (cl:in-package :dense-arrays)
 
-(define-compiler-macro aref (&whole form array &rest subscripts &environment env)
-
-  (flet ((optim-failure ()
-           (format
-            *error-output*
-            "~&Unable to optimize~%  ~S~%because:~%  ~A~%but is:~%  ~S~%"
-            form
-            "Can only optimize when ARRAY is a symbol or a list of the form (THE TYPE FORM)"
-            array))
-         (insufficient-declarations (reason &rest reason-args)
-           (format
-            *error-output*
-            "~&Unable to (fully) optimize ~S because:~%  ~A"
-            form
-            (apply #'format nil reason reason-args))))
-
-    (with-speed-optimization (env form)
-      (if (not (or (symbolp array)
-                   (and (listp array)
-                        (eq 'the (first array)))))
-          (progn
-            (optim-failure)
-            form)
-          (multiple-value-bind (exists elt-type rank)
-              (if (symbolp array)
-                  (compile-time-array-type array env)
-                  (values t (second (second array)) (third (second array))))
-            ;; (print (list exists elt-type rank))
-            (unless (symbolp array) (setq array (third array)))
-            ;; TODO: Check if the types are declared!
-            (let*
-                ((subscript-types (mapcar (lm form (cm:form-type form env)) subscripts))
-                 (os              (make-gensym-list (length subscripts) "OFFSET"))
-                 (ss              (make-gensym-list (length subscripts) "STRIDE"))
-                 (ds              (make-gensym-list (length subscripts) "DIMENSION"))
-                 (full-expansion
-                   (once-only (array)
-                     `(cond ((and (= (array-rank ,array) ,(length subscripts))
+(defpolymorph-compiler-macro aref (dense-array &rest)
+    (&whole form array &rest subscripts &environment env)
+  (with-speed-optimization (env form)
+    (if (not (or (symbolp array)
+                 (and (listp array)
+                      (eq 'the (first array)))))
+        (progn
+          (optim-failure)
+          form)
+        (multiple-value-bind (backend-name elt-type rank)
+            (compile-time-array-type array env)
+          (unless (symbolp array) (setq array (third array)))
+          ;; TODO: Check if the types are declared!
+          (let*
+              ((backend         (handler-case (find-backend backend-name)
+                                  (no-existing-backend (c)
+                                    (declare (ignore c))
+                                    ;; The optimization benefit would be
+                                    ;; totally insignificant in this case
+                                    (unknown-backend backend-name)
+                                    (return-from aref form))))
+               (storage-accessor (backend-storage-accessor backend))
+               (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
+                                          backend)
+                                         `(%dense-array ,elt-type ,rank)))
+               (subscript-types (mapcar (lm form (cm:form-type form env)) subscripts))
+               (os              (make-gensym-list (length subscripts) "OFFSET"))
+               (ss              (make-gensym-list (length subscripts) "STRIDE"))
+               (ds              (make-gensym-list (length subscripts) "DIMENSION"))
+               (full-expansion
+                 (once-only (array)
+                   `(locally (declare (type dense-array ,array))
+                      (cond ((and (= (array-rank ,array) ,(length subscripts))
                                   ,@(mapcar (lm ss `(integerp ,ss)) subscripts))
                              (destructuring-lists ((size      ,os (array-offsets ,array)
                                                               :dynamic-extent nil)
@@ -45,105 +40,100 @@
                                                               :dynamic-extent nil)
                                                    (size      ,ds (narray-dimensions ,array)
                                                               :dynamic-extent nil))
-                               (cl:aref (the (cl:simple-array ,elt-type)
-                                             (array-displaced-to ,array))
-                                        (the size (+ ,@os
-                                                       ,@(mapcar (lm ss ds sub
-                                                                     `(the size
-                                                                           (* ,ss
-                                                                              (normalize-index
-                                                                               ,sub
-                                                                               ,ds))))
-                                                                 ss ds subscripts))))))
+                               (,storage-accessor
+                                (the ,storage-type (array-storage ,array))
+                                (the size (+ ,@os
+                                             ,@(mapcar (lm ss ds sub
+                                                           `(the size
+                                                                 (* ,ss
+                                                                    (normalize-index
+                                                                     ,sub
+                                                                     ,ds))))
+                                                       ss ds subscripts))))))
                             ((or ,@(mapcar (lm ss `(cl:arrayp ,ss)) subscripts)
                                  ,@(mapcar (lm ss `(arrayp ,ss)) subscripts))
                              (%aref ,array ,@subscripts))
                             (t
-                             (%aref-view ,array ,@subscripts)))))
-                 (optim-expansion
-                   `(the ,elt-type
-                         ,(once-only (array)
-                            `(destructuring-lists ((size      ,os (array-offsets ,array)
+                             (%aref-view ,array ,@subscripts))))))
+               (optim-expansion
+                 `(the ,elt-type
+                       ,(once-only (array)
+                          `(locally (declare (type dense-array ,array))
+                             (destructuring-lists ((size      ,os (array-offsets ,array)
                                                               :dynamic-extent nil)
                                                    (int-index ,ss (array-strides ,array)
                                                               :dynamic-extent nil)
                                                    (size      ,ds (narray-dimensions ,array)
                                                               :dynamic-extent nil))
-                               (cl:aref (the (cl:simple-array ,elt-type 1)
-                                             (array-displaced-to ,array))
-                                        (the-size (+ ,@os
-                                                     ,@(mapcar (lm ss ds sub
-                                                                   `(the-size
-                                                                     (* ,ss
-                                                                        (normalize-index
-                                                                         ,sub
-                                                                         ,ds))))
-                                                               ss ds subscripts)))))))))
-              (return-from aref
-                (cond ((null exists)
-                       (insufficient-declarations "Type of ~S is not declared" array)
-                       ;; No hope of optimizing
-                       form)
-                      ((eq '* elt-type)
-                       (insufficient-declarations "ELEMENT-TYPE of ~S is not declared" array)
-                       form)
-                      ((not (integerp rank))
-                       (insufficient-declarations
-                        "Rank of array ~S is not declared" array)
-                       full-expansion)
-                      ((not (= rank (length subscripts)))
-                       (insufficient-declarations
-                        "Number of subscripts does not match array rank ~D" rank)
-                       full-expansion)
-                      ((not (every (lm type (subtypep type 'integer)) subscript-types))
-                       (insufficient-declarations
-                        "Type of subscripts ~S were derived to be non-integers ~S"
-                        subscripts
-                        subscript-types)
-                       full-expansion)
-                      (t
-                       optim-expansion)))))))))
+                               (,storage-accessor
+                                (the ,storage-type (array-storage ,array))
+                                (the-size (+ ,@os
+                                             ,@(mapcar (lm ss ds sub
+                                                           `(the-size
+                                                             (* ,ss
+                                                                (normalize-index
+                                                                 ,sub
+                                                                 ,ds))))
+                                                       ss ds subscripts))))))))))
+            (return-from aref
+              (cond ((eq '* elt-type)
+                     (insufficient-declarations "ELEMENT-TYPE of ~S is not declared"
+                                                array)
+                     form)
+                    ((not (integerp rank))
+                     (insufficient-declarations
+                      "Rank of array ~S is not declared" array)
+                     full-expansion)
+                    ((not (= rank (length subscripts)))
+                     (insufficient-declarations
+                      "Number of subscripts does not match array rank ~D" rank)
+                     full-expansion)
+                    ((not (every (lm type (subtypep type 'integer)) subscript-types))
+                     (insufficient-declarations
+                      "Type of subscripts ~S were derived to be non-integers ~S"
+                      subscripts
+                      subscript-types)
+                     full-expansion)
+                    (t
+                     optim-expansion))))))))
 
-(define-compiler-macro (setf aref) (&whole form new-value array
-                                           &rest subscripts &environment env)
 
-  (flet ((optim-failure ()
-           (format
-            *error-output*
-            "~&Unable to optimize~%  ~S~%because:~%  ~A~%but is:~%  ~S~%"
-            form
-            "Can only optimize when ARRAY is a symbol or a list of the form (THE TYPE FORM)"
-            array))
-         (insufficient-declarations (reason &rest reason-args)
-           (format
-            *error-output*
-            "~&Unable to (fully) optimize ~S because:~%  ~A"
-            form
-            (apply #'format nil reason reason-args))))
 
-    (with-speed-optimization (env form)
-      (if (not (or (symbolp array)
-                   (and (listp array)
-                        (eq 'the (first array)))))
-          (progn
-            (optim-failure)
-            form)
-          (multiple-value-bind (exists elt-type rank)
-              (if (symbolp array)
-                  (compile-time-array-type array env)
-                  (values t (second (second array)) (third (second array))))
-            ;; (print (list exists elt-type rank))
-            (unless (symbolp array) (setq array (third array)))
-            ;; TODO: Check if the types are declared!
-            (let*
-                ((subscript-types (mapcar (lm form (cm:form-type form env)) subscripts))
-                 (new-value-type  (cm:form-type new-value env))
-                 (os              (make-gensym-list (length subscripts) "OFFSET"))
-                 (ss              (make-gensym-list (length subscripts) "STRIDE"))
-                 (ds              (make-gensym-list (length subscripts) "DIMENSION"))
-                 (full-expansion
-                   (once-only (array new-value)
-                     `(cond ((and (= (array-rank ,array) ,(length subscripts))
+(defpolymorph-compiler-macro (setf aref) (t dense-array &rest)
+    (&whole form new-value array &rest subscripts &environment env)
+
+  (with-speed-optimization (env form)
+    (if (not (or (symbolp array)
+                 (and (listp array)
+                      (eq 'the (first array)))))
+        (progn
+          (optim-failure)
+          form)
+        (multiple-value-bind (backend-name elt-type rank)
+            (compile-time-array-type array env)
+          (unless (symbolp array) (setq array (third array)))
+          ;; TODO: Check if the types are declared!
+          (let*
+              ((backend         (handler-case (find-backend backend-name)
+                                  (no-existing-backend (c)
+                                    (declare (ignore c))
+                                    ;; The optimization benefit would be
+                                    ;; totally insignificant in this case
+                                    (unknown-backend backend-name)
+                                    (return-from aref form))))
+               (storage-accessor (backend-storage-accessor backend))
+               (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
+                                          backend)
+                                         `(%dense-array ,elt-type ,rank)))
+               (subscript-types (mapcar (lm form (cm:form-type form env)) subscripts))
+               (new-value-type  (cm:form-type new-value env))
+               (os              (make-gensym-list (length subscripts) "OFFSET"))
+               (ss              (make-gensym-list (length subscripts) "STRIDE"))
+               (ds              (make-gensym-list (length subscripts) "DIMENSION"))
+               (full-expansion
+                 (once-only (array new-value)
+                   `(locally (declare (type dense-array ,array))
+                      (cond ((and (= (array-rank ,array) ,(length subscripts))
                                   ,@(mapcar (lm ss `(integerp ,ss)) subscripts))
                              (destructuring-lists ((size      ,os (array-offsets ,array)
                                                               :dynamic-extent nil)
@@ -151,68 +141,66 @@
                                                               :dynamic-extent nil)
                                                    (size      ,ds (narray-dimensions ,array)
                                                               :dynamic-extent nil))
-                               (setf
-                                (cl:aref (the (cl:simple-array ,elt-type)
-                                              (array-displaced-to ,array))
-                                         (the size (+ ,@os
-                                                      ,@(mapcar (lm ss ds sub
-                                                                    `(the size
-                                                                          (* ,ss
-                                                                             (normalize-index
-                                                                              ,sub
-                                                                              ,ds))))
-                                                                ss ds subscripts))))
-                                ,new-value)))
+                               (setf (,storage-accessor
+                                      (the ,storage-type (array-storage ,array))
+                                      (the size (+ ,@os
+                                                   ,@(mapcar (lm ss ds sub
+                                                                 `(the size
+                                                                       (* ,ss
+                                                                          (normalize-index
+                                                                           ,sub
+                                                                           ,ds))))
+                                                             ss ds subscripts))))
+                                     ,new-value)))
                             ((or ,@(mapcar (lm ss `(cl:arrayp ,ss)) subscripts)
                                  ,@(mapcar (lm ss `(arrayp ,ss)) subscripts))
-                             (setf (%aref ,array ,@subscripts) ,new-value))
+                             (%aref ,array ,@subscripts))
                             (t
-                             (setf (%aref-view ,array ,@subscripts) ,new-value)))))
-                 (optim-expansion
-                   `(the ,elt-type
-                         ,(once-only (array)
-                            `(destructuring-lists ((size      ,os (array-offsets ,array)
+                             (%aref-view ,array ,@subscripts))))))
+               (optim-expansion
+                 `(the ,elt-type
+                       ,(once-only (array)
+                          `(locally (declare (type dense-array ,array))
+                             (destructuring-lists ((size      ,os (array-offsets ,array)
                                                               :dynamic-extent nil)
                                                    (int-index ,ss (array-strides ,array)
                                                               :dynamic-extent nil)
                                                    (size      ,ds (narray-dimensions ,array)
                                                               :dynamic-extent nil))
-                               (setf (cl:aref (the (cl:simple-array ,elt-type 1)
-                                                   (array-displaced-to ,array))
-                                              (the-size (+ ,@os
-                                                           ,@(mapcar (lm ss ds sub
-                                                                         `(the-size
-                                                                           (* ,ss
-                                                                              (normalize-index
-                                                                               ,sub
-                                                                               ,ds))))
-                                                                     ss ds subscripts))))
-                                     ,new-value))))))
-              (return-from aref
-                (cond ((null exists)
-                       (insufficient-declarations "Type of ~S is not declared" array)
-                       ;; No hope of optimizing
-                       form)
-                      ((eq '* elt-type)
-                       (insufficient-declarations "ELEMENT-TYPE of ~S is not declared" array)
-                       form)
-                      ((not (integerp rank))
-                       (insufficient-declarations
-                        "Rank of array ~S is not declared" array)
-                       full-expansion)
-                      ((not (= rank (length subscripts)))
-                       (insufficient-declarations
-                        "Number of subscripts does not match array rank ~D" rank)
-                       full-expansion)
-                      ((not (every (lm type (subtypep type 'integer)) subscript-types))
-                       (insufficient-declarations
-                        "Type of subscripts ~S were derived to be non-integers ~S"
-                        subscripts
-                        subscript-types)
-                       full-expansion)
-                      ((not (subtypep new-value-type elt-type))
-                       (insufficient-declarations
-                        "Type of the new-value form ~S was derived to be ~S not of type ~S"
-                        new-value new-value-type elt-type))
-                      (t
-                       optim-expansion)))))))))
+                               (setf (,storage-accessor
+                                      (the ,storage-type (array-storage ,array))
+                                      (the-size (+ ,@os
+                                                   ,@(mapcar (lm ss ds sub
+                                                                 `(the-size
+                                                                   (* ,ss
+                                                                      (normalize-index
+                                                                       ,sub
+                                                                       ,ds))))
+                                                             ss ds subscripts))))
+                                     ,new-value)))))))
+            (return-from aref
+              (cond ((eq '* elt-type)
+                     (insufficient-declarations "ELEMENT-TYPE of ~S is not declared"
+                                                array)
+                     form)
+                    ((not (integerp rank))
+                     (insufficient-declarations
+                      "Rank of array ~S is not declared" array)
+                     full-expansion)
+                    ((not (= rank (length subscripts)))
+                     (insufficient-declarations
+                      "Number of subscripts does not match array rank ~D" rank)
+                     full-expansion)
+                    ((not (every (lm type (subtypep type 'integer)) subscript-types))
+                     (insufficient-declarations
+                      "Type of subscripts ~S were derived to be non-integers ~S"
+                      subscripts
+                      subscript-types)
+                     full-expansion)
+                    ((not (subtypep new-value-type elt-type))
+                     (insufficient-declarations
+                      "Type of the new-value form ~S was derived to be ~S not of type ~S"
+                      new-value new-value-type elt-type)
+                     full-expansion)
+                    (t
+                     optim-expansion))))))))

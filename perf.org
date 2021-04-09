@@ -18,8 +18,8 @@
 | Native CL (SBCL)        |       0.12 |
 | Python (unidiomatic)    |       8.34 |
 | Python (idiomatic/SIMD) |       0.03 |
-| aref (unoptimized)      |       1.57 |
-| aref (optimized)        |       0.74 |
+| aref (unoptimized)      |       3.97 |
+| aref (optimized)        |       0.35 |
 | do-arrays (optimized)   |       0.15 |
 
 All lisp performances are in the absence of SIMD.
@@ -83,7 +83,7 @@ timeit(1000)[1]
 *** aref (unoptimized)
 
 #+BEGIN_SRC lisp
-;; 1.57 seconds of real time
+;; 3.97 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
@@ -96,7 +96,7 @@ timeit(1000)[1]
 *** aref (optimized)
 
 #+BEGIN_SRC lisp
-;; 0.74 seconds of real time
+;; 0.35 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
@@ -142,8 +142,14 @@ DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
                          (j 0))
                      (declare (optimize speed))
                      (aref a i j))
-; Unable to (fully) optimize (AREF A I J) because:
-;   Type of A is not declared
+; Optimization of
+;   (AREF A I J)
+; is left to SBCL because ADHOC-POLYMORPHIC-FUNCTIONS
+; is unable to optimize it because
+;   
+;   Type of 
+;     A
+;   could not be determined
 0
 DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
                          (i 0)
@@ -151,7 +157,14 @@ DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
                      (declare (optimize speed)
                               (type (array t) a))
                      (aref a i j))
-; Unable to (fully) optimize (AREF A I J) because:
+; Unable to (fully) optimize
+;   ((LAMBDA (ARRAY &REST SUBSCRIPTS)
+;      (DECLARE (TYPE DENSE-ARRAY ARRAY))
+; .
+; . (several lines of the form)
+; .
+;    A I J)
+; because:
 ;   Rank of array A is not declared
 0
 DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
@@ -160,7 +173,14 @@ DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
                      (declare (optimize speed)
                               (type (array t 2) a))
                      (aref a i j))
-; Unable to (fully) optimize (AREF A I J) because:
+; Unable to (fully) optimize
+;   ((LAMBDA (ARRAY &REST SUBSCRIPTS)
+;      (DECLARE (TYPE DENSE-ARRAY ARRAY))
+; .
+; . (several lines of the form)
+; .
+;    A I J)
+; because:
 ;   Type of subscripts (I J) were derived to be non-integers (T T)
 0
 DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
