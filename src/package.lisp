@@ -44,31 +44,6 @@
 
 (in-suite :dense-arrays)
 
-(defvar *use-static-vectors-alist* nil
-  "An ALIST mapping package to a boolean. If the boolean corresponding to *PACKAGE* is true,
-dense-arrays:make-array uses static-vectors to allocate the storage/displaced vector.
-Can be overriden by both
-  - binding *USE-STATIC-VECTORS*
-  - providing keyword arg :STATIC to DENSE-ARRAYS:MAKE-ARRAY")
-
-(defvar *use-static-vectors*)
-(setf (documentation '*use-static-vectors* 'variable)
-      "If T dense-arrays:make-array uses static-vectors to allocate the underlying
-storage/displaced vector. Can be overriden by providing keyword arg :STATIC
-to DENSE-ARRAYS:MAKE-ARRAY")
-
-(define-symbol-macro use-static-vectors-p
-    (if (boundp '*use-static-vectors*)
-        *use-static-vectors*
-        (cdr (assoc *package* *use-static-vectors-alist*))))
-
-(defvar *use-static-vectors*)
-
-(defmacro unless-static-vectors ((num-passes) &body body)
-  `(if use-static-vectors-p
-       (dotimes (i ,num-passes) (pass "Skipping for static vectors"))
-       (locally ,@body)))
-
 (deftype size () `(unsigned-byte 62))
 (deftype int-index () `(signed-byte 62))
 
@@ -96,8 +71,11 @@ STORAGE-ALLOCATOR
     that allocates a VECTOR of length SIZE of ELEMENT-TYPE with each element as
     INITIAL-ELEMENT for use as a STORAGE-VECTOR for the ABSTRACT-ARRAY.
 
-STORAGE-DEALLOCATOR (FIXME: A function that returns a function?)
-  - A function to be called when the ABSTRACT-ARRAY goes out of scope.
+STORAGE-DEALLOCATOR
+  - A function to be called to delete the STORAGE when the ABSTRACT-ARRAY
+    goes out of scope. This function should take only the STORAGE object
+    as its argument. (See static-vectors.lisp and the DENSE-ARRAYS:MAKE-ARRAY
+    function for reference.)
   "
   (name                  nil :required t :type symbol)
   ;; We need an accessor with a setf expansion, to play nice in do-arrays

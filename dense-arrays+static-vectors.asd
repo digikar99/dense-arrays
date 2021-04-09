@@ -1,6 +1,5 @@
 (defsystem "dense-arrays+static-vectors"
   :author "Shubhamkar B. Ayare"
-  ;; System kept separate to reduce the load time of dense-arrays
   :description "Redefines dense-arrays:make-array and adds a few symbols for providing
 compatibility layer for using static-vectors."
   :license "MIT"

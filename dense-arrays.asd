@@ -13,7 +13,6 @@
                "compiler-macro"
                "fiveam"
                "iterate"
-               "static-vectors"
                "trivial-garbage"
                "trivial-package-local-nicknames"
                "trivial-types"

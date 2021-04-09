@@ -1,5 +1,7 @@
 # Status
 
+> README is outdated; to be updated soon.
+
 [Last update: 27th December 2020]
 
 - Under Construction:
@@ -92,8 +94,6 @@ Development of the following system could aid for further minimalism of the firs
 
 - trivial-form-type: For form-type, there is a full dependency on [compiler-macros](https://github.com/Bike/compiler-macro)
 
-> `dense-arrays+static-vectors` system is currently "especially unstable" because we might move towards abstracting its functionality to provide more interchangeable backends.
-
 # Exported Symbols as of this commit
 
 - dense-arrays:
@@ -115,8 +115,6 @@ Development of the following system could aid for further minimalism of the firs
     - array-element-type
     - array-total-size
     - \*array-element-print-format\*
-    - \*use-static-vectors\*
-    - \*use-static-vectors-alist*\
 
 - dense-arrays-plus-lite:
     - asarray
