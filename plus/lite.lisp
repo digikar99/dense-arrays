@@ -5,8 +5,7 @@
    :make-dense-array
    :array-offsets
    :array-strides
-   :array-root-array
-   :unless-static-vectors)
+   :array-root-array)
   (:reexport :dense-arrays)
   (:export
    :asarray
@@ -128,9 +127,8 @@ See the definition of ASARRAY for an example of usage.")
                                                                  '(signed-byte 32))))
                                (*package*            (find-package :cl)))
                            (asarray '(1 2 3))))))
-  (unless-static-vectors (1)
-    (is (array= (make-array 2 :initial-contents '("hello" "goodbye"))
-                (asarray '("hello" "goodbye"))))))
+  (is (array= (make-array 2 :initial-contents '("hello" "goodbye"))
+              (asarray '("hello" "goodbye")))))
 
 ;; MISC ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -138,14 +136,15 @@ See the definition of ASARRAY for an example of usage.")
   (declare (optimize speed)
            (type array array))
   (make-dense-array :displaced-to (array-displaced-to array)
+                    :storage (array-displaced-to array)
                     :element-type (array-element-type array)
-                    :dim (reverse (narray-dimensions  array))
+                    :dimensions (reverse (narray-dimensions  array))
                     :strides (reverse (array-strides  array))
                     :offsets (reverse (array-offsets  array))
                     :contiguous-p nil
                     :total-size   (array-total-size   array)
                     :rank (array-rank array)
-                    :root-array (or (array-root-array array)
+                    :root-array (or (dense-arrays::dense-array-root-array array)
                                     array)))
 
 (defun split-at-keywords (args)
@@ -163,6 +162,7 @@ See the definition of ASARRAY for an example of usage.")
 
 (defmacro define-splice-list-fn (name args &body body)
   `(defun ,name (&rest args)
+     ,(format nil "LAMBDA-LIST: ~A" args)
      (destructuring-bind ,args (split-at-keywords args)
        ,@body)))
 

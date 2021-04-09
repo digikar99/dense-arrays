@@ -8,11 +8,10 @@
                 py4cl2:*arrayfiers*)))
 
 (def-test py4cl2 ()
-  (unless-static-vectors (1)
-    (is (array= (make-array '(2 3)
-                            :initial-contents '((1 2 3) (4 5 6)))
-                (let ((py4cl2:*array-type* :dense-arrays))
-                  (py4cl2:pyeval #2A((1 2 3) (4 5 6)))))))
+  (is (array= (make-array '(2 3)
+                          :initial-contents '((1 2 3) (4 5 6)))
+              (let ((py4cl2:*array-type* :dense-arrays))
+                (py4cl2:pyeval #2A((1 2 3) (4 5 6))))))
   (is (array= (make-array '(3 2)
                           :element-type 'int32
                           :initial-contents '((1 4) (2 5) (3 6)))
