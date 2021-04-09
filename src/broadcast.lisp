@@ -4,13 +4,13 @@
   (unless (arrayp array)
     ;; Should probably warn if ARRAY is not an array
     (setq array (make-array 1 :initial-element array :element-type (type-of array))))
-  (with-slots (dim element-type strides offsets displaced-to) array
+  (with-slots (dimensions element-type strides offsets displaced-to) array
     (multiple-value-bind (strides offsets)
         (let* ((blen (length broadcast-dimensions))
-               (len  (length dim))
+               (len  (length dimensions))
                (dim  (append (make-list (- blen len)
                                         :initial-element 1)
-                             dim))
+                             dimensions))
                (strides (append (make-list (- blen len)
                                            :initial-element 0)
                                 strides))
@@ -34,7 +34,7 @@
            (nreverse new-offsets)))
       (let ((total-size (apply #'* broadcast-dimensions)))
         (make-dense-array
-         :dim broadcast-dimensions
+         :dimensions broadcast-dimensions
          :element-type element-type
          :strides strides
          :offsets offsets
@@ -43,8 +43,9 @@
          :contiguous-p (= (first strides)
                           (/ total-size (first broadcast-dimensions)))
          :total-size total-size
-         :root-array (or (array-root-array array) array)
-         :rank (length broadcast-dimensions))))))
+         :root-array (or (dense-array-root-array array) array)
+         :rank (length broadcast-dimensions)
+         :storage (array-storage array))))))
 
 (defun %broadcast-compatible-p (dimensions-a dimensions-b)
   "Returns two values:

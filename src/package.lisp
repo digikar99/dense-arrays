@@ -1,31 +1,46 @@
-#.(cl:let ((export-symbols '(:array :arrayp
-                             :array-dimensions
+#.(cl:let ((abstract-array-symbols '(:arrayp
+                                     :array-dimensions
+                                     :array-dimension
+                                     :array-element-type
+                                     :array-total-size
+                                     :aref
+                                     :array-rank
+                                     :array-storage-set
+                                     :array-storage-ref))
+           (shadow-symbols '(:array
+                             :simple-array
+                             :array-storage-allocator
+                             :array-storage-deallocator
+                             :upgraded-array-element-type
+
                              :narray-dimensions
-                             :array-dimension
-                             :array-element-type
-                             :array-total-size
                              :array-displacement
                              :array-displaced-to
                              :array=
-                             :aref
                              :row-major-aref
-                             :array-rank
                              :make-array
                              :*array-element-print-format*
                              :print-array
                              :copy-array
-                             :do-arrays
-                             :reset-array-types-cache)))
+                             :do-arrays)))
     `(uiop:define-package :dense-arrays
-       (:mix :iterate :alexandria :cl :5am :trivial-types)
-       (:export ,@export-symbols)
-       (:shadow ,@export-symbols)
+       (:mix :adhoc-polymorphic-functions :abstract-arrays
+             :cl :iterate :alexandria :5am :trivial-types)
+       (:export ,@shadow-symbols
+                ,@abstract-array-symbols)
+       (:shadow ,@shadow-symbols)
+       (:import-from :abstract-arrays
+                     :define-struct-with-required-slots
+                     :dimensions
+                     :rank
+                     :element-type)
        (:local-nicknames (:cm :sandalphon.compiler-macro)
                          (:env :introspect-environment))))
 
 (in-package :dense-arrays)
 
 (def-suite :dense-arrays)
+
 (in-suite :dense-arrays)
 
 (defvar *use-static-vectors-alist* nil
@@ -71,27 +86,78 @@ to DENSE-ARRAYS:MAKE-ARRAY")
 (deftype int64 () `(signed-byte 64))
 (deftype uint64 () `(unsigned-byte 64))
 
-(defmacro define-struct-with-required-slots (name-and-options &rest slot-descriptions)
-  "Like DEFSTRUCT but SLOT-DESCRIPTIONS can also have a `:required t` as an option."
-  `(defstruct ,name-and-options
-     ,@(loop :for desc :in (if (stringp (first slot-descriptions))
-                               (rest slot-descriptions)
-                               slot-descriptions)
-             :collect (if (getf (cddr desc) :required)
-                          `(,(first desc)
-                            (cl:error ,(format nil
-                                               "~S must be supplied during ~A:~A initialization"
-                                               (first desc)
-                                               (package-name
-                                                (symbol-package
-                                                 (first name-and-options)))
-                                               (first name-and-options)))
-                            ,@(progn (remf (cddr desc) :required)
-                                     (cddr desc)))
-                          desc))))
+(defparameter *dense-array-backends* nil)
 
-(define-struct-with-required-slots (dense-array (:conc-name array-)
-                                                (:predicate arrayp)
+(define-struct-with-required-slots (backend (:constructor create-backend))
+  "
+STORAGE-ALLOCATOR
+  - a function with signature (SIZE &KEY ELEMENT-TYPE INITIAL-ELEMENT)
+    that allocates a VECTOR of length SIZE of ELEMENT-TYPE with each element as
+    INITIAL-ELEMENT for use as a STORAGE-VECTOR for the ABSTRACT-ARRAY.
+
+STORAGE-DEALLOCATOR (FIXME: A function that returns a function?)
+  - A function to be called when the ABSTRACT-ARRAY goes out of scope.
+  "
+  (name                  nil :required t :type symbol)
+  ;; We need an accessor with a setf expansion, to play nice in do-arrays
+  (storage-accessor      nil :required t :type function-name)
+  (storage-allocator     nil :required t :type function-designator)
+  (storage-deallocator   nil :required t :type (or null function-designator))
+  (element-type-upgrader nil :required t :type function-designator)
+  (storage-type-inferrer-from-array nil :required t :type function-designator)
+  (storage-type-inferrer-from-array-type nil :required t :type function-designator))
+
+(defmethod print-object ((o backend) s)
+  (print-unreadable-object (o s :type t :identity t)
+    (write (backend-name o) :stream s)))
+
+(defun make-backend (name &rest args &key storage-type-inferrer-from-array-type
+                                       storage-type-inferrer-from-array
+                                       storage-accessor
+                                       storage-allocator
+                                       storage-deallocator
+                                       element-type-upgrader)
+  (declare (ignore storage-type-inferrer-from-array-type
+                   storage-type-inferrer-from-array
+                   storage-accessor
+                   storage-allocator
+                   storage-deallocator
+                   element-type-upgrader))
+  (let ((backend (apply #'create-backend :name name args)))
+    (removef *dense-array-backends* name :key #'backend-name)
+    (push backend *dense-array-backends*)
+    backend))
+
+(define-condition no-existing-backend (error)
+  ((name :initarg :name
+         :accessor no-existing-backend-name))
+  (:report (lambda (condition stream)
+             (format stream "There is no backend with name ~S.
+Existing backend names include:~{~^~%  ~S~}"
+                     (no-existing-backend-name condition)
+                     (mapcar #'backend-name *dense-array-backends*)))))
+
+(defun find-backend (name)
+  (or (find name *dense-array-backends* :key #'backend-name)
+      (error 'no-existing-backend :name name)))
+
+(defparameter *standard-dense-array-backend*
+  (make-backend :cl
+                :storage-accessor 'cl:aref
+                :storage-allocator 'cl:make-array
+                :storage-deallocator nil
+                :element-type-upgrader 'cl:upgraded-array-element-type
+                :storage-type-inferrer-from-array
+                (lambda (array)
+                  (declare (type abstract-array array)
+                           (optimize speed))
+                  `(cl:array ,(array-element-type array) 1))
+                :storage-type-inferrer-from-array-type
+                (lambda (array-type)
+                  `(cl:array ,(array-type-element-type array-type) 1))))
+
+(define-struct-with-required-slots (dense-array (:include abstract-array)
+                                                (:predicate dense-array-p)
                                                 (:constructor make-dense-array)
                                                 (:copier copy-dense-array))
   ;; TODO: Add more documentation with a proper example
@@ -99,140 +165,32 @@ to DENSE-ARRAYS:MAKE-ARRAY")
 - STRIDES is a list of strides along each dimension.
 - OFFSETS is a list of offsets along each dimension."
   (displaced-to nil :required t :type (cl:simple-array * 1))
-  (element-type nil :required t)
-  (dim          nil :required t :read-only t)
-   ;; DIM is actually a read-only slot; however, in TRANSPOSE, for performance reasons,
-   ;; we, first copy an existing array, and then write to this slot
   (strides      nil :required t)
   (offsets      nil :required t :type list)
   (contiguous-p nil :required t)
-  (total-size   nil :required t :type size)
-  (rank         nil :required t :type size)
+  (backend      :cl :read-only t :type (or symbol backend))
   (root-array   nil :required t))
 
-(defparameter *element-type->checker-fn-ht* (make-hash-table))
-(defparameter *checker-fn->element-and-rank* (make-hash-table))
+(defun standard-dense-array-p (object)
+  (and (dense-array-p object)
+       (eq :cl (dense-array-backend object))))
 
-(defun checker-fn-sym (element-type rank)
-  (when-let (inner-ht (gethash element-type *element-type->checker-fn-ht*))
-    (gethash rank inner-ht)))
-(defun (setf checker-fn-sym) (fn-sym element-type rank)
-  (when (null (gethash element-type *element-type->checker-fn-ht*))
-    (setf (gethash element-type *element-type->checker-fn-ht*) (make-hash-table)))
-  (setf (gethash rank (gethash element-type *element-type->checker-fn-ht*))
-        fn-sym)
-  (setf (gethash fn-sym *checker-fn->element-and-rank*) (list element-type rank)))
+(defun simple-dense-array-p (object)
+  (and (dense-array-p object)
+       (loop :for o :of-type size :in (array-offsets object)
+             :always (zerop o))
+       (let ((total-size (array-total-size object)))
+         (loop :for s :in (array-strides object)
+               :for d :in (narray-dimensions object)
+               :always (= s (/ total-size d))
+               :do (setq total-size (floor total-size d))))))
 
-(deftype array (&optional (element-type '* elt-supplied-p) (rank '* rankp))
-  (check-type rank (or (eql *) size))
-  (let* ((element-type (if elt-supplied-p
-                           (introspect-environment:typexpand
-                            (upgraded-array-element-type element-type))
-                           element-type))
-         (elt-sym (intern (concatenate 'string
-                                       "%ARRAY-"
-                                       (let ((*package* (find-package :cl)))
-                                         (write-to-string element-type))
-                                       "-P")
-                          :dense-arrays))
-         (rank-sym (intern (concatenate 'string
-                                        "%ARRAY-"
-                                        (write-to-string rank)
-                                        "-P")
-                           :dense-arrays)))
-    ;; The above separation is required to better pass subtypep test in dense-arrays.lisp.
-    (unless (checker-fn-sym element-type rank)
-      ;; This portion is used by compiler macros
-      ;; TODO: Determine if things are simpler without this
-      (let ((fn-sym (intern (concatenate 'string
-                                         "%ARRAY-"
-                                         (let ((*package* (find-package :cl)))
-                                           (write-to-string element-type))
-                                         "-" (write-to-string rank)
-                                         "-P")
-                            :dense-arrays)))
-        (compile fn-sym
-                 `(lambda (array)
-                    (and (arrayp array)
-                         (type= ',element-type (array-element-type array))
-                         ,(if (eq rank '*)
-                              t
-                              `(= ',rank (array-rank array))))))
-        (setf (checker-fn-sym element-type rank) fn-sym)))
-    (when (and elt-supplied-p (not (fboundp elt-sym)))
-      (compile elt-sym
-               `(lambda (array)
-                  (declare (type dense-array array))
-                  (type= ',element-type (array-element-type array)))))
-    (when (and rankp (not (fboundp rank-sym)))
-      (compile rank-sym
-               `(lambda (array)
-                  (declare (type dense-array array))
-                  (= ',rank (array-rank array)))))
-    (cond ((and rankp elt-supplied-p)
-           (add-to-array-types-cache `(array ,element-type ,rank))
-           `(and dense-array
-                 (satisfies ,(checker-fn-sym element-type rank))
-                 (satisfies ,elt-sym)
-                 (satisfies ,rank-sym)))
-          (elt-supplied-p
-           (add-to-array-types-cache `(array ,element-type))
-           `(and dense-array
-                 (satisfies ,(checker-fn-sym element-type rank))
-                 (satisfies ,elt-sym)))
-          (rankp ; never invoked though
-           (add-to-array-types-cache `(array * ,rank))
-           `(and dense-array
-                 (satisfies ,(checker-fn-sym element-type rank))
-                 (satisfies ,rank-sym)))
-          (t
-           'dense-array))))
+(deftype standard-dense-array () `(and dense-array (satisfies standard-dense-array-p)))
+(deftype simple-dense-array   () `(and dense-array (satisfies simple-dense-array-p)))
 
-(define-constant +array-types-cache-doc+
-  ";;; This file is automatically managed by (DEFTYPE ARRAY ...) and
-;;; ENSURE-ARRAY-TYPE-DURING-LOAD. Please do not modify this file manually."
-  :test #'string=)
+(define-array-specialization-type array standard-dense-array)
+(define-array-specialization-type simple-array (and standard-dense-array
+                                                    simple-dense-array))
 
-(defvar *array-types-cache* ())
-
-;;; FIXME: The caching system will break the day we have custom array types
-;;; Perhaps, then, we could just add a check to see if the element-type
-;;; is predefined.
-(defun add-to-array-types-cache (array-type)
-  ;; The types would be present in a form canonicalized by DEFTYPE body above.
-  ;; FIXME: array-types-cache file should depend on implementation?
-  (unless (member array-type *array-types-cache* :test #'equalp)
-    (let ((*package* (find-package :dense-arrays)))
-      (with-open-file (f (asdf:component-pathname
-                          (asdf:find-component
-                           (asdf:find-component
-                            (asdf:find-system "dense-arrays")
-                            "src")
-                           "array-types-cache"))
-                         :direction :output
-                         :if-does-not-exist :create
-                         :if-exists :append)
-        (unless *array-types-cache*
-          (write '(cl:in-package :dense-arrays) :stream f)
-          (terpri f)
-          (write-string +array-types-cache-doc+ f)
-          (terpri f)
-          (terpri f))
-        ;; We use FORMAT instead of WRITE because on compilers like SBCL,
-        ;; ENV or INTROSPECT-ENVIRONMENT translate to sbcl-specific symbols.
-        (format f "(PROGN~%  (PUSH '~S *ARRAY-TYPES-CACHE*)~%  (ENV:TYPEXPAND '~S))~%"
-                array-type array-type)
-        (terpri f)
-        (push array-type *array-types-cache*)))))
-
-(defun reset-array-types-cache ()
-  (with-open-file (f (asdf:component-pathname
-                      (asdf:find-component
-                       (asdf:find-component
-                        (asdf:find-system "dense-arrays")
-                        "src")
-                       "array-types-cache"))
-                     :direction :output
-                     :if-does-not-exist :create
-                     :if-exists :supersede))
-  (setq *array-types-cache* nil))
+;; For internal usage
+(define-array-specialization-type %dense-array dense-array)

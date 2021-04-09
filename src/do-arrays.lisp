@@ -45,7 +45,7 @@
                ,format)
              ,@list-vars)))
 
-(defun expand-do-arrays-with-rank (elt-vars array-vars element-types rank body)
+(defun expand-do-arrays-with-rank (elt-vars array-vars storage-types storage-accessors rank body)
   ;; TODO Add rank correctness checks
   (let ((num-arrays (length array-vars)))
     (let ((dimensions  (make-gensym-list rank "DIMENSION"))
@@ -76,10 +76,10 @@
                ,@(map-collect `(,%1 0) is))
            (declare (type int-index ,@is)
                     ;; (optimize speed) ; check before finalizing
-                    ,@(map-collect `(type (cl:simple-array ,%1 1) ,%2)
-                                   element-types svs))
-           (symbol-macrolet (,@(map-collect `(,%1 (cl:aref ,%2 ,%3))
-                                            elt-vars svs is))
+                    ,@(mapcar (lm st sv `(type ,st ,sv))
+                              storage-types svs))
+           (symbol-macrolet (,@(mapcar (lm elt-var sa sv i `(,elt-var (,sa ,sv ,i)))
+                                     elt-vars storage-accessors svs is))
              (destructuring-bind ,dimensions (narray-dimensions ,(first array-vars))
                (declare (type size ,@dimensions))
                (destructuring-lists
@@ -87,18 +87,18 @@
                                   `(int-index ,strides (array-strides ,array-var)))
                               all-strides array-vars)
                     ,@(mapcar (lm offsets array-var
-                                 `(size ,offsets (array-offsets ,array-var)))
-                             all-offsets array-vars))
+                                  `(size ,offsets (array-offsets ,array-var)))
+                              all-offsets array-vars))
                  ,(nest-loop dimensions all-strides all-offsets)))))))))
 
-(defun expand-do-arrays-without-rank (elt-vars array-vars element-types body)
+(defun expand-do-arrays-without-rank (elt-vars array-vars storage-types storage-accessors body)
   ;; TODO Add rank correctness checks
   (let ((num-arrays (length array-vars)))
     (let ((offsets      (make-gensym-list num-arrays "OFFSETS"))
           (dimensions   (gensym "DIMENSIONS"))
           (strides      (make-gensym-list num-arrays "STRIDES"))
           (is           (make-gensym-list num-arrays "I"))
-          (svs          (make-gensym-list num-arrays "SV"))
+          (svs          (make-gensym-list num-arrays "SV")) ; storage-vector
           (d            (gensym "D"))
           (ss           (make-gensym-list num-arrays "SS"))
           (os           (make-gensym-list num-arrays "OS")))
@@ -112,11 +112,11 @@
              ,@(map-collect `(,%1 0) is))
          (declare (type int-index ,@is)
                   ;; (optimize speed) ; check before finalizing
-                  ,@(map-collect `(type (cl:simple-array ,%1 1) ,%2)
-                                 element-types svs))
+                  ,@(mapcar (lm st sv `(type ,st ,sv))
+                            storage-types svs))
          ;; TODO: A proper let form would aid debugging, but doesn't allow setf-ing
-         (symbol-macrolet (,@(map-collect `(,%1 (cl:aref ,%2 ,%3))
-                                          elt-vars svs is))
+         (symbol-macrolet (,@(mapcar (lm elt-var sa sv i `(,elt-var (,sa ,sv ,i)))
+                                     elt-vars storage-accessors svs is))
            (labels ((nest-loop (,dimensions ,@strides ,@offsets)
                       (let ((,d  (first ,dimensions))
                             ,@(map-collect `(,%1 (first ,%2)) ss strides)
@@ -150,7 +150,9 @@
   "  If the argument is of type SIZE, it'd be treated as the rank of the arrays. Then,
 the BINDINGS are assumed to be the first element of the BODY.
   Otherwise, the first argument is treated as if they are BINDINGS.
-  Each BINDING is of the form (ELT-VAR ARRAY &OPTIONAL ELEMENT-TYPE).
+  Each BINDING is of the form 
+    (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (BACKEND-NAME :CL))
+  Here, only ARRAY is evaluated.
 
 Examples
 
@@ -171,10 +173,16 @@ Either of the two cases might be faster depending on the number of dimensions."
          (rank     (when rankp rank/bindings))
          (bindings (if rankp (first body) rank/bindings))
          (body     (if rankp (rest body) body)))
-    (multiple-value-bind (elt-vars arrays element-types)
-        (let (elt-vars arrays element-types)
+    (destructuring-bind (elt-vars arrays storage-types storage-accessors)
+        (let (elt-vars arrays storage-types storage-accessors)
           (loop :for binding :in bindings
-                :do (destructuring-bind (elt-var array &optional (element-type '*))
+                :do (destructuring-bind
+                        (elt-var array
+                         &optional (element-type '*)
+                         ;; Could there be a case where a user wants to specify
+                         ;; the backend but not the element-type?
+                         ;; Well, they could just specify the *
+                         &key (backend :cl))
                         binding
                       (when (and (= 3 (env:policy-quality 'speed env))
                                  (eq element-type '*))
@@ -183,13 +191,18 @@ Either of the two cases might be faster depending on the number of dimensions."
                          "~&Unable to optimize~%  ~S~%because element-type (third argument) is not provided in~%  ~S~%"
                          form
                          (list elt-var array)))
-                      (push  elt-var      elt-vars)
+                      (push elt-var      elt-vars)
                       (push array        arrays)
-                      (push element-type element-types)))
+                      (let ((backend (find-backend backend)))
+                        (push (funcall (backend-storage-type-inferrer-from-array-type backend)
+                                       `(%dense-array ,element-type))
+                              storage-types)
+                        (push (backend-storage-accessor backend) storage-accessors))))
           ;; Reverse - so same as given order - because, see the test below
-          (values (nreverse elt-vars)
-                  (nreverse arrays)
-                  (nreverse element-types)))
+          (list (nreverse elt-vars)
+                (nreverse arrays)
+                (nreverse storage-types)
+                (nreverse storage-accessors)))
       (let ((array-vars (make-gensym-list (length arrays) "ARRAY")))
         `(let (,@(mapcar (lm var arr `(,var ,arr)) array-vars arrays))
            ,(unless (zerop (env:policy-quality 'safety env))
@@ -201,8 +214,10 @@ Either of the two cases might be faster depending on the number of dimensions."
                        (mapcar (lm array-var (narray-dimensions array-var))
                                (list ,@array-vars))))
            ,(if rankp
-                (expand-do-arrays-with-rank elt-vars array-vars element-types rank body)
-                (expand-do-arrays-without-rank elt-vars array-vars element-types body)))))))
+                (expand-do-arrays-with-rank elt-vars array-vars storage-types
+                                            storage-accessors rank body)
+                (expand-do-arrays-without-rank elt-vars array-vars storage-types
+                                               storage-accessors body)))))))
 
 (def-test do-arrays ()
   (is (equalp '((2 3) (1 2) (0 1) 2 1)

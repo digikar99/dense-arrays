@@ -21,31 +21,75 @@
                 (+ index dimension)
                 index)))
 
-(defun aref (array &rest subscripts)
-  ;; DONE: (partially) Introduce parametric types in CL.
+(defpolymorph array-storage ((array array)) (cl:array * 1)
+  (abstract-arrays::abstract-array-storage array))
+
+(defun foo (a i)
+  (declare (optimize speed (safety 0))
+           (type (array single-float 1) a)
+           (type int-index i))
+  (aref a i))
+
+(defun bar (a i)
   (declare (optimize speed)
-           (type array array)
+           (type (cl:simple-array single-float 1) a))
+  (cl:aref a i))
+
+(defpolymorph (aref :inline t) ((array dense-array) &rest subscripts) t
+  (declare ;; (optimize speed)
+           (type dense-array array)
            (dynamic-extent subscripts))
   (cond ((and (= (array-rank array) (length subscripts))
               (every #'integerp subscripts))
-         (cl:aref (the (cl:simple-array * 1) (array-displaced-to array))
-                  (let ((index 0))
-                    (declare (type size index))
-                    ;; TODO: Better error reporting for negative indices
-                    (loop :for stride :of-type int-index :in (array-strides array)
-                          :for subscript :of-type int-index :in subscripts
-                          :for offset :of-type size :in (array-offsets array)
-                          :for dimension :of-type size :in (narray-dimensions array)
-                          :do (incf index (+ offset
-                                             (the-size
-                                              (* stride
-                                                 (normalize-index subscript dimension))))))
-                    index)))
+         (let* ((backend        (dense-array-backend array))
+                (backend-object (if (backend-p backend)
+                                    backend
+                                    (find-backend backend))))
+           (funcall (backend-storage-accessor backend-object)
+                    (array-storage array)
+                    (the int-index
+                         (let ((index 0))
+                           (declare (type size index))
+                           ;; TODO: Better error reporting for negative indices
+                           (loop :for stride :of-type int-index :in (array-strides array)
+                                 :for subscript :of-type int-index :in subscripts
+                                 :for offset :of-type size :in (array-offsets array)
+                                 :for dimension :of-type size :in (narray-dimensions array)
+                                 :do (incf index (+ offset
+                                                    (the-size
+                                                     (* stride
+                                                        (normalize-index subscript dimension))))))
+                           index)))))
         ((or (some #'cl:arrayp subscripts)
              (some #'arrayp subscripts))
          (apply #'%aref array subscripts))
         (t
          (apply #'%aref-view array subscripts))))
+
+;; (defun aref (array &rest subscripts)
+;;   (declare (optimize speed)
+;;            (type array array)
+;;            (dynamic-extent subscripts))
+;;   (cond ((and (= (array-rank array) (length subscripts))
+;;               (every #'integerp subscripts))
+;;          (cl:aref (the (cl:simple-array * 1) (array-displaced-to array))
+;;                   (let ((index 0))
+;;                     (declare (type size index))
+;;                     ;; TODO: Better error reporting for negative indices
+;;                     (loop :for stride :of-type int-index :in (array-strides array)
+;;                           :for subscript :of-type int-index :in subscripts
+;;                           :for offset :of-type size :in (array-offsets array)
+;;                           :for dimension :of-type size :in (narray-dimensions array)
+;;                           :do (incf index (+ offset
+;;                                              (the-size
+;;                                               (* stride
+;;                                                  (normalize-index subscript dimension))))))
+;;                     index)))
+;;         ((or (some #'cl:arrayp subscripts)
+;;              (some #'arrayp subscripts))
+;;          (apply #'%aref array subscripts))
+;;         (t
+;;          (apply #'%aref-view array subscripts))))
 
 
 (define-condition invalid-index (error)
@@ -57,15 +101,15 @@
   "Returns a VIEW of the subscripted ARRAY (no copy)"
   (declare (optimize speed)
            (dynamic-extent subscripts)
-           (type array array))
-  (with-slots (displaced-to strides offsets dim rank element-type) array
+           (type dense-array array))
+  (with-slots (displaced-to strides offsets dimensions rank element-type) array
     (multiple-value-bind (dimensions strides offsets contiguous-p rank)
         (let ((new-offsets    nil)
               (new-dimensions nil)
               (new-strides    nil)
-              (contiguous-p   (array-contiguous-p array))
+              (contiguous-p   (dense-array-contiguous-p array))
               (rank           rank)
-              (dim            dim)
+              (dim            dimensions)
               (strides        strides)
               (offsets        offsets)
               (offset-carry   0))
@@ -113,20 +157,21 @@
                   rank))
       (make-dense-array
        :displaced-to displaced-to
+       :storage displaced-to
        :element-type element-type
-       :dim dimensions
+       :dimensions dimensions
        :strides strides
        :offsets offsets
        :contiguous-p contiguous-p
        :total-size (apply #'* dimensions)
-       :root-array (or (array-root-array array) array)
+       :root-array (or (dense-array-root-array array) array)
        :rank rank))))
 
 (defun %aref (array &rest subscripts)
   "Returns a copy of the subscripted array."
   (declare ;; (optimize speed)
            (dynamic-extent subscripts)
-           (type array array))
+           (type dense-array array))
   ;; TODO: Optimize this
   ;; TODO: Combining basic and advanced indexing - raise an issue if this is needed
   ;; Reference: https://numpy.org/doc/stable/reference/arrays.indexing.html#advanced-indexing
@@ -140,7 +185,7 @@
   (cond
     ((= (length subscripts) (array-rank array))
      (let ((subscript (first subscripts)))
-       (declare (type array subscript))
+       (declare (type dense-array subscript))
        (let ((result (make-array (array-dimensions subscript)
                                  :element-type (array-element-type array)))
              (rank   (array-rank subscript))
@@ -165,9 +210,9 @@
      (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
 
 (defun (setf aref) (new-element/s array &rest subscripts)
-  (declare (type array array)
+  (declare (type dense-array array)
            (dynamic-extent subscripts))
-  (with-slots (displaced-to element-type strides offsets dim rank) array
+  (with-slots (displaced-to element-type strides offsets dimensions rank) array
     (declare (type (cl:simple-array * (*)) displaced-to))
     (cond ((and (= rank (length subscripts))
                 (every #'integerp subscripts))
@@ -180,11 +225,11 @@
                                   :for offset :of-type size :in offsets
                                   :for dimension :of-type size :in (narray-dimensions array)
                                   :do (incf index
-                                          (the-size
-                                           (+ offset
-                                              (the-int-index
-                                               (* stride
-                                                  (normalize-index subscript dimension)))))))
+                                            (the-size
+                                             (+ offset
+                                                (the-int-index
+                                                 (* stride
+                                                    (normalize-index subscript dimension)))))))
                             index))
                  new-element/s))
           ((or (some #'cl:arrayp subscripts)
@@ -206,7 +251,7 @@
 (defun (setf %aref) (new-array array &rest subscripts)
   (declare ;; (optimize speed)
            (dynamic-extent subscripts)
-           (type array array))
+           (type dense-array array))
   ;; TODO: Optimize this
   (destructuring-bind (new-array &rest subscripts)
       (apply #'broadcast-arrays
@@ -321,9 +366,9 @@
   "Return the element of ARRAY corresponding to the row-major INDEX.
 This is SETFable"
   (declare ;; (optimize speed)
-   (type array array)
+   (type dense-array array)
    (type int-index index))
-  (if (array-contiguous-p array)
+  (if (dense-array-contiguous-p array)
       (cl:aref (array-displaced-to array)
                (the int-index (apply #'+ index (array-offsets array))))
       (let ((row-major-index   0)
@@ -345,9 +390,9 @@ This is SETFable"
 
 (defun (setf row-major-aref) (new-element array index)
   (declare ;; (optimize speed)
-           (type array array)
+           (type dense-array array)
            (type int-index index))
-  (if (array-contiguous-p array)
+  (if (dense-array-contiguous-p array)
       (setf (cl:aref (array-displaced-to array)
                      (the int-index (apply #'+ index (array-offsets array))))
             new-element)

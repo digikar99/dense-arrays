@@ -43,6 +43,7 @@
                      (strides nil strides-p)
                      (adjustable nil adjustable-p)
                      (fill-pointer nil fill-pointer-p)
+                     (backend :cl)
 
                      (displaced-to nil displaced-to-p)
                      (offsets nil offsets-p)
@@ -64,31 +65,49 @@
   (when adjustable-p
     (error "ADJUSTABLE has not been handled yet in DENSE-ARRAY"))
 
-  (let* ((dimensions (if (listp dimensions)
-                         dimensions
-                         (list dimensions)))
-         (displaced-vector-initial-element
-           (cond (initial-element-p initial-element)
-                 (t
-                  (case element-type
-                    ;; TODO: Include more types?
-                    (single-float 0.0s0)
-                    (double-float 0.0d0)
-                    (t 0)))))
-         (rank (length dimensions))
-         (total-size (apply #'* dimensions))
-         (displaced-to (cond (displaced-to displaced-to)
-                             (t (cl:make-array
-                                 total-size
-                                 :initial-element displaced-vector-initial-element
-                                 :element-type element-type))))
-         (offsets (if displaced-index-offset
-                      (nconc (list displaced-index-offset)
-                             (make-list (1- rank) :initial-element 0))
-                      offsets))
-         (strides (if strides-p
-                      strides
-                      (dimensions->strides dimensions))))
+  (let* ((dimensions      (ensure-list dimensions))
+         (rank            (length dimensions))
+         (total-size      (apply #'* dimensions))
+         (strides         (if strides-p
+                              strides
+                              (dimensions->strides dimensions)))
+
+         ;; FIXME: Handle displaced-index-offset correctly
+         (offsets         (if displaced-index-offset
+                              (nconc (list displaced-index-offset)
+                                     (make-list (1- rank) :initial-element 0))
+                              offsets))
+
+         (backend-object  (if (backend-p backend)
+                              backend
+                              (find-backend backend)))
+         (element-type    (funcall (backend-element-type-upgrader backend-object)
+                                   element-type))
+         (initial-element (cond (initial-element-p initial-element)
+                                (t (case element-type
+                                     ;; TODO: Include more types?
+                                     (single-float 0.0s0)
+                                     (double-float 0.0d0)
+                                     (t 0)))))
+         (storage         (or displaced-to
+                              (funcall (backend-storage-allocator backend-object)
+                                       total-size
+                                       :initial-element initial-element
+                                       :element-type element-type)))
+
+         (dense-array     (make-dense-array :storage storage
+                                            ;; FIXME: DISPLACED-TO is redundant with STORAGE
+                                            :displaced-to storage
+                                            :element-type element-type
+                                            :dimensions dimensions
+                                            :strides strides
+                                            :offsets offsets
+                                            :contiguous-p t
+                                            :total-size (apply #'* dimensions)
+                                            :root-array nil
+                                            :rank (length dimensions)
+                                            :backend backend))
+         (storage-accessor (backend-storage-accessor backend-object)))
     (cond (constructor-p
            (let ((row-major-index 0))
              (declare (type size row-major-index))
@@ -102,8 +121,9 @@
                         ;; (print r)
                         ;; (princ (list row-major-index :stride stride subscripts))
                         (if (< r 0)
-                            (setf (cl:aref displaced-to row-major-index)
-                                  (apply constructor subscripts))
+                            (funcall (fdefinition `(setf ,storage-accessor))
+                                     (apply constructor subscripts)
+                                     storage row-major-index)
                             (loop :for i :of-type size :below (nth r dimensions)
                                   :with 1-r :of-type int-index := (1- r)
                                   :with s :of-type size := (nth r strides)
@@ -127,31 +147,24 @@
                            (loop :for e :in elt
                                  :do (set-displaced-to e)))
                           (string
-                           (setf (cl:aref displaced-to row-major-index) elt)
+                           (funcall (fdefinition `(setf ,storage-accessor))
+                                    elt storage row-major-index)
                            (incf row-major-index))
                           (cl:vector
                            (loop :for e :across elt
                                  :do (set-displaced-to e)))
                           (t
-                           (setf (cl:aref displaced-to row-major-index) elt)
+                           (funcall (fdefinition `(setf ,storage-accessor))
+                                    elt storage row-major-index)
                            (incf row-major-index)))))
                (set-displaced-to initial-contents)))))
-    (let* ((array (make-dense-array :displaced-to displaced-to
-                                    :element-type (cl:array-element-type displaced-to)
-                                    :dim dimensions
-                                    :strides strides
-                                    :offsets offsets
-                                    :contiguous-p t
-                                    :total-size (apply #'* dimensions)
-                                    :root-array nil
-                                    :rank (length dimensions))))
-      array)))
+    dense-array))
 
 (def-test make-array ()
   (is (equalp #(0 1 2 1 2 3)
-              (array-displaced-to (make-array '(2 3) :constructor #'+ :element-type 'int32))))
+              (array-storage (make-array '(2 3) :constructor #'+ :element-type 'int32))))
   (is (equalp #(0 1 2 3 1 2 3 4 2 3 4 5 1 2 3 4 2 3 4 5 3 4 5 6)
-              (array-displaced-to (make-array '(2 3 4)
+              (array-storage (make-array '(2 3 4)
                                               :constructor #'+ :element-type 'int32))))
 
   (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
@@ -159,39 +172,47 @@
     (is (typep a '(array (signed-byte 32)))))
   (unless-static-vectors (1)
    (is (equalp #("hello" "goodbye")
-               (array-displaced-to (make-array 2 :initial-contents '("hello" "goodbye")))))))
+               (array-storage (make-array 2 :initial-contents '("hello" "goodbye")))))))
 
 ;; trivial function definitions
 
-(declaim (ftype (function (array) list) array-dimensions narray-dimensions))
+(declaim (ftype (function (array) list)
+                narray-dimensions
+                array-strides
+                array-offsets))
 
-(defun array-dimensions (array)
-  "Returns a copy of the dimensions-list of the ARRAY.
-Use NARRAY-DIMENSIONS to avoid the copy."
-  (declare (type array array)
-           ;; (optimize speed)
-           )
-  (copy-list (array-dim array)))
+(declaim (inline array-displaced-to))
+(defun array-displaced-to (array)
+  (declare (type dense-array array))
+  (array-storage array))
 
+(declaim (inline narray-dimensions))
 (defun narray-dimensions (array)
   "Returns the dimensions-list of the ARRAY. The list is not expected to be modified."
-  (declare ;; (optimize speed)
-           (type array array))
-  (array-dim array))
+  (declare (type array array))
+  (abstract-arrays::abstract-array-dimensions array))
 
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."
   (declare (type array array)
-           ;; (optimize speed)
            (type fixnum axis-number))
   (elt (narray-dimensions array) axis-number))
+
+(declaim (inline array-strides))
+(defun array-strides (array)
+  (declare (type dense-array array))
+  (dense-array-strides array))
 
 (defun array-stride (array axis-number)
   "Return the length of stride AXIS-NUMBER of ARRAY."
   (declare (type array array)
-           ;; (optimize speed)
            (type fixnum axis-number))
   (elt (array-strides array) axis-number))
+
+(declaim (inline array-offsets))
+(defun array-offsets (array)
+  (declare (type dense-array array))
+  (dense-array-offsets array))
 
 (defun array-offset (array axis-number)
   "Return the length of offset AXIS-NUMBER of ARRAY."
@@ -208,7 +229,7 @@ Use NARRAY-DIMENSIONS to avoid the copy."
 (defun array-view-p (array)
   "Returns T if the ARRAY is a VIEW, otherwise returns NIL"
   (declare (type array array))
-  (if (array-root-array array) t nil))
+  (if (dense-array-root-array array) t nil))
 
 (defun array-displaced-index-offset (array)
   (declare (type array array))
