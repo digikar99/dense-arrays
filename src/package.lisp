@@ -31,6 +31,7 @@
        (:shadow ,@shadow-symbols)
        (:import-from :abstract-arrays
                      :define-struct-with-required-slots
+                     :storage
                      :dimensions
                      :rank
                      :element-type)
@@ -168,7 +169,7 @@ Existing backend names include:~{~^~%  ~S~}"
   (strides      nil :required t)
   (offsets      nil :required t :type list)
   (contiguous-p nil :required t)
-  (backend      :cl :read-only t :type (or symbol backend))
+  (backend      :cl :read-only t :type symbol)
   (root-array   nil :required t))
 
 (defun standard-dense-array-p (object)

@@ -21,82 +21,6 @@
                 (+ index dimension)
                 index)))
 
-(defpolymorph array-storage ((array array)) (cl:array * 1)
-  (abstract-arrays::abstract-array-storage array))
-
-(defun foo (a i)
-  (declare (optimize speed (safety 0))
-           (type (array single-float 1) a)
-           (type int-index i))
-  (aref a i))
-
-(defun bar (a i)
-  (declare (optimize speed)
-           (type (cl:simple-array single-float 1) a))
-  (cl:aref a i))
-
-(defpolymorph (aref :inline t) ((array dense-array) &rest subscripts) t
-  (declare ;; (optimize speed)
-           (type dense-array array)
-           (dynamic-extent subscripts))
-  (cond ((and (= (array-rank array) (length subscripts))
-              (every #'integerp subscripts))
-         (let* ((backend        (dense-array-backend array))
-                (backend-object (if (backend-p backend)
-                                    backend
-                                    (find-backend backend))))
-           (funcall (backend-storage-accessor backend-object)
-                    (array-storage array)
-                    (the int-index
-                         (let ((index 0))
-                           (declare (type size index))
-                           ;; TODO: Better error reporting for negative indices
-                           (loop :for stride :of-type int-index :in (array-strides array)
-                                 :for subscript :of-type int-index :in subscripts
-                                 :for offset :of-type size :in (array-offsets array)
-                                 :for dimension :of-type size :in (narray-dimensions array)
-                                 :do (incf index (+ offset
-                                                    (the-size
-                                                     (* stride
-                                                        (normalize-index subscript dimension))))))
-                           index)))))
-        ((or (some #'cl:arrayp subscripts)
-             (some #'arrayp subscripts))
-         (apply #'%aref array subscripts))
-        (t
-         (apply #'%aref-view array subscripts))))
-
-;; (defun aref (array &rest subscripts)
-;;   (declare (optimize speed)
-;;            (type array array)
-;;            (dynamic-extent subscripts))
-;;   (cond ((and (= (array-rank array) (length subscripts))
-;;               (every #'integerp subscripts))
-;;          (cl:aref (the (cl:simple-array * 1) (array-displaced-to array))
-;;                   (let ((index 0))
-;;                     (declare (type size index))
-;;                     ;; TODO: Better error reporting for negative indices
-;;                     (loop :for stride :of-type int-index :in (array-strides array)
-;;                           :for subscript :of-type int-index :in subscripts
-;;                           :for offset :of-type size :in (array-offsets array)
-;;                           :for dimension :of-type size :in (narray-dimensions array)
-;;                           :do (incf index (+ offset
-;;                                              (the-size
-;;                                               (* stride
-;;                                                  (normalize-index subscript dimension))))))
-;;                     index)))
-;;         ((or (some #'cl:arrayp subscripts)
-;;              (some #'arrayp subscripts))
-;;          (apply #'%aref array subscripts))
-;;         (t
-;;          (apply #'%aref-view array subscripts))))
-
-
-(define-condition invalid-index (error)
-  ((index :accessor index :initarg :index))
-  (:report (lambda (condition stream)
-             (format stream "Index ~S is invalid" (index condition)))))
-
 (defun %aref-view (array &rest subscripts)
   "Returns a VIEW of the subscripted ARRAY (no copy)"
   (declare (optimize speed)
@@ -209,29 +133,63 @@
     (t
      (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
 
+(defpolymorph (aref :inline t) ((array dense-array) &rest subscripts) t
+  (declare ;; (optimize speed)
+           (type dense-array array)
+           (dynamic-extent subscripts))
+  (cond ((and (= (array-rank array) (length subscripts))
+              (every #'integerp subscripts))
+         (let* ((backend-object (find-backend (dense-array-backend array))))
+           (funcall (backend-storage-accessor backend-object)
+                    (array-storage array)
+                    (the int-index
+                         (let ((index 0))
+                           (declare (type size index))
+                           ;; TODO: Better error reporting for negative indices
+                           (loop :for stride :of-type int-index :in (array-strides array)
+                                 :for subscript :of-type int-index :in subscripts
+                                 :for offset :of-type size :in (array-offsets array)
+                                 :for dimension :of-type size :in (narray-dimensions array)
+                                 :do (incf index (+ offset
+                                                    (the-size
+                                                     (* stride
+                                                        (normalize-index subscript dimension))))))
+                           index)))))
+        ((or (some #'cl:arrayp subscripts)
+             (some #'arrayp subscripts))
+         (apply #'%aref array subscripts))
+        (t
+         (apply #'%aref-view array subscripts))))
+
+(define-condition invalid-index (error)
+  ((index :accessor index :initarg :index))
+  (:report (lambda (condition stream)
+             (format stream "Index ~S is invalid" (index condition)))))
+
 (defun (setf aref) (new-element/s array &rest subscripts)
   (declare (type dense-array array)
            (dynamic-extent subscripts))
-  (with-slots (displaced-to element-type strides offsets dimensions rank) array
-    (declare (type (cl:simple-array * (*)) displaced-to))
+  (with-slots (storage element-type strides offsets dimensions rank) array
     (cond ((and (= rank (length subscripts))
                 (every #'integerp subscripts))
-           (setf (cl:aref displaced-to
-                          (let ((index 0))
-                            (declare (type size index))
-                            ;; TODO: Better error reporting for negative indices
-                            (loop :for stride :of-type int-index :in strides
-                                  :for subscript :of-type int-index :in subscripts
-                                  :for offset :of-type size :in offsets
-                                  :for dimension :of-type size :in (narray-dimensions array)
-                                  :do (incf index
-                                            (the-size
-                                             (+ offset
-                                                (the-int-index
-                                                 (* stride
-                                                    (normalize-index subscript dimension)))))))
-                            index))
-                 new-element/s))
+           (let* ((backend-object (find-backend (dense-array-backend array))))
+             (funcall (fdefinition `(setf ,(backend-storage-accessor backend-object)))
+                      new-element/s
+                      storage
+                      (let ((index 0))
+                        (declare (type size index))
+                        ;; TODO: Better error reporting for negative indices
+                        (loop :for stride :of-type int-index :in strides
+                              :for subscript :of-type int-index :in subscripts
+                              :for offset :of-type size :in offsets
+                              :for dimension :of-type size :in (narray-dimensions array)
+                              :do (incf index
+                                        (the-size
+                                         (+ offset
+                                            (the-int-index
+                                             (* stride
+                                                (normalize-index subscript dimension)))))))
+                        index))))
           ((or (some #'cl:arrayp subscripts)
                (some #'arrayp subscripts))
            (apply #'(setf %aref) new-element/s array subscripts))
@@ -369,7 +327,8 @@ This is SETFable"
    (type dense-array array)
    (type int-index index))
   (if (dense-array-contiguous-p array)
-      (cl:aref (array-displaced-to array)
+      (funcall (fdefinition (backend-storage-accessor (find-backend (dense-array-backend array))))
+               (array-storage array)
                (the int-index (apply #'+ index (array-offsets array))))
       (let ((row-major-index   0)
             (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
@@ -385,7 +344,9 @@ This is SETFable"
               :do (incf row-major-index (the-int-index (+ o (the-int-index
                                                              (* s (floor index as))))))
                   (setf index (rem index as)))
-        (cl:aref (array-displaced-to array)
+        (funcall (fdefinition (backend-storage-accessor
+                               (find-backend (dense-array-backend array))))
+                 (array-storage array)
                  row-major-index))))
 
 (defun (setf row-major-aref) (new-element array index)
@@ -393,9 +354,11 @@ This is SETFable"
            (type dense-array array)
            (type int-index index))
   (if (dense-array-contiguous-p array)
-      (setf (cl:aref (array-displaced-to array)
-                     (the int-index (apply #'+ index (array-offsets array))))
-            new-element)
+      (funcall (fdefinition `(setf ,(backend-storage-accessor
+                                     (find-backend (dense-array-backend array)))))
+               new-element
+               (array-storage array)
+               (the int-index (apply #'+ index (array-offsets array))))
       (let ((row-major-index   0)
             (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
         (declare (type int-index row-major-index))
@@ -405,9 +368,11 @@ This is SETFable"
               :do (incf row-major-index (the-int-index (+ o (the-int-index
                                                              (* s (floor index as))))))
                   (setf index (rem index as)))
-        (setf (cl:aref (array-displaced-to array)
-                       row-major-index)
-              new-element))))
+        (funcall (fdefinition `(setf ,(backend-storage-accessor
+                                     (find-backend (dense-array-backend array)))))
+               new-element
+               (array-storage array)
+               row-major-index))))
 
 (def-test row-major-aref ()
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))

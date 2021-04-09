@@ -78,9 +78,7 @@
                                      (make-list (1- rank) :initial-element 0))
                               offsets))
 
-         (backend-object  (if (backend-p backend)
-                              backend
-                              (find-backend backend)))
+         (backend-object  (find-backend backend))
          (element-type    (funcall (backend-element-type-upgrader backend-object)
                                    element-type))
          (initial-element (cond (initial-element-p initial-element)
@@ -258,27 +256,29 @@
 
 (defmethod print-object ((array dense-array) stream)
   ;; (print (type-of array))
-  (let ((*print-right-margin* (or *print-right-margin* 80))
-        (sv     (array-displaced-to array))
-        (rank   (array-rank array))
-        (rank-1 (1- (array-rank array)))
-        (lines  3)
-        (*axis-number* 0)
-        (indent 3)
-        (fmt-control (or *array-element-print-format*
-                         (switch ((array-element-type array) :test #'type=)
-                           ('double-float "~,15,3@e")
-                           ('single-float "~,7,2@e")
-                           (t             "~s")))))
+  (let* ((*print-right-margin* (or *print-right-margin* 80))
+         (sv      (array-storage array))
+         (backend (dense-array-backend array))
+         (sv-ref  (fdefinition (backend-storage-accessor (find-backend backend))))
+         (rank    (array-rank array))
+         (rank-1  (1- (array-rank array)))
+         (lines   3)
+         (*axis-number* 0)
+         (indent  3)
+         (fmt-control (or *array-element-print-format*
+                          (switch ((array-element-type array) :test #'type=)
+                            ('double-float "~,15,3@e")
+                            ('single-float "~,7,2@e")
+                            (t             "~s")))))
     ;; Do this before just to save some horizontal space
     (declare (special *axis-number*))
-    (print-unreadable-object (array stream :identity t)
+    (print-unreadable-object (array stream :identity t :type t)
+      ;; header
+      (format stream "~A~S ~{~S~^x~}"
+              (if (array-view-p array) "(VIEW) " "")
+              (array-element-type array)
+              (narray-dimensions array))      
       (when *print-array*
-        ;; header
-        (format stream "DENSE-ARRAYS:ARRAY ~A~S ~{~S~^x~}"
-                (if (array-view-p array) "(VIEW) " "")
-                (array-element-type array)
-                (narray-dimensions array))
         ;; elements
         ;; DONE: *print-level*
         ;; DONE: *print-lines*
@@ -321,7 +321,7 @@
                             (dotimes (i indent) (write-char #\space stream))
                             (setq column indent)))
                      (cond ((= *axis-number* rank)
-                            (print-respecting-margin (cl:aref sv (+ offset start)) column))
+                            (print-respecting-margin (funcall sv-ref sv (+ offset start)) column))
                            (t
                             (let ((dim               (array-dimension array *axis-number*))
                                   (stride            (array-stride array *axis-number*))
@@ -378,7 +378,9 @@
               (print-lines-exhausted (condition)
                 (write-string " ..." stream)
                 (dotimes (i (axis-number condition)) (write-char #\) stream))
-                (terpri stream)))))))))
+                (terpri stream))))))
+      ;; footer
+      (format stream " :BACKEND ~S" backend))))
 
 (defun print-array (array &optional array-element-print-format &key level length
                                                                  (stream nil streamp))
