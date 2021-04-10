@@ -44,6 +44,9 @@
 (in-package :dense-arrays)
 
 (def-suite :dense-arrays)
+(def-suite backend-dependent :in :dense-arrays)
+(def-suite backend-independent :in :dense-arrays
+  :description "DENSE-ARRAY tests that are supposed to pass irrespective of the backend.")
 
 (in-suite :dense-arrays)
 

@@ -246,6 +246,11 @@ Tests are also littered throughout out the system and may serve as examples, for
 
 # Usage
 
+0. Obtain
+   - [adhoc-polymorphic-functions](https://github.com/digikar99/adhoc-polymorphic-functions/)
+   - my copy of [trivial-types](https://github.com/digikar99/trivial-types/) (original has been archived by the author)
+   - [abstract-arrays](https://github.com/digikar99/abstract-arrays)
+   - perhaps a few other alpha-stage things not added to quicklisp yet (raise an issue!)
 1. Clone into `$QUICKLISP_HOME/local-projects`. (See `ql:*local-project-directories*`.)
 2. `(ql:quickload "dense-arrays")` - or dense-arrays-plus or dense-arrays-plus-lite
 3. Optionally: `(asdf:test-system "dense-arrays")`- or dense-arrays-plus or dense-arrays-plus-lite

@@ -1,17 +1,12 @@
 (in-package :dense-arrays)
 
-(in-suite :dense-arrays)
-
 (defun array= (array1 array2 &key (test #'equalp))
   (and (equalp (narray-dimensions array1)
                (narray-dimensions array2))
-       (let ((array= t))
-         (do-arrays ((elt1 array1)
-                     (elt2 array2))
-           (setf array= (funcall test elt1 elt2))
-           (unless array=
-             (return-from array= nil)))
-         t)))
+       (loop :for i :below (array-total-size array1)
+             :always (funcall test
+                              (row-major-aref array1 i)
+                              (row-major-aref array2 i)))))
 
 (declaim (inline normalize-index))
 (defun normalize-index (index dimension)
@@ -201,10 +196,11 @@
 (defun (setf %aref-view) (new-array array &rest subscripts)
   ;; TODO: Optimize
   (declare (dynamic-extent subscripts))
-  (let ((sub-array (apply #'aref array subscripts)))
-    (do-arrays ((new (broadcast-array new-array (array-dimensions sub-array)))
-                (old sub-array))
-      (setf old new)))
+  (let* ((sub-array         (apply #'aref array subscripts))
+         (broadcasted-array (broadcast-array new-array (array-dimensions sub-array))))
+    (loop for i below (array-total-size sub-array)
+          do (setf (row-major-aref sub-array i)
+                   (row-major-aref broadcasted-array i))))
   new-array)
 
 (defun (setf %aref) (new-array array &rest subscripts)
@@ -242,7 +238,7 @@
        (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
   new-array)
 
-(def-test aref ()
+(def-test aref (:suite backend-independent)
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))
     (is (= 9 (aref array 9 0)))
     (is (= 9 (aref array 8 1)))
@@ -268,7 +264,7 @@
               (make-array '(4 4) :constructor (lambda (x y) (+ 2 x y))
                            :element-type 'int32))))
 
-(def-test advanced-aref ()
+(def-test advanced-aref (:suite backend-dependent)
   (is (array= (make-array '(2 2) :initial-contents '((2 6) (1 4)) :element-type 'int32)
               (aref (make-array '(2 3)
                                 :element-type 'int32
@@ -287,7 +283,8 @@
                                 :element-type 'bit
                                 :initial-contents '((1 0 1) (0 0 1)))))))
 
-(def-test setf-aref ()
+(def-test setf-aref (:suite backend-independent)
+  ;; The array constructed in BROADCAST-ARRAY has an implicit assumption
   (is (array= (make-array '(2 3) :initial-contents '((0 1 2) (1 2 -1)) :element-type 'int32)
               (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32)))
                 (setf (aref a 1 2) -1)
@@ -311,13 +308,14 @@
                       (make-array 2 :initial-contents '(2 3) :element-type 'int32))
                 a))))
 
-(def-test setf-advanced-aref ()
+(def-test setf-advanced-aref (:suite backend-dependent)
   (is (array= (make-array '(2 3) :initial-contents '((2 2 2) (4 5 2)) :element-type 'int32)
               (let ((a (make-array '(2 3)
                                    :initial-contents '((1 2 3) (4 5 6)) :element-type 'int32)))
                 (setf (aref a (make-array '(2 3)
                                           :element-type 'bit
-                                          :initial-contents '((1 0 1) (0 0 1))))
+                                          :initial-contents '((1 0 1) (0 0 1))
+                                          :backend :cl))
                       2)
                 a))))
 
@@ -328,7 +326,8 @@ This is SETFable"
    (type dense-array array)
    (type int-index index))
   (if (dense-array-contiguous-p array)
-      (funcall (fdefinition (backend-storage-accessor (find-backend (dense-array-backend array))))
+      (funcall (fdefinition (backend-storage-accessor
+                             (find-backend (dense-array-backend array))))
                (array-storage array)
                (the int-index (apply #'+ index (array-offsets array))))
       (let ((row-major-index   0)
@@ -375,7 +374,7 @@ This is SETFable"
                (array-storage array)
                row-major-index))))
 
-(def-test row-major-aref ()
+(def-test row-major-aref (:suite backend-independent)
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))
     (is (= 5 (row-major-aref array 9)))
     (is (= 9 (row-major-aref array 18)))
@@ -384,7 +383,7 @@ This is SETFable"
                                    '(9))
                              1)))))
 
-(def-test setf-row-major-aref ()
+(def-test setf-row-major-aref (:suite backend-independent)
   (is (array= (make-array '(2 3) :initial-contents '((0 1 2) (1 0 3)) :element-type 'int32)
               (let ((array (make-array '(2 3) :constructor #'+ :element-type 'int32)))
                 (setf (row-major-aref array 4) 0)

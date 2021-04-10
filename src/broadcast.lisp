@@ -1,6 +1,7 @@
 (in-package :dense-arrays)
 
 (defun broadcast-array (array broadcast-dimensions)
+  (declare (optimize debug))
   (unless (arrayp array)
     ;; Should probably warn if ARRAY is not an array
     (setq array (make-array 1 :initial-element array :element-type (type-of array))))

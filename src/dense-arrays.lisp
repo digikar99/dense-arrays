@@ -1,6 +1,6 @@
 (in-package :dense-arrays)
 
-(in-suite :dense-arrays)
+(in-suite backend-independent)
 
 (def-test array-type ()
   (is (subtypep '(array single-float) 'array))
@@ -162,12 +162,12 @@
                (set-displaced-to initial-contents)))))
     dense-array))
 
-(def-test make-array ()
+(def-test make-array (:suite backend-dependent)
   (is (equalp #(0 1 2 1 2 3)
               (array-storage (make-array '(2 3) :constructor #'+ :element-type 'int32))))
   (is (equalp #(0 1 2 3 1 2 3 4 2 3 4 5 1 2 3 4 2 3 4 5 3 4 5 6)
               (array-storage (make-array '(2 3 4)
-                                              :constructor #'+ :element-type 'int32))))
+                                         :constructor #'+ :element-type 'int32))))
 
   (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
     (is (typep a '(%dense-array int32)))
@@ -270,18 +270,20 @@
          (*axis-number* 0)
          (indent  3)
          (fmt-control (or *array-element-print-format*
-                          (switch ((array-element-type array) :test #'type=)
-                            ('double-float "~,15,3@e")
-                            ('single-float "~,7,2@e")
-                            (t             "~s")))))
+                          (if (type-specifier-p (array-element-type array))
+                              (switch ((array-element-type array) :test #'type=)
+                                ('double-float "~,15,3@e")
+                                ('single-float "~,7,2@e")
+                                (t             "~s"))
+                              "~S"))))
     ;; Do this before just to save some horizontal space
     (declare (special *axis-number*))
     (print-unreadable-object (array stream :identity t :type t)
       ;; header
-      (format stream "~A~S ~{~S~^x~}"
-              (if (array-view-p array) "(VIEW) " "")
-              (array-element-type array)
-              (narray-dimensions array))      
+      (format stream "~A~{~S~^x~} ~S "
+              (if (array-view-p array) "(VIEW) " "")              
+              (narray-dimensions array)
+              (array-element-type array))      
       (when *print-array*
         ;; elements
         ;; DONE: *print-level*

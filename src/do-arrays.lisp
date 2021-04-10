@@ -1,7 +1,5 @@
 (in-package :dense-arrays)
 
-(in-suite :dense-arrays)
-
 (defmacro lm (&rest body-vars)
   `(lambda ,(butlast body-vars)
      ,@(last body-vars)))
@@ -182,7 +180,7 @@ Either of the two cases might be faster depending on the number of dimensions."
                          ;; Could there be a case where a user wants to specify
                          ;; the backend but not the element-type?
                          ;; Well, they could just specify the *
-                         &key (backend :cl))
+                         &key (backend *dense-array-backend*))
                         binding
                       (when (and (= 3 (env:policy-quality 'speed env))
                                  (eq element-type '*))
@@ -219,7 +217,7 @@ Either of the two cases might be faster depending on the number of dimensions."
                 (expand-do-arrays-without-rank elt-vars array-vars storage-types
                                                storage-accessors body)))))))
 
-(def-test do-arrays ()
+(def-test do-arrays (:suite backend-dependent)
   (is (equalp '((2 3) (1 2) (0 1) 2 1)
               (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32))
                     (elt))
