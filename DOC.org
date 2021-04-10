@@ -1,0 +1,94 @@
+
+* Documentation
+:PROPERTIES:
+:TOC: :include all :ignore this
+:END:
+
+:CONTENTS:
+- [[#the-array-object][The Array Object]]
+- [[#array-types][Array Types]]
+- [[#changing-backends][Changing backends]]
+- [[#references-and-internal-discussion][References and Internal Discussion]]
+  - [[#why-interchangeable-backends-instead-of-abstract-dense-array--standard-dense-array][Why interchangeable backends instead of {abstract-dense-array + standard-dense-array}?]]
+  - [[#types-vs-classes][Types vs Classes]]
+:END:
+
+
+* The Array Object
+
+The =dense-arrays::dense-array= object is essentially a wrapper around a 1-dimensional vector. Depending on the =offsets=, =strides= and =dimensions= this 1-dimensional vector may be interpreted in different ways. For instance, below, notice how the =displaced-to= is the same:
+
+#+BEGIN_SRC lisp
+DENSE-ARRAYS> (make-array '(2 3) :constructor #'+)
+#<DENSE-ARRAYS:ARRAY T 2x3
+   (0 1 2)
+   (1 2 3)
+ {10216B01F3}>
+DENSE-ARRAYS> (describe *)
+  DISPLACED-TO                   = #(0 1 2 1 2 3)
+  DIM                            = (2 3)
+  STRIDES                        = (3 1)
+  OFFSETS                        = (0 0)
+  ROOT-ARRAY                     = NIL
+; No value
+DENSE-ARRAYS> (aref (make-array '(2 3) :constructor #'+) 1)
+#<DENSE-ARRAYS:ARRAY (VIEW) T 3
+   1 2 3
+ {1021907203}>
+DENSE-ARRAYS> (describe *)
+  DISPLACED-TO                   = #(0 1 2 1 2 3)
+  DIM                            = (3)
+  STRIDES                        = (1)
+  OFFSETS                        = (3)
+  ROOT-ARRAY                     = #<DENSE-ARRAYS:ARRAY T 2x3 {1021907143}>
+; No value
+DENSE-ARRAYS> (aref (make-array '(2 3) :constructor #'+) nil 1)
+#<DENSE-ARRAYS:ARRAY (VIEW) T 2
+   2 3
+ {1021B87ED3}>
+DENSE-ARRAYS> (describe *)
+  DISPLACED-TO                   = #(0 1 2 1 2 3)
+  DIM                            = (2)
+  STRIDES                        = (3)
+  OFFSETS                        = (2)
+  ROOT-ARRAY                     = #<DENSE-ARRAYS:ARRAY T 2x3 {1021B87E03}>
+; No value
+#+END_SRC
+
+* Array Types
+
+This object is to be used through the following types provided for optimization purposes.
+
+- =(dense-arrays:array &optional element-type rank)=
+- =(dense-arrays:simple-array &optional element-type rank)= (TODO)
+- =(dense-arrays:cl-array &optional element-type rank)= (TODO)
+
+* Changing backends
+
+The =dense-array= object has a slot named =backend=. The default value of this slot is =:cl=, and then, this object is also known as a =standard-dense-array=. Thus, to provide another backend for =dense-array=, one needs to:
+
+1. Create a new backend using =make-backend=. See =*standard-dense-array-backend*= for an example.
+2. Provide a different value for =:backend= initarg to =make-array=; this value should be a symbol that is the name of a backend. (See =find-backend=.)
+
+See [[file:plus/static-vectors.lisp][plus/static-vectors.lisp]] and [[file:plus/cl-cuda.lisp][plus/cl-cuda.lisp]] for some examples.
+
+* References and Internal Discussion
+
+** Why interchangeable backends instead of {abstract-dense-array + standard-dense-array}?
+
+   Whatever functions one writes should work on a dense-array. It doesn't make a lot of user sense to write a function for "abstract dense array" as compared to writing it for "dense-array".
+
+   In addition, for functions preprovided with the system, one wants to let the user use the functions directly without any usage overhead. For instance, consider the case of the two versions of =aref=, one written for the interchangeable backend case, and the other for =abstract-dense-array=:
+
+- The former =aref= can be directly called by the user.
+- However, the latter =aref= will first need to be compiled and then the resulting function can be called. In my taste, this goes against the dynamicity of Common Lisp. One can still provide one more concretized version of =aref=, but the user needs to repeat this process for every backend they develop. To conclude, this just doesn't feel correct in my taste.
+
+The philosophy I'd like to stick to is: if you are writing a function for =dense-array=, you should be able to run it without recompilation on a =dense-array= with /any/ backend. A recompilation with the right declarations should merely be of help for purposes of optimization and should not be necessary for unoptimized usage.
+
+PS: I'd still be open to think over the "slight" alternatives to the second version. As far as I see things, the second alternative is akin to [[https://github.com/markcox80/template-function][template-function]].
+
+** Types vs Classes
+
+1. https://stackoverflow.com/a/39665334/8957330
+2. https://www.cs.princeton.edu/courses/archive/fall98/cs441/mainus/node12.html
+3. https://www.cs.utexas.edu/users/wcook/papers/InheritanceSubtyping90/CookPOPL90.pdf
