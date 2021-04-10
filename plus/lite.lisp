@@ -3,6 +3,9 @@
   (:import-from
    :dense-arrays
    :make-dense-array
+   :dense-array-backend
+   :backend-storage-accessor
+   :dense-array
    :array-offsets
    :array-strides
    :array-root-array)
@@ -40,24 +43,24 @@ See the definition of ASARRAY for an example of usage.")
 (defun dimensions (array-like)
   "Consequences of ARRAY-LIKE having elements of different dimensions is undefined."
   (typecase array-like
-    (string   nil)
-    (sequence (let ((len (length array-like)))
-                (cons len
-                      (when (> len 0) (dimensions (elt array-like 0))))))
-    (cl:array (cl:array-dimensions array-like))
-    (array    (array-dimensions array-like))
-    (t        ())))
+    (string      nil)
+    (sequence    (let ((len (length array-like)))
+                   (cons len
+                         (when (> len 0) (dimensions (elt array-like 0))))))
+    (cl:array    (cl:array-dimensions array-like))
+    (dense-array (array-dimensions array-like))
+    (t           ())))
 
 (defun element-type (array-like)
   "Consequences of ARRAY-LIKE having elements of different element-type is undefined."
   (typecase array-like
-    (string   t)
-    (sequence (if (> (length array-like) 0)
-                  (element-type (elt array-like 0))
-                  'null))
-    (cl:array (cl:array-element-type array-like))
-    (array    (array-element-type array-like))
-    (t        t)))
+    (string      t)
+    (sequence    (if (> (length array-like) 0)
+                     (element-type (elt array-like 0))
+                     'null))
+    (cl:array    (cl:array-element-type array-like))
+    (dense-array (array-element-type (array-displaced-to array-like)))
+    (t           t)))
 
 (def-test dimensions ()
   (is (equalp '(3)   (dimensions '(1 2 3))))
@@ -69,17 +72,20 @@ See the definition of ASARRAY for an example of usage.")
               (dimensions (list (cl:make-array '(3 4))
                                 (cl:make-array '(3 4)))))))
 
-(defvar *storage-vector*)
 (defvar *index*)
+(defvar *storage*)
+(defvar *storage-accessor*)
 
 (defmethod traverse ((object t))
-  (setf (cl:aref *storage-vector* *index*)
-        ;; TODO: Abstract this out into a "trivial-coerce" package
-        (trivial-coerce:coerce object (cl:array-element-type *storage-vector*)))
+  (funcall (fdefinition `(setf ,*storage-accessor*))
+           (trivial-coerce:coerce object (array-element-type *storage*))
+            *storage* *index*)
   (incf *index*))
 
 (defmethod traverse ((object string))
-  (setf (cl:aref *storage-vector* *index*) object)
+  (funcall (fdefinition `(setf ,*storage-accessor*))
+           object
+            *storage* *index*)
   (incf *index*))
 
 (macrolet ((def-stub (type)
@@ -108,8 +114,10 @@ See the definition of ASARRAY for an example of usage.")
                                  :element-type (if (eq :auto element-type)
                                                    (element-type array-like)
                                                    element-type)))
-         (*storage-vector* (array-displaced-to array))
-         (*index*          0))
+         (*storage*  (array-displaced-to array))
+         (*storage-accessor* (backend-storage-accessor
+                              (find-backend (dense-array-backend array))))
+         (*index*    0))
     (traverse array-like)
     array))
 
@@ -134,7 +142,7 @@ See the definition of ASARRAY for an example of usage.")
 
 (defun transpose (array)
   (declare (optimize speed)
-           (type array array))
+           (type dense-array array))
   (make-dense-array :displaced-to (array-displaced-to array)
                     :storage (array-displaced-to array)
                     :element-type (array-element-type array)
@@ -144,6 +152,7 @@ See the definition of ASARRAY for an example of usage.")
                     :contiguous-p nil
                     :total-size   (array-total-size   array)
                     :rank (array-rank array)
+                    :backend (dense-array-backend array)
                     :root-array (or (dense-arrays::dense-array-root-array array)
                                     array)))
 
@@ -205,14 +214,14 @@ See the definition of ASARRAY for an example of usage.")
   (rand (dimensions array-like) :type (element-type array-like)))
 
 (defun as-cl-array (array)
-  (declare (type array array))
+  (declare (type dense-array array))
   (let ((cl-array (cl:make-array (narray-dimensions array)
                                  :element-type (array-element-type array)
                                  :initial-element (coerce 0 (array-element-type array))))
         (index    0))
-    (do-arrays ((a array))
-      (setf (cl:row-major-aref cl-array index) a)
-      (incf index))
+    (dotimes (index (cl:array-total-size cl-array))
+      (setf (cl:row-major-aref cl-array index)
+            (row-major-aref array index)))
     cl-array))
 
 ;; TODO: Write a functional version of this

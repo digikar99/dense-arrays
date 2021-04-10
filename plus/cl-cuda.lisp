@@ -75,12 +75,14 @@
   (cu:free-memory-block memory-block))
 
 (defun upgraded-cuda-array-element-type (element-type)
-  (or (find element-type *lisp-cuda-types* :key #'lisp-type :test #'type=)
-      ;; TODO: Some default type
-      (make-lisp-cuda-type :cuda 'cu:float
-                           :lisp element-type
-                           :c :float
-                           :size 4)))
+  (if (lisp-cuda-type-p element-type)
+      element-type
+      (or (find element-type *lisp-cuda-types* :key #'lisp-type :test #'type=)
+          ;; TODO: Some default type
+          (make-lisp-cuda-type :cuda 'cu:float
+                               :lisp element-type
+                               :c :float
+                               :size 4))))
 
 (declaim (inline cuda-memory-block-aref (setf cuda-memory-block-aref)))
 (defun cuda-memory-block-aref (memory-block index)
@@ -107,6 +109,13 @@
               :storage-deallocator 'free-cuda-vector
               :element-type-upgrader 'upgraded-cuda-array-element-type
               ;; TODO: Would additional types help in optimization?
+              :default-element-initializer
+              (lambda (lisp-cuda-type)
+                (ecase (cuda-type lisp-cuda-type)
+                  (cu:int 0)
+                  (cu:bool nil)
+                  (cu:float 0.0f0)
+                  (cu:double 0.0d0)))
               :storage-type-inferrer-from-array
               (lambda (array)
                 (declare (ignore array))
@@ -115,3 +124,9 @@
               (lambda (array)
                 (declare (ignore array))
                 'cl-cuda.api.memory::memory-block))
+
+(defpolymorph array-element-type ((memory-block cl-cuda.api.memory::memory-block)) t
+  (lisp-type (find (cl-cuda:memory-block-type memory-block)
+                   *lisp-cuda-types*
+                   :key #'cuda-type)))
+

@@ -82,11 +82,8 @@
          (element-type    (funcall (backend-element-type-upgrader backend-object)
                                    element-type))
          (initial-element (cond (initial-element-p initial-element)
-                                (t (case element-type
-                                     ;; TODO: Include more types?
-                                     (single-float 0.0s0)
-                                     (double-float 0.0d0)
-                                     (t 0)))))
+                                (t (funcall (backend-default-element-initializer backend-object)
+                                            element-type))))
          (storage         (or displaced-to
                               (funcall (backend-storage-allocator backend-object)
                                        total-size
