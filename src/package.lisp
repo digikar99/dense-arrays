@@ -13,6 +13,8 @@
                              :array-storage-deallocator
                              :upgraded-array-element-type
                              :define-dense-array-backend-specialization
+                             :make-backend
+                             :*dense-array-backend*
 
                              :narray-dimensions
                              :array-displacement
@@ -64,6 +66,7 @@
 (deftype uint64 () `(unsigned-byte 64))
 
 (defparameter *dense-array-backends* nil)
+(defparameter *dense-array-backend* :cl)
 
 (define-struct-with-required-slots (backend (:constructor create-backend))
   "
@@ -155,11 +158,11 @@ Existing backend names include:~{~^~%  ~S~}"
   "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.
 - OFFSETS is a list of offsets along each dimension."
-  (displaced-to nil :required t :type (cl:simple-array * 1))
+  (displaced-to nil :required t)
   (strides      nil :required t)
   (offsets      nil :required t :type list)
   (contiguous-p nil :required t)
-  (backend      :cl :read-only t :type symbol)
+  (backend      *dense-array-backend* :read-only t :type symbol)
   (root-array   nil :required t))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -192,6 +195,7 @@ Existing backend names include:~{~^~%  ~S~}"
 (deftype simple-dense-array   () `(and dense-array (satisfies simple-dense-array-p)))
 
 (define-array-specialization-type array standard-dense-array)
+;;; TODO: Put simple-array type to use
 (define-array-specialization-type simple-array (and standard-dense-array
                                                     simple-dense-array))
 

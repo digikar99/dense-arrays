@@ -37,7 +37,7 @@
 (defun nonzero (bit-array)
   (declare (optimize speed)
            ;; TODO: Optimize
-           (type (array bit) bit-array))
+           (type (%dense-array bit) bit-array))
   (let ((elt-count 0)
         (rank      (array-rank bit-array))
         (dims      (narray-dimensions bit-array)))

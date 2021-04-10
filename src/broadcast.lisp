@@ -45,7 +45,8 @@
          :total-size total-size
          :root-array (or (dense-array-root-array array) array)
          :rank (length broadcast-dimensions)
-         :storage (array-storage array))))))
+         :storage (array-storage array)
+         :backend (dense-array-backend array))))))
 
 (defun %broadcast-compatible-p (dimensions-a dimensions-b)
   "Returns two values:

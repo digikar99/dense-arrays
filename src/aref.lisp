@@ -89,6 +89,7 @@
        :contiguous-p contiguous-p
        :total-size (apply #'* dimensions)
        :root-array (or (dense-array-root-array array) array)
+       :backend (dense-array-backend array)
        :rank rank))))
 
 (defun %aref (array &rest subscripts)
@@ -103,7 +104,7 @@
         (apply #'broadcast-arrays
                (iter (for subscript in subscripts)
                  ;; TYPE-EXPAND is required for CCL and ECL
-                 (if (typep subscript (env:typexpand '(array bit)))
+                 (if (typep subscript (env:typexpand '(%dense-array bit)))
                      (appending (nonzero subscript))
                      (collect   subscript)))))
   (cond
@@ -215,7 +216,7 @@
       (apply #'broadcast-arrays
              new-array
              (iter (for subscript in subscripts)
-               (if (typep subscript (env:typexpand '(array bit)))
+               (if (typep subscript (env:typexpand '(%dense-array bit)))
                    (appending (nonzero subscript))
                    (collect   subscript))))
     (cond

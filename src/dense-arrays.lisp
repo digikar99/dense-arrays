@@ -43,7 +43,7 @@
                      (strides nil strides-p)
                      (adjustable nil adjustable-p)
                      (fill-pointer nil fill-pointer-p)
-                     (backend :cl)
+                     (backend *dense-array-backend*)
 
                      (displaced-to nil displaced-to-p)
                      (offsets nil offsets-p)
@@ -170,14 +170,15 @@
                                               :constructor #'+ :element-type 'int32))))
 
   (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
-    (is (typep a '(array int32)))
-    (is (typep a '(array (signed-byte 32)))))
+    (is (typep a '(%dense-array int32)))
+    (is (typep a '(%dense-array (signed-byte 32)))))
   (is (equalp #("hello" "goodbye")
-              (array-storage (make-array 2 :initial-contents '("hello" "goodbye"))))))
+              (array-storage (make-array 2 :initial-contents '("hello" "goodbye")
+                                         :backend :cl)))))
 
 ;; trivial function definitions
 
-(declaim (ftype (function (array) list)
+(declaim (ftype (function (dense-array) list)
                 narray-dimensions
                 array-strides
                 array-offsets))
@@ -190,12 +191,12 @@
 (declaim (inline narray-dimensions))
 (defun narray-dimensions (array)
   "Returns the dimensions-list of the ARRAY. The list is not expected to be modified."
-  (declare (type array array))
+  (declare (type dense-array array))
   (abstract-arrays::abstract-array-dimensions array))
 
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."
-  (declare (type array array)
+  (declare (type dense-array array)
            (type fixnum axis-number))
   (elt (narray-dimensions array) axis-number))
 
@@ -206,7 +207,7 @@
 
 (defun array-stride (array axis-number)
   "Return the length of stride AXIS-NUMBER of ARRAY."
-  (declare (type array array)
+  (declare (type dense-array array)
            (type fixnum axis-number))
   (elt (array-strides array) axis-number))
 
@@ -217,23 +218,23 @@
 
 (defun array-offset (array axis-number)
   "Return the length of offset AXIS-NUMBER of ARRAY."
-  (declare (type array array)
+  (declare (type dense-array array)
            ;; (optimize speed)
            (type size axis-number))
   (elt (array-offsets array) axis-number))
 
 (defun 1d-storage-array (array)
   "Returns the storage-vector underlying the ARRAY. This is equivalent to ARRAY-DISPLACED-TO."
-  (declare (type array array))
+  (declare (type dense-array array))
   (array-displaced-to array))
 
 (defun array-view-p (array)
   "Returns T if the ARRAY is a VIEW, otherwise returns NIL"
-  (declare (type array array))
+  (declare (type dense-array array))
   (if (dense-array-root-array array) t nil))
 
 (defun array-displaced-index-offset (array)
-  (declare (type array array))
+  (declare (type dense-array array))
   (let ((offsets (array-offsets array)))
     (if (every #'zerop (rest offsets))
         (first offsets)
@@ -400,7 +401,7 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
   nil)
 
 (def-test print-array ()
-  (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello)))
+  (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello :backend :cl)))
     (macrolet ((lines (n)
                  `(with-output-to-string (*standard-output*)
                     (let ((*print-lines* ,n))
