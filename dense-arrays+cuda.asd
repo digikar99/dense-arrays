@@ -12,9 +12,7 @@
              (declare (ignore o c))
              ;; Other tests won't pass because do-arrays is a compile time thing.
              ;; Or, they make certain assumptions about the backend.
-             (eval (read-from-string "(PROGN
-                                        (IN-PACKAGE :DENSE-ARRAYS)
-                                        (LET ((CL-CUDA:*SHOW-MESSAGES* NIL)
-                                              (*DENSE-ARRAY-BACKEND* :CUDA))
-                                          (5AM:RUN 'BACKEND-INDEPENDENT)))"))))
+             (eval (read-from-string "(LET ((CL-CUDA:*SHOW-MESSAGES* NIL)
+                                            (DENSE-ARRAYS:*DENSE-ARRAY-BACKEND* :CUDA))
+                                        (5AM:RUN 'DENSE-ARRAYS::BACKEND-INDEPENDENT)))"))))
  
