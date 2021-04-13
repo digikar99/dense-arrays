@@ -190,6 +190,7 @@ See the definition of ASARRAY for an example of usage.")
                     :initial-element (coerce 1 type)))
 
 (define-splice-list-fn rand (shape &key (type default-element-type))
+  ;; FIXME: What if type is lisp-cuda-type
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
@@ -200,8 +201,8 @@ See the definition of ASARRAY for an example of usage.")
                        ('short-float  1.0s0)
                        ('long-float   1.0l0)
                        (t            (random 1.0))))))
-    (do-arrays ((a-elt a))
-      (setf a-elt (random lim)))
+    (dotimes (index (array-total-size a))
+      (setf (row-major-aref a index) (random lim)))
     a))
 
 (defun zeros-like (array-like)
