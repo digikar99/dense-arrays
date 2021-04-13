@@ -18,8 +18,6 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (trivial-package-local-nicknames:add-package-local-nickname :cu :cl-cuda))
 
-;;; FIXME: Improve type translations
-
 (define-struct-with-required-slots (lisp-cuda-type)
   (lisp nil  :required t)
   (cuda nil  :required t)
@@ -63,8 +61,9 @@
                              :c :bool)))
 
 (defun make-cuda-vector (size &key element-type initial-element)
-  ;; FIXME: Handle initial-element correctly
-  (let* ((block (cu:alloc-memory-block (cuda-type element-type) size)))
+  (let* ((lisp-cuda-type (find element-type *lisp-cuda-types*
+                               :key #'lisp-type :test #'type=))
+         (block (cu:alloc-memory-block (cuda-type lisp-cuda-type) size)))
     (loop :for i :below size
           :do (setf (cuda-memory-block-aref block i) initial-element))
     ;; TODO: A faster option; but there are better things to optimize than this
@@ -77,12 +76,11 @@
 (defun upgraded-cuda-array-element-type (element-type)
   (if (lisp-cuda-type-p element-type)
       element-type
-      (or (find element-type *lisp-cuda-types* :key #'lisp-type :test #'type=)
-          ;; TODO: Some default type
-          (make-lisp-cuda-type :cuda 'cu:float
-                               :lisp element-type
-                               :c :float
-                               :size 4))))
+      (if-let (lisp-cuda-type (find element-type *lisp-cuda-types*
+                                    :key #'lisp-type :test #'type=))
+        (lisp-type lisp-cuda-type)
+       ;; TODO: Some default type
+        'single-float)))
 
 (declaim (inline cuda-memory-block-aref (setf cuda-memory-block-aref)))
 (defun cuda-memory-block-aref (memory-block index)
@@ -100,8 +98,9 @@
       (setf (cu:memory-block-aref memory-block index) new)))
 
 (define-dense-array-backend-specialization :cuda)
-(deftype cuda-dense-array () `(and dense-array (satisfies ,(backend-p-fn-name :cuda))))
-(define-array-specialization-type cuda-array cuda-dense-array)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (deftype cuda-dense-array () `(and dense-array (satisfies ,(backend-p-fn-name :cuda))))
+  (define-array-specialization-type cuda-array cuda-dense-array))
 
 (make-backend :cuda
               :storage-accessor 'cuda-memory-block-aref
@@ -110,12 +109,11 @@
               :element-type-upgrader 'upgraded-cuda-array-element-type
               ;; TODO: Would additional types help in optimization?
               :default-element-initializer
-              (lambda (lisp-cuda-type)
-                (ecase (cuda-type lisp-cuda-type)
-                  (cu:int 0)
-                  (cu:bool nil)
-                  (cu:float 0.0f0)
-                  (cu:double 0.0d0)))
+              (lambda (element-type)
+                (switch (element-type :test #'type=)
+                  ('single-float 0.0f0)
+                  ('double-float 0.0d0)
+                  (t 0)))
               :storage-type-inferrer-from-array
               (lambda (array)
                 (declare (ignore array))

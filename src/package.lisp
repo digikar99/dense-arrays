@@ -5,8 +5,7 @@
                                      :array-total-size
                                      :aref
                                      :array-rank
-                                     :array-storage-set
-                                     :array-storage-ref))
+                                     :array-storage))
            (shadow-symbols '(:array
                              :simple-array
                              :array-storage-allocator
