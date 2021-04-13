@@ -90,7 +90,6 @@ STORAGE-DEALLOCATOR
   (storage-allocator     nil :required t :type function-designator)
   (storage-deallocator   nil :required t :type (or null function-designator))
   (element-type-upgrader nil :required t :type function-designator)
-  (default-element-initializer nil :required t :type function-designator)
   (storage-type-inferrer-from-array nil :required t :type function-designator)
   (storage-type-inferrer-from-array-type nil :required t :type function-designator))
 
@@ -100,14 +99,12 @@ STORAGE-DEALLOCATOR
 
 (defun make-backend (name &rest args &key storage-type-inferrer-from-array-type
                                        storage-type-inferrer-from-array
-                                       default-element-initializer
                                        storage-accessor
                                        storage-allocator
                                        storage-deallocator
                                        element-type-upgrader)
   (declare (ignore storage-type-inferrer-from-array-type
                    storage-type-inferrer-from-array
-                   default-element-initializer
                    storage-accessor
                    storage-allocator
                    storage-deallocator
@@ -147,12 +144,6 @@ Existing backend names include:~{~^~%  ~S~}"
                 :storage-allocator 'cl:make-array
                 :storage-deallocator nil
                 :element-type-upgrader 'cl:upgraded-array-element-type
-                :default-element-initializer
-                (lambda (element-type)
-                  (switch (element-type :test #'type=)
-                    ('single-float 0.0f0)
-                    ('double-float 0.0d0)
-                    (t 0)))
                 :storage-type-inferrer-from-array
                 (lambda (array)
                   (declare (type abstract-array array)

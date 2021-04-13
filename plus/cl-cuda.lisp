@@ -108,12 +108,6 @@
               :storage-deallocator 'free-cuda-vector
               :element-type-upgrader 'upgraded-cuda-array-element-type
               ;; TODO: Would additional types help in optimization?
-              :default-element-initializer
-              (lambda (element-type)
-                (switch (element-type :test #'type=)
-                  ('single-float 0.0f0)
-                  ('double-float 0.0d0)
-                  (t 0)))
               :storage-type-inferrer-from-array
               (lambda (array)
                 (declare (ignore array))

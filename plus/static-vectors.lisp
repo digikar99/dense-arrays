@@ -6,12 +6,6 @@
               :storage-allocator 'static-vectors:make-static-vector
               :storage-deallocator 'static-vectors:free-static-vector
               :element-type-upgrader 'cl:upgraded-array-element-type
-              :default-element-initializer
-              (lambda (element-type)
-                  (switch (element-type :test #'type=)
-                    ('single-float 0.0f0)
-                    ('double-float 0.0d0)
-                    (t 0)))
               :storage-type-inferrer-from-array
               (lambda (array)
                 (declare (type abstract-array array)
