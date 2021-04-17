@@ -100,7 +100,9 @@
 (define-dense-array-backend-specialization :cuda)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (deftype cuda-dense-array () `(and dense-array (satisfies ,(backend-p-fn-name :cuda))))
-  (define-array-specialization-type cuda-array cuda-dense-array))
+  (define-array-specialization-type cuda-array cuda-dense-array)
+  (define-array-specialization-type simple-cuda-array (and cuda-dense-array simple-dense-array))
+  (export '(cuda-array simple-cuda-array) :dense-arrays))
 
 (make-backend :cuda
               :storage-accessor 'cuda-memory-block-aref
