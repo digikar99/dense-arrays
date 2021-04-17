@@ -14,6 +14,7 @@
                              :define-dense-array-backend-specialization
                              :make-backend
                              :find-backend
+                             :dense-array-type-backend
                              :*dense-array-backend*
 
                              :narray-dimensions
@@ -130,12 +131,10 @@ Existing backend names include:~{~^~%  ~S~}"
 ;;; Some implementations like CCL do not have a #'(setf cl:aref)
 (declaim (inline cl-aref (setf cl-aref)))
 (defun cl-aref (array &rest subscripts)
-  (declare (optimize speed)
-           (dynamic-extent subscripts))
+  (declare (dynamic-extent subscripts))
   (apply #'cl:aref array subscripts))
 (defun (setf cl-aref) (new array &rest subscripts)
-  (declare (optimize speed)
-           (dynamic-extent subscripts))
+  (declare (dynamic-extent subscripts))
   (setf (apply #'cl:aref array subscripts) new))
 
 (defparameter *standard-dense-array-backend*
