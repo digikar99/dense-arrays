@@ -4,6 +4,10 @@
   `(lambda ,(butlast body-vars)
      ,@(last body-vars)))
 
+(defmacro define-macro-helper (name lambda-list &body body)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (defun ,name ,lambda-list ,@body)))
+
 ;;; We are not using let-plus, because for something like
 ;;
 ;; (let ((array (make-array '(1000000 1))))
@@ -34,6 +38,7 @@
                        :collect `(setq ,var (nth ,i ,values-sym))))
              (destructuring-lists ,bindings ,@body))))))
 
+;; TODO: Do away with map-collect using mapcar and lm above
 (defmacro map-collect (format &rest list-vars)
   "(map-collect `(c ,%1) '(1 2 3)) ;=> ((C 1) (C 2) (C 3))"
   ;; TODO: Replace this using mapcar and lm
@@ -43,7 +48,8 @@
                ,format)
              ,@list-vars)))
 
-(defun expand-do-arrays-with-rank (elt-vars array-vars storage-types storage-accessors rank body)
+(define-macro-helper expand-do-arrays-with-rank
+    (elt-vars array-vars storage-types storage-accessors rank body)
   ;; TODO Add rank correctness checks
   (let ((num-arrays (length array-vars)))
     (let ((dimensions  (make-gensym-list rank "DIMENSION"))
@@ -89,7 +95,8 @@
                               all-offsets array-vars))
                  ,(nest-loop dimensions all-strides all-offsets)))))))))
 
-(defun expand-do-arrays-without-rank (elt-vars array-vars storage-types storage-accessors body)
+(define-macro-helper expand-do-arrays-without-rank
+    (elt-vars array-vars storage-types storage-accessors body)
   ;; TODO Add rank correctness checks
   (let ((num-arrays (length array-vars)))
     (let ((offsets      (make-gensym-list num-arrays "OFFSETS"))
@@ -148,7 +155,7 @@
   "  If the argument is of type SIZE, it'd be treated as the rank of the arrays. Then,
 the BINDINGS are assumed to be the first element of the BODY.
   Otherwise, the first argument is treated as if they are BINDINGS.
-  Each BINDING is of the form 
+  Each BINDING is of the form
     (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (BACKEND-NAME :CL))
   Here, only ARRAY is evaluated.
 
