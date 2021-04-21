@@ -38,7 +38,8 @@
                      :storage
                      :dimensions
                      :rank
-                     :element-type)
+                     :element-type
+                     :intersection-type-types)
        (:local-nicknames (:cm :sandalphon.compiler-macro)
                          (:env :introspect-environment))))
 

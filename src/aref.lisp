@@ -157,41 +157,37 @@
         (t
          (apply #'%aref-view array subscripts))))
 
+(defpolymorph (aref :inline t) ((array dense-array) &rest subscripts) t
+  (declare (type dense-array array)
+           (dynamic-extent subscripts))
+  (cond ((and (= (array-rank array) (length subscripts))
+              (every #'integerp subscripts))
+         (let* ((backend-object (find-backend (dense-array-backend array))))
+           (funcall (backend-storage-accessor backend-object)
+                    (array-storage array)
+                    (the int-index
+                         (let ((index 0))
+                           (declare (type size index))
+                           ;; TODO: Better error reporting for negative indices
+                           (loop :for stride :of-type int-index :in (array-strides array)
+                                 :for subscript :of-type int-index :in subscripts
+                                 :for offset :of-type size :in (array-offsets array)
+                                 :for dimension :of-type size :in (narray-dimensions array)
+                                 :do (incf index (+ offset
+                                                    (the-size
+                                                     (* stride
+                                                        (normalize-index subscript dimension))))))
+                           index)))))
+        ((or (some #'cl:arrayp subscripts)
+             (some #'arrayp subscripts))
+         (apply #'%aref array subscripts))
+        (t
+         (apply #'%aref-view array subscripts))))
+
 (define-condition invalid-index (error)
   ((index :accessor index :initarg :index))
   (:report (lambda (condition stream)
              (format stream "Index ~S is invalid" (index condition)))))
-
-(defpolymorph (setf aref) (new-element/s (array dense-array) &rest subscripts) t
-  (declare (type dense-array array)
-           (dynamic-extent subscripts))
-  (with-slots (storage element-type strides offsets dimensions rank) array
-    (cond ((and (= rank (length subscripts))
-                (every #'integerp subscripts))
-           (let* ((backend-object (find-backend (dense-array-backend array))))
-             (funcall (fdefinition `(setf ,(backend-storage-accessor backend-object)))
-                      new-element/s
-                      storage
-                      (let ((index 0))
-                        (declare (type size index))
-                        ;; TODO: Better error reporting for negative indices
-                        (loop :for stride :of-type int-index :in strides
-                              :for subscript :of-type int-index :in subscripts
-                              :for offset :of-type size :in offsets
-                              :for dimension :of-type size :in (narray-dimensions array)
-                              :do (incf index
-                                        (the-size
-                                         (+ offset
-                                            (the-int-index
-                                             (* stride
-                                                (normalize-index subscript dimension)))))))
-                        index))))
-          ((or (some #'cl:arrayp subscripts)
-               (some #'arrayp subscripts))
-           (apply #'(setf %aref) new-element/s array subscripts))
-          (t
-           (apply #'(setf %aref-view) new-element/s array subscripts))))
-  new-element/s)
 
 (defun (setf %aref-view) (new-array array &rest subscripts)
   ;; TODO: Optimize
@@ -237,6 +233,38 @@
       (t
        (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
   new-array)
+
+(defpolymorph ((setf aref) :inline t) (new-element/s (array dense-array) &rest subscripts) t
+  (declare (type dense-array array)
+           ;; (optimize speed)
+           (dynamic-extent subscripts))
+  (with-slots (storage element-type strides offsets dimensions rank) array
+    (cond ((and (= rank (length subscripts))
+                (every #'integerp subscripts))
+           (let* ((backend-object (find-backend (dense-array-backend array))))
+             (funcall (fdefinition `(setf ,(backend-storage-accessor backend-object)))
+                      new-element/s
+                      storage
+                      (let ((index 0))
+                        (declare (type size index))
+                        ;; TODO: Better error reporting for negative indices
+                        (loop :for stride :of-type int-index :in strides
+                              :for subscript :of-type int-index :in subscripts
+                              :for offset :of-type size :in offsets
+                              :for dimension :of-type size :in (narray-dimensions array)
+                              :do (incf index
+                                        (the-size
+                                         (+ offset
+                                            (the-int-index
+                                             (* stride
+                                                (normalize-index subscript dimension)))))))
+                        index))))
+          ((or (some #'cl:arrayp subscripts)
+               (some #'arrayp subscripts))
+           (apply #'(setf %aref) new-element/s array subscripts))
+          (t
+           (apply #'(setf %aref-view) new-element/s array subscripts))))
+  new-element/s)
 
 (def-test aref (:suite backend-independent)
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))
@@ -319,19 +347,21 @@
                       2)
                 a))))
 
+(declaim (notinline row-major-aref))
 (defun row-major-aref (array index)
   "Return the element of ARRAY corresponding to the row-major INDEX.
 This is SETFable"
-  (declare ;; (optimize speed)
-   (type dense-array array)
-   (type int-index index))
+  (declare (type dense-array array)
+           ;; (optimize speed)
+           (type int-index index))
   (if (dense-array-contiguous-p array)
       (funcall (fdefinition (backend-storage-accessor
                              (find-backend (dense-array-backend array))))
                (array-storage array)
                (the int-index (apply #'+ index (array-offsets array))))
       (let ((row-major-index   0)
-            (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
+            (apparant-strides  (rest (collect-reduce-from-end #'*
+                                                              (narray-dimensions array) 1))))
         ;; APPARANT-STRIDES corresponds to the INDEX if DIMENSIONS were the true dimensions.
         ;; A user supplies the INDEX assuming that DIMENSIONS are the true dimensions.
         ;; But this need not be true due to strides and offsets.
