@@ -25,7 +25,7 @@
                (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
                                           backend)
                                          `(%dense-array ,elt-type ,rank)))
-               (subscript-types (mapcar (lm form (cm:form-type form env)) subscripts))
+               (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
                (os              (make-gensym-list (length subscripts) "OFFSET"))
                (ss              (make-gensym-list (length subscripts) "STRIDE"))
                (ds              (make-gensym-list (length subscripts) "DIMENSION"))
@@ -125,8 +125,8 @@
                (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
                                           backend)
                                          `(%dense-array ,elt-type ,rank)))
-               (subscript-types (mapcar (lm form (cm:form-type form env)) subscripts))
-               (new-value-type  (cm:form-type new-value env))
+               (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
+               (new-value-type  (primary-form-type new-value env))
                (os              (make-gensym-list (length subscripts) "OFFSET"))
                (ss              (make-gensym-list (length subscripts) "STRIDE"))
                (ds              (make-gensym-list (length subscripts) "DIMENSION"))

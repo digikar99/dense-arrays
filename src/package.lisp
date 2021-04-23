@@ -4,6 +4,7 @@
                                      :array-element-type
                                      :array-total-size
                                      :aref
+                                     :row-major-aref
                                      :array-rank
                                      :array-storage))
            (shadow-symbols '(:array
@@ -21,7 +22,6 @@
                              :array-displacement
                              :array-displaced-to
                              :array=
-                             :row-major-aref
                              :make-array
                              :*array-element-print-format*
                              :print-array
@@ -40,8 +40,10 @@
                      :rank
                      :element-type
                      :intersection-type-types)
-       (:local-nicknames (:cm :sandalphon.compiler-macro)
-                         (:env :introspect-environment))))
+       (:import-from :trivial-form-type
+                     #:primary-form-type
+                     #:primary-form-typep)
+       (:local-nicknames (:env :introspect-environment))))
 
 (in-package :dense-arrays)
 

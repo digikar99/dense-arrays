@@ -8,13 +8,11 @@
                "abstract-arrays"
                "adhoc-polymorphic-functions"
                "alexandria"
-               ;; TODO: replace compiler-macro with trivial-form-type
-               ;; after making the latter
-               "compiler-macro"
                "fiveam"
                "iterate"
                "trivial-garbage"
                "trivial-package-local-nicknames"
+               "trivial-form-type"
                "trivial-types"
                "uiop")
   :serial t

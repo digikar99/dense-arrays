@@ -1,12 +1,12 @@
 (cl:in-package :dense-arrays)
 
 (defmacro with-speed-optimization ((env form) &body body)
-  `(if (= 3 (cm:policy-quality 'speed ,env))
+  `(if (= 3 (env:policy-quality 'speed ,env))
        (let ((s *error-output*))
          (flet ((optim-failure ()
                   (terpri s)
                   (pprint-logical-block (s nil :per-line-prefix "; ")
-                    (format s "Unable to optimize~%")
+                    (format s "Unable to portably optimize~%")
                     (pprint-logical-block (s nil :per-line-prefix "  ")
                       (format s "~S" form))
                     (format s "~%because:~%")
@@ -17,19 +17,22 @@
                       (format s "~S" array))))
                 (unknown-backend (backend)
                   (pprint-logical-block (s nil :per-line-prefix "; ")
-                    (format s "Unable to optimize")
+                    (format s "Unable to portably optimize")
                     (pprint-logical-block (s nil :per-line-prefix "  ")
                       (format s "~S" form))
                     (format s "because backend ~S is not known" backend)))
                 (insufficient-declarations (reason &rest reason-args)
                   (terpri s)
                   (pprint-logical-block (s nil :per-line-prefix "; ")
-                    (format s "Unable to (fully) optimize~%")
+                    (format s "Unable to portably optimize~%")
                     (pprint-logical-block (s nil :per-line-prefix "  ")
                       (format s "~S" form))
                     (format s "~%because:~%")
                     (pprint-logical-block (s nil :per-line-prefix "  ")
                       (apply #'format s reason reason-args)))))
+           (declare (ignorable (function optim-failure)
+                               (function unknown-backend)
+                               (function insufficient-declarations)))
            ,@body))
        ,form))
 
@@ -58,15 +61,20 @@
 ;;; Or, make a trivial-form-type package
 (defun compile-time-array-type (array &optional env)
   (let ((array-type
-          (cond ((symbolp array)
-                 (cdr (when-let (type-information
-                                 (assoc 'type
-                                        (nth-value 2
-                                                   (env:variable-information array env))))
-                        type-information)))
-                ((and (listp array) (eq 'the (first array)))
-                 (second array))
-                (t (return-from compile-time-array-type nil)))))
-    (values (dense-array-type-backend array-type env)
-            (array-type-element-type array-type env)
-            (array-type-rank array-type env))))
+          (introspect-environment:typexpand
+           (cond ((symbolp array)
+                  (cdr (when-let (type-information
+                                  (assoc 'type
+                                         (nth-value 2
+                                                    (env:variable-information array env))))
+                         type-information)))
+                 ((and (listp array) (eq 'the (first array)))
+                  (second array))
+                 (t (return-from compile-time-array-type nil))))))
+    (if (and (listp array-type)
+             (eq 'and (first array-type)))
+        (values (dense-array-type-backend array-type env)
+                (array-type-element-type array-type env)
+                (array-type-rank array-type env)
+                (subtypep array-type 'simple-dense-array))
+        (values 'cl:* 'cl:* 'cl:* nil))))
