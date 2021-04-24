@@ -1,5 +1,23 @@
 (cl:in-package :dense-arrays)
 
+(define-compiler-macro array= (array1 array2 &key (test '(function equalp)) &environment env)
+  ;; Turns out merely inlining functions is not sufficient to "preserve"
+  ;; the type declarations; so, we use a compiler macro. See
+  ;;   https://stackoverflow.com/questions/67149358/portable-type-propagation-in-common-lisp-inlined-functions-without-compiler-macr
+  ;; for some details
+  ;; TODO: Create a PORTABLE-INLINABLE-FUNCTIONS library to preserve environment
+  (with-gensyms (array1-sym array2-sym)
+    `(let ((,array1-sym ,array1)
+           (,array2-sym ,array2))
+       (declare (type ,(primary-form-type array1 env) ,array1-sym)
+                (type ,(primary-form-type array2 env) ,array2-sym))
+       (and (equalp (narray-dimensions ,array1-sym)
+                    (narray-dimensions ,array2-sym))
+            (loop :for i :below (array-total-size ,array1-sym)
+                  :always (funcall ,test
+                                   (row-major-aref ,array1-sym i)
+                                   (row-major-aref ,array2-sym i)))))))
+
 (defpolymorph-compiler-macro aref (dense-array &rest)
     (&whole form array &rest subscripts &environment env)
   (compiler-macro-notes:with-notes (form
