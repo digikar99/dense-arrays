@@ -8,6 +8,7 @@
                "abstract-arrays"
                "adhoc-polymorphic-functions"
                "alexandria"
+               "compiler-macro-notes"
                "fiveam"
                "iterate"
                "trivial-garbage"
