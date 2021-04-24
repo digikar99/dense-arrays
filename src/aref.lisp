@@ -347,62 +347,61 @@
                       2)
                 a))))
 
-(declaim (notinline row-major-aref))
-(defun row-major-aref (array index)
-  "Return the element of ARRAY corresponding to the row-major INDEX.
-This is SETFable"
-  (declare (type dense-array array)
-           ;; (optimize speed)
-           (type int-index index))
-  (if (dense-array-contiguous-p array)
-      (funcall (fdefinition (backend-storage-accessor
-                             (find-backend (dense-array-backend array))))
-               (array-storage array)
-               (the int-index (apply #'+ index (array-offsets array))))
-      (let ((row-major-index   0)
-            (apparant-strides  (rest (collect-reduce-from-end #'*
-                                                              (narray-dimensions array) 1))))
-        ;; APPARANT-STRIDES corresponds to the INDEX if DIMENSIONS were the true dimensions.
-        ;; A user supplies the INDEX assuming that DIMENSIONS are the true dimensions.
-        ;; But this need not be true due to strides and offsets.
-        ;; Therefore, we obtain the INDEX from the APPARANT-STRIDES with each dimension
-        ;; of calculation.
-        (declare (type int-index row-major-index))
-        (loop :for s  :of-type int-index :in (array-strides array)
-              :for as :of-type int-index :in apparant-strides
-              :for o  :of-type int-index :in (array-offsets array)
-              :do (incf row-major-index (the-int-index (+ o (the-int-index
-                                                             (* s (floor index as))))))
-                  (setf index (rem index as)))
-        (funcall (fdefinition (backend-storage-accessor
-                               (find-backend (dense-array-backend array))))
-                 (array-storage array)
-                 row-major-index))))
+(defpolymorph row-major-aref ((array dense-array) index) t
+  (declare (type int-index index))
+  (let ((row-major-index   0)
+        (apparant-strides  (rest (collect-reduce-from-end #'*
+                                                          (narray-dimensions array) 1))))
+    ;; APPARANT-STRIDES corresponds to the INDEX if DIMENSIONS were the true dimensions.
+    ;; A user supplies the INDEX assuming that DIMENSIONS are the true dimensions.
+    ;; But this need not be true due to strides and offsets.
+    ;; Therefore, we obtain the INDEX from the APPARANT-STRIDES with each dimension
+    ;; of calculation.
+    (declare (type int-index row-major-index))
+    (loop :for s  :of-type int-index :in (array-strides array)
+          :for as :of-type int-index :in apparant-strides
+          :for o  :of-type int-index :in (array-offsets array)
+          :do (incf row-major-index (the-int-index (+ o (the-int-index
+                                                         (* s (floor index as))))))
+              (setf index (rem index as)))
+    (funcall (fdefinition (backend-storage-accessor
+                           (find-backend (dense-array-backend array))))
+             (array-storage array)
+             row-major-index)))
 
-(defun (setf row-major-aref) (new-element array index)
-  (declare ;; (optimize speed)
-           (type dense-array array)
-           (type int-index index))
-  (if (dense-array-contiguous-p array)
-      (funcall (fdefinition `(setf ,(backend-storage-accessor
-                                     (find-backend (dense-array-backend array)))))
-               new-element
-               (array-storage array)
-               (the int-index (apply #'+ index (array-offsets array))))
-      (let ((row-major-index   0)
-            (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
-        (declare (type int-index row-major-index))
-        (loop :for s  :of-type int-index :in (array-strides array)
-              :for as :of-type int-index :in apparant-strides
-              :for o  :of-type int-index :in (array-offsets array)
-              :do (incf row-major-index (the-int-index (+ o (the-int-index
-                                                             (* s (floor index as))))))
-                  (setf index (rem index as)))
-        (funcall (fdefinition `(setf ,(backend-storage-accessor
-                                     (find-backend (dense-array-backend array)))))
-               new-element
-               (array-storage array)
-               row-major-index))))
+(defpolymorph row-major-aref ((array simple-dense-array) index) t
+  ;; TODO: Use contiguous-dense-array instead of simple-dense-array
+  (declare (type int-index index))
+  (funcall (fdefinition (backend-storage-accessor
+                         (find-backend (dense-array-backend array))))
+           (array-storage array)
+           index))
+
+(defpolymorph (setf row-major-aref) (new-element (array dense-array) index) t
+  (declare (type int-index index))
+  (let ((row-major-index   0)
+        (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
+    (declare (type int-index row-major-index))
+    (loop :for s  :of-type int-index :in (array-strides array)
+          :for as :of-type int-index :in apparant-strides
+          :for o  :of-type int-index :in (array-offsets array)
+          :do (incf row-major-index (the-int-index (+ o (the-int-index
+                                                         (* s (floor index as))))))
+              (setf index (rem index as)))
+    (funcall (fdefinition `(setf ,(backend-storage-accessor
+                                   (find-backend (dense-array-backend array)))))
+             new-element
+             (array-storage array)
+             row-major-index)))
+
+(defpolymorph (setf row-major-aref) (new-element (array simple-dense-array) index) t
+  ;; TODO: Use contiguous-dense-array instead of simple-dense-array
+  (declare (type int-index index))
+  (funcall (fdefinition `(setf ,(backend-storage-accessor
+                                 (find-backend (dense-array-backend array)))))
+           new-element
+           (array-storage array)
+           index))
 
 (def-test row-major-aref (:suite backend-independent)
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))

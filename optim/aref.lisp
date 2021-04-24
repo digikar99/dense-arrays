@@ -210,3 +210,64 @@
                  full-expansion)
                 (t
                  optim-expansion)))))))
+
+(defpolymorph-compiler-macro row-major-aref (simple-dense-array t)
+    (&whole form array index &environment env)
+  ;; This is still 30 times slower than CL:ROW-MAJOR-AREF :(
+  ;; Perhaps, due to the requirements of double accessing
+  (compiler-macro-notes:with-notes
+      (form :optimization-note-condition optim-speed
+            :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
+    (let* ((array-type   (primary-form-type array env))
+           (backend-name (dense-array-type-backend array-type env))
+           (elt-type     (array-type-element-type array-type env)))
+      (when (eq 'cl:* backend-name)
+        ;; Don't have much hope of optimization
+        (signal 'backend-failure :form array :form-type array-type)
+        (return-from row-major-aref form))
+      (let*
+          ((backend         (handler-case (find-backend backend-name)
+                              (no-existing-backend (c)
+                                (declare (ignore c))
+                                ;; The optimization benefit would be
+                                ;; totally insignificant in this case
+                                (signal 'no-existing-backend/note :name backend-name)
+                                (return-from row-major-aref form))))
+           (storage-accessor (backend-storage-accessor backend))
+           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
+                                      backend)
+                                     `(%dense-array ,elt-type))))
+        `(the ,elt-type
+              (,storage-accessor (the ,storage-type (array-storage ,array))
+                                 ,index))))))
+
+(defpolymorph-compiler-macro (setf row-major-aref) (t simple-dense-array t)
+    (&whole form new-element array index &environment env)
+  ;; This is still 200 times slower than CL:ROW-MAJOR-AREF on SBCL :(
+  (compiler-macro-notes:with-notes
+      (form :optimization-note-condition optim-speed
+            :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
+    (let* ((array-type   (primary-form-type array env))
+           (backend-name (dense-array-type-backend array-type env))
+           (elt-type     (array-type-element-type array-type env)))
+      (when (eq 'cl:* backend-name)
+        ;; Don't have much hope of optimization
+        (signal 'backend-failure :form array :form-type array-type)
+        (return-from row-major-aref form))
+      (let*
+          ((backend         (handler-case (find-backend backend-name)
+                              (no-existing-backend (c)
+                                (declare (ignore c))
+                                ;; The optimization benefit would be
+                                ;; totally insignificant in this case
+                                (signal 'no-existing-backend/note :name backend-name)
+                                (return-from row-major-aref form))))
+           (storage-accessor (backend-storage-accessor backend))
+           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
+                                      backend)
+                                     `(%dense-array ,elt-type))))
+        `(the ,elt-type
+              (setf (,storage-accessor
+                     (the ,storage-type (array-storage ,array))
+                     ,index)
+                    ,new-element))))))
