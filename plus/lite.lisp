@@ -2,10 +2,12 @@
   (:mix :dense-arrays :cl :5am)
   (:import-from
    :dense-arrays
+   :lm
    :make-dense-array
    :dense-array-backend
    :backend-storage-accessor
    :dense-array
+   :simple-dense-array
    :array-offsets
    :array-strides
    :array-root-array)
@@ -170,10 +172,14 @@ See the definition of ASARRAY for an example of usage.")
 ;; TODO: Add compiler macros to speed things up
 
 (defmacro define-splice-list-fn (name args &body body)
-  `(defun ,name (&rest args)
-     ,(format nil "LAMBDA-LIST: ~A" args)
-     (destructuring-bind ,args (split-at-keywords args)
-       ,@body)))
+  `(progn
+     (declaim (inline ,name))
+     (declaim (ftype (function * simple-dense-array) ,name))
+     (defun ,name (&rest args)
+       ,(format nil "LAMBDA-LIST: ~A" args)
+       (destructuring-bind ,args (split-at-keywords args)
+         ,@body))
+     (declaim (notinline ,name))))
 
 (define-splice-list-fn zeros (shape &key (type default-element-type))
   (when (listp (first shape))
@@ -197,8 +203,12 @@ See the definition of ASARRAY for an example of usage.")
   (let ((a     (zeros shape :type type))
         (range (coerce (- max min) type))
         (min   (coerce min type)))
+    (declare (type simple-dense-array a))
     (dotimes (index (array-total-size a))
-      (setf (row-major-aref a index) (+ min (random range))))
+      (funcall #'(setf row-major-aref)
+               (+ min (random range))
+               a
+               index))
     a))
 
 (defun zeros-like (array-like)
@@ -222,18 +232,22 @@ See the definition of ASARRAY for an example of usage.")
     cl-array))
 
 ;; TODO: Write a functional version of this
+;; TODO: Optimize this
 (defmacro macro-map-array (function &rest arrays)
-  (alexandria:with-gensyms (first r result)
+  (alexandria:with-gensyms (result i)
     (let ((array-syms (alexandria:make-gensym-list (length arrays) "ARRAY"))
           (function   (cond ((eq 'quote (first function)) (second function))
                             ((eq 'function (first function)) (second function))
                             (t (error "Unexpected")))))
-      `(let ((,first ,(first arrays)))
-         (let ((,result (zeros-like ,first)))
-           (do-arrays ((,r ,result)
-                       (,(first array-syms) ,first)
-                       ,@(loop :for sym :in (rest array-syms)
-                               :for array-expr :in (rest arrays)
-                               :collect `(,sym ,array-expr)))
-             (setf ,r (,function ,@array-syms)))
+      `(let (,@(loop :for sym :in array-syms
+                     :for array-expr :in arrays
+                     :collect `(,sym ,array-expr)))
+         (declare (type dense-array ,@array-syms))
+         ;; TODO: Optimize this
+         (let ((,result (zeros-like ,(first array-syms))))
+           (dotimes (,i (array-total-size ,(first array-syms)))
+             (funcall #'(setf row-major-aref)
+                      (,function ,@(mapcar (lm array-sym `(row-major-aref ,array-sym ,i))
+                                           array-syms))
+                      ,result ,i))
            ,result)))))
