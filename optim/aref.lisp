@@ -231,8 +231,6 @@
 
 (defpolymorph-compiler-macro row-major-aref (simple-dense-array t)
     (&whole form array index &environment env)
-  ;; This is still 30 times slower than CL:ROW-MAJOR-AREF :(
-  ;; Perhaps, due to the requirements of double accessing
   (compiler-macro-notes:with-notes
       (form :optimization-note-condition optim-speed
             :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
@@ -261,7 +259,6 @@
 
 (defpolymorph-compiler-macro (setf row-major-aref) (t simple-dense-array t)
     (&whole form new-element array index &environment env)
-  ;; This is still 200 times slower than CL:ROW-MAJOR-AREF on SBCL :(
   (compiler-macro-notes:with-notes
       (form :optimization-note-condition optim-speed
             :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
