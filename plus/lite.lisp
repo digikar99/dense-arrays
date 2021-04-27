@@ -171,10 +171,13 @@ See the definition of ASARRAY for an example of usage.")
 
 ;; TODO: Add compiler macros to speed things up
 
+
+(declaim (ftype (function * simple-dense-array)
+                ones zeros rand ones-like zeros-like))
+
 (defmacro define-splice-list-fn (name args &body body)
   `(progn
      (declaim (inline ,name))
-     (declaim (ftype (function * simple-dense-array) ,name))
      (defun ,name (&rest args)
        ,(format nil "LAMBDA-LIST: ~A" args)
        (destructuring-bind ,args (split-at-keywords args)
