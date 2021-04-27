@@ -17,14 +17,17 @@
                                    :element-type 'uint64
                                    :initial-element 0))
           (elt-idx      0))
-      (declare (type size elt-idx))
+      (declare (type size elt-idx)
+               (type dense-array index-array))
       (labels ((index-iter (depth indices)
                  (declare (type size depth))
                  (if (= depth rank)
                      (unless (zerop (the bit (apply #'aref bit-array indices)))
                        (loop :for i :of-type size :from 0
                              :for idx :in indices
-                             :do (setf (aref index-array elt-idx i) idx))
+                             :do (funcall #'(setf aref)
+                                          idx
+                                          index-array elt-idx i))
                        (incf elt-idx))
                      (loop :for i :from 0 :below (the size (nth depth dims))
                            :do (setf (nth depth indices) i)
@@ -55,9 +58,11 @@
                  (declare (type size depth))
                  (if (= depth rank)
                      (unless (zerop (the bit (apply #'aref bit-array indices)))
-                       (loop :for idx-array :in index-arrays
+                       (loop :for idx-array :of-type dense-array :in index-arrays
                              :for idx :in indices
-                             :do (setf (aref idx-array elt-idx) idx))
+                             :do (funcall #'(setf aref)
+                                          idx
+                                          idx-array elt-idx))
                        (incf elt-idx))
                      (loop :for i :from 0 :below (the size (nth depth dims))
                            :do (setf (nth depth indices) i)
