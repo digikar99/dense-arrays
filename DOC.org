@@ -74,6 +74,10 @@ See [[file:plus/static-vectors.lisp][plus/static-vectors.lisp]] and [[file:plus/
 
 * References and Internal Discussion
 
+** 
+
+   A dense array can never be instantiated without a backend. In this sense, a =cl:array= is actually an abstract entity. No concrete object can ever be instantiated from the class =cl:array=, and one /does/ need a more concrete class to actually create an array.
+  
 ** Why interchangeable backends instead of {abstract-dense-array + standard-dense-array}?
 
    Whatever functions one writes should work on a dense-array. It doesn't make a lot of user sense to write a function for "abstract dense array" as compared to writing it for "dense-array".
@@ -86,6 +90,18 @@ See [[file:plus/static-vectors.lisp][plus/static-vectors.lisp]] and [[file:plus/
 The philosophy I'd like to stick to is: if you are writing a function for =dense-array=, you should be able to run it without recompilation on a =dense-array= with /any/ backend. A recompilation with the right declarations should merely be of help for purposes of optimization and should not be necessary for unoptimized usage.
 
 PS: I'd still be open to think over the "slight" alternatives to the second version. As far as I see things, the second alternative is akin to [[https://github.com/markcox80/template-function][template-function]].
+
+** Use of specialized-function
+
+https://github.com/numcl/specialized-function
+
+In some cases, a compiler-macro is not worth the trouble of minor speed benefits.
+Such cases include:
+
+In some other cases, a compiler-macro is definitely worth the trouble. 
+These cases include (TODO):
+
+- aref and (setf aref)
 
 ** Types vs Classes
 

@@ -22,7 +22,7 @@
            (dynamic-extent subscripts)
            (type dense-array array))
   (with-slots (displaced-to strides offsets dimensions rank element-type) array
-    (multiple-value-bind (dimensions strides offsets contiguous-p rank)
+    (multiple-value-bind (constructor dimensions strides offsets contiguous-p rank)
         (let ((new-offsets    nil)
               (new-dimensions nil)
               (new-strides    nil)
@@ -69,23 +69,23 @@
                          strides    (cdr strides)
                          subscripts (cdr subscripts)
                          offsets    (cdr offsets)))
-          (values (append (nreverse new-dimensions) dim)
+          (values (backend-constructor (class-of array))
+                  (append (nreverse new-dimensions) dim)
                   (append (nreverse new-strides) strides)
                   (nreverse new-offsets)
                   contiguous-p
                   rank))
-      (make-dense-array
-       :displaced-to displaced-to
-       :storage displaced-to
-       :element-type element-type
-       :dimensions dimensions
-       :strides strides
-       :offsets offsets
-       :contiguous-p contiguous-p
-       :total-size (apply #'* dimensions)
-       :root-array (or (dense-array-root-array array) array)
-       :backend (dense-array-backend array)
-       :rank rank))))
+      (funcall constructor
+               :displaced-to displaced-to
+               :storage displaced-to
+               :element-type element-type
+               :dimensions dimensions
+               :strides strides
+               :offsets offsets
+               :contiguous-p contiguous-p
+               :total-size (apply #'* dimensions)
+               :root-array (or (dense-array-root-array array) array)
+               :rank rank))))
 
 (defun %aref (array &rest subscripts)
   "Returns a copy of the subscripted array."
@@ -135,8 +135,8 @@
            (dynamic-extent subscripts))
   (cond ((and (= (array-rank array) (length subscripts))
               (every #'integerp subscripts))
-         (let* ((backend-object (find-backend (dense-array-backend array))))
-           (funcall (backend-storage-accessor backend-object)
+         (let* ((dense-array-class (class-of array)))
+           (funcall (backend-storage-accessor dense-array-class)
                     (array-storage array)
                     (the int-index
                          (let ((index 0))
@@ -162,8 +162,8 @@
            (dynamic-extent subscripts))
   (cond ((and (= (array-rank array) (length subscripts))
               (every #'integerp subscripts))
-         (let* ((backend-object (find-backend (dense-array-backend array))))
-           (funcall (backend-storage-accessor backend-object)
+         (let* ((dense-array-class (class-of array)))
+           (funcall (backend-storage-accessor dense-array-class)
                     (array-storage array)
                     (the int-index
                          (let ((index 0))
@@ -241,8 +241,8 @@
   (with-slots (storage element-type strides offsets dimensions rank) array
     (cond ((and (= rank (length subscripts))
                 (every #'integerp subscripts))
-           (let* ((backend-object (find-backend (dense-array-backend array))))
-             (funcall (fdefinition `(setf ,(backend-storage-accessor backend-object)))
+           (let* ((dense-array-class (class-of array)))
+             (funcall (fdefinition `(setf ,(backend-storage-accessor dense-array-class)))
                       new-element/s
                       storage
                       (let ((index 0))
@@ -343,7 +343,7 @@
                 (setf (aref a (make-array '(2 3)
                                           :element-type 'bit
                                           :initial-contents '((1 0 1) (0 0 1))
-                                          :backend :cl))
+                                          :class 'standard-dense-array))
                       2)
                 a))))
 
@@ -364,16 +364,14 @@
           :do (incf row-major-index (the-int-index (+ o (the-int-index
                                                          (* s (floor index as))))))
               (setf index (rem index as)))
-    (funcall (fdefinition (backend-storage-accessor
-                           (find-backend (dense-array-backend array))))
+    (funcall (fdefinition (backend-storage-accessor (class-of array)))
              (array-storage array)
              row-major-index)))
 
 (defpolymorph row-major-aref ((array simple-dense-array) index) t
   ;; TODO: Use contiguous-dense-array instead of simple-dense-array
   (declare (type int-index index))
-  (funcall (fdefinition (backend-storage-accessor
-                         (find-backend (dense-array-backend array))))
+  (funcall (fdefinition (backend-storage-accessor (class-of array)))
            (array-storage array)
            index))
 
@@ -388,8 +386,7 @@
           :do (incf row-major-index (the-int-index (+ o (the-int-index
                                                          (* s (floor index as))))))
               (setf index (rem index as)))
-    (funcall (fdefinition `(setf ,(backend-storage-accessor
-                                   (find-backend (dense-array-backend array)))))
+    (funcall (fdefinition `(setf ,(backend-storage-accessor (class-of array))))
              new-element
              (array-storage array)
              row-major-index)))
@@ -397,8 +394,7 @@
 (defpolymorph (setf row-major-aref) (new-element (array simple-dense-array) index) t
   ;; TODO: Use contiguous-dense-array instead of simple-dense-array
   (declare (type int-index index))
-  (funcall (fdefinition `(setf ,(backend-storage-accessor
-                                 (find-backend (dense-array-backend array)))))
+  (funcall (fdefinition `(setf ,(backend-storage-accessor (class-of array))))
            new-element
            (array-storage array)
            index))

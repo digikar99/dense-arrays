@@ -33,21 +33,21 @@
                        (t (error "~D of dim ~D cannot be broadcasted to dim ~D"
                                  array dim broadcast-dimensions))))
            (nreverse new-offsets)))
-      (let ((total-size (apply #'* broadcast-dimensions)))
-        (make-dense-array
-         :dimensions broadcast-dimensions
-         :element-type element-type
-         :strides strides
-         :offsets offsets
-         :displaced-to displaced-to
-         ;; TODO: Raises the question of semantics of array being contiguous
-         :contiguous-p (= (first strides)
-                          (/ total-size (first broadcast-dimensions)))
-         :total-size total-size
-         :root-array (or (dense-array-root-array array) array)
-         :rank (length broadcast-dimensions)
-         :storage (array-storage array)
-         :backend (dense-array-backend array))))))
+      (let ((total-size (apply #'* broadcast-dimensions))
+            (constructor (backend-constructor (class-of array))))
+        (funcall constructor
+                 :dimensions broadcast-dimensions
+                 :element-type element-type
+                 :strides strides
+                 :offsets offsets
+                 :displaced-to displaced-to
+                 ;; TODO: Raises the question of semantics of array being contiguous
+                 :contiguous-p (= (first strides)
+                                  (/ total-size (first broadcast-dimensions)))
+                 :total-size total-size
+                 :root-array (or (dense-array-root-array array) array)
+                 :rank (length broadcast-dimensions)
+                 :storage (array-storage array))))))
 
 (defun %broadcast-compatible-p (dimensions-a dimensions-b)
   "Returns two values:

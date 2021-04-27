@@ -117,8 +117,7 @@ See the definition of ASARRAY for an example of usage.")
                                                    (element-type array-like)
                                                    element-type)))
          (*storage*  (array-displaced-to array))
-         (*storage-accessor* (backend-storage-accessor
-                              (find-backend (dense-array-backend array))))
+         (*storage-accessor* (backend-storage-accessor (class-of array)))
          (*index*    0))
     (traverse array-like)
     array))
@@ -171,10 +170,11 @@ See the definition of ASARRAY for an example of usage.")
 
 ;; TODO: Add compiler macros to speed things up
 
+(declaim (ftype (function * simple-dense-array) zeros ones rand))
+
 (defmacro define-splice-list-fn (name args &body body)
   `(progn
      (declaim (inline ,name))
-     (declaim (ftype (function * simple-dense-array) ,name))
      (defun ,name (&rest args)
        ,(format nil "LAMBDA-LIST: ~A" args)
        (destructuring-bind ,args (split-at-keywords args)
@@ -233,7 +233,7 @@ See the definition of ASARRAY for an example of usage.")
 
 ;; TODO: Write a functional version of this
 ;; TODO: Optimize this
-(defmacro macro-map-array (function &rest arrays)
+(defmacro macro-map-array (result-array function &rest arrays)
   (alexandria:with-gensyms (result i)
     (let ((array-syms (alexandria:make-gensym-list (length arrays) "ARRAY"))
           (function   (cond ((eq 'quote (first function)) (second function))
@@ -244,7 +244,7 @@ See the definition of ASARRAY for an example of usage.")
                      :collect `(,sym ,array-expr)))
          (declare (type dense-array ,@array-syms))
          ;; TODO: Optimize this
-         (let ((,result (zeros-like ,(first array-syms))))
+         (let ((,result (or ,result-array (zeros-like ,(first array-syms)))))
            (dotimes (,i (array-total-size ,(first array-syms)))
              (funcall #'(setf row-major-aref)
                       (,function ,@(mapcar (lm array-sym `(row-major-aref ,array-sym ,i))

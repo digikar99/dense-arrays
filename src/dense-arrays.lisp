@@ -43,7 +43,7 @@
                      (strides nil strides-p)
                      (adjustable nil adjustable-p)
                      (fill-pointer nil fill-pointer-p)
-                     (backend *dense-array-backend*)
+                     (class *dense-array-class*)
 
                      (displaced-to nil displaced-to-p)
                      (offsets nil offsets-p)
@@ -78,8 +78,11 @@
                                      (make-list (1- rank) :initial-element 0))
                               offsets))
 
-         (backend-object  (find-backend backend))
-         (element-type    (funcall (backend-element-type-upgrader backend-object)
+         (class           (typecase class
+                            (class class)
+                            (t (find-class class))))
+         (object-constructor (backend-constructor class))
+         (element-type    (funcall (backend-element-type-upgrader class)
                                    element-type))
          (initial-element (cond (initial-element-p initial-element)
                                 (t (switch (element-type :test #'type=)
@@ -87,25 +90,25 @@
                                      ('double-float 0.0d0)
                                      (t 0)))))
          (storage         (or displaced-to
-                              (funcall (backend-storage-allocator backend-object)
+                              (funcall (backend-storage-allocator class)
                                        total-size
                                        :initial-element initial-element
                                        :element-type element-type)))
 
-         (dense-array     (make-dense-array :storage storage
-                                            ;; FIXME: DISPLACED-TO is redundant with STORAGE
-                                            :displaced-to storage
-                                            :element-type element-type
-                                            :dimensions dimensions
-                                            :strides strides
-                                            :offsets offsets
-                                            :contiguous-p t
-                                            :total-size (apply #'* dimensions)
-                                            :root-array nil
-                                            :rank (length dimensions)
-                                            :backend backend))
-         (storage-accessor (backend-storage-accessor backend-object))
-         (storage-deallocator (backend-storage-deallocator backend-object)))
+         (dense-array     (funcall object-constructor
+                                   :storage storage
+                                   ;; FIXME: DISPLACED-TO is redundant with STORAGE
+                                   :displaced-to storage
+                                   :element-type element-type
+                                   :dimensions dimensions
+                                   :strides strides
+                                   :offsets offsets
+                                   :contiguous-p t
+                                   :total-size (apply #'* dimensions)
+                                   :root-array nil
+                                   :rank (length dimensions)))
+         (storage-accessor (backend-storage-accessor class))
+         (storage-deallocator (backend-storage-deallocator class)))
     (when storage-deallocator
       (trivial-garbage:finalize dense-array
                                 (lambda () (funcall storage-deallocator storage))))
@@ -173,7 +176,7 @@
     (is (typep a '(%dense-array (signed-byte 32)))))
   (is (equalp #("hello" "goodbye")
               (array-storage (make-array 2 :initial-contents '("hello" "goodbye")
-                                         :backend :cl)))))
+                                           :class 'standard-dense-array)))))
 
 ;; trivial function definitions
 
@@ -261,8 +264,8 @@
   ;; (print (type-of array))
   (let* ((*print-right-margin* (or *print-right-margin* 80))
          (sv      (array-storage array))
-         (backend (dense-array-backend array))
-         (sv-ref  (fdefinition (backend-storage-accessor (find-backend backend))))
+         (class   (class-of array))
+         (sv-ref  (fdefinition (backend-storage-accessor class)))
          (rank    (array-rank array))
          (rank-1  (1- (array-rank array)))
          (lines   3)
@@ -280,9 +283,9 @@
     (print-unreadable-object (array stream :identity t :type t)
       ;; header
       (format stream "~A~{~S~^x~} ~S "
-              (if (array-view-p array) "(VIEW) " "")              
+              (if (array-view-p array) "(VIEW) " "")
               (narray-dimensions array)
-              (array-element-type array))      
+              (array-element-type array))
       (when *print-array*
         ;; elements
         ;; DONE: *print-level*
@@ -384,9 +387,7 @@
               (print-lines-exhausted (condition)
                 (write-string " ..." stream)
                 (dotimes (i (axis-number condition)) (write-char #\) stream))
-                (terpri stream))))))
-      ;; footer
-      (format stream " :BACKEND ~S" backend))))
+                (terpri stream)))))))))
 
 (defun print-array (array &optional array-element-print-format &key level length
                                                                  (stream nil streamp))
@@ -402,7 +403,8 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
   nil)
 
 (def-test print-array ()
-  (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello :backend :cl)))
+  (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello
+                                       :class 'standard-dense-array)))
     (macrolet ((lines (n)
                  `(with-output-to-string (*standard-output*)
                     (let ((*print-lines* ,n))

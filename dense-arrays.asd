@@ -9,6 +9,7 @@
                "adhoc-polymorphic-functions"
                "alexandria"
                "compiler-macro-notes"
+               "closer-mop"
                "fiveam"
                "iterate"
                "trivial-garbage"
@@ -32,4 +33,6 @@
                              (:file "aref"))))
   :perform (test-op (o c)
              (declare (ignore o c))
-             (eval (read-from-string "(5AM:RUN :DENSE-ARRAYS)"))))
+             (eval (read-from-string "(LET ((5AM:*ON-ERROR* :DEBUG)
+                                            (5AM:*ON-FAILURE* :DEBUG))
+                                       (5AM:RUN :DENSE-ARRAYS))"))))
