@@ -233,7 +233,7 @@ See the definition of ASARRAY for an example of usage.")
 
 ;; TODO: Write a functional version of this
 ;; TODO: Optimize this
-(defmacro macro-map-array (function &rest arrays)
+(defmacro macro-map-array (result-array function &rest arrays)
   (alexandria:with-gensyms (result i)
     (let ((array-syms (alexandria:make-gensym-list (length arrays) "ARRAY"))
           (function   (cond ((eq 'quote (first function)) (second function))
@@ -244,7 +244,7 @@ See the definition of ASARRAY for an example of usage.")
                      :collect `(,sym ,array-expr)))
          (declare (type dense-array ,@array-syms))
          ;; TODO: Optimize this
-         (let ((,result (zeros-like ,(first array-syms))))
+         (let ((,result (or ,result-array (zeros-like ,(first array-syms)))))
            (dotimes (,i (array-total-size ,(first array-syms)))
              (funcall #'(setf row-major-aref)
                       (,function ,@(mapcar (lm array-sym `(row-major-aref ,array-sym ,i))
