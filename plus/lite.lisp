@@ -3,6 +3,7 @@
   (:import-from
    :dense-arrays
    :lm
+   :default-element-type
    :make-dense-array
    :dense-array-backend
    :backend-storage-accessor
@@ -14,7 +15,6 @@
   (:reexport :dense-arrays)
   (:export
    :asarray
-   :*element-type-alist*
    :transpose
    :zeros
    :ones
@@ -29,16 +29,6 @@
 
 (def-suite :dense-arrays-plus-lite)
 (in-suite :dense-arrays-plus-lite)
-
-(defvar *element-type-alist* nil
-  "An ALIST mapping package to the default element-type used in that package.
-See the definition of ASARRAY for an example of usage.")
-
-(define-symbol-macro package-local-element-type
-    (cdr (assoc *package* *element-type-alist*)))
-
-(define-symbol-macro default-element-type
-  (or package-local-element-type 'double-float))
 
 ;; ASARRAY ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -109,8 +99,7 @@ See the definition of ASARRAY for an example of usage.")
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
 (defun asarray (array-like &optional
-                             (element-type (or package-local-element-type
-                                               :auto)))
+                             (element-type default-element-type))
   (let* ((dimensions (dimensions array-like))
          (array      (make-array dimensions
                                  :element-type (if (eq :auto element-type)
@@ -133,9 +122,11 @@ See the definition of ASARRAY for an example of usage.")
               (asarray '(#(1 2 3)) '(integer 0 3))))
   (is (alexandria:type= '(signed-byte 32)
                         (array-element-type
-                         (let ((*element-type-alist* (list (cons (find-package :cl)
-                                                                 '(signed-byte 32))))
-                               (*package*            (find-package :cl)))
+                         (let ((*array-element-type-alist*
+                                 (list (cons (find-package :cl)
+                                             '(signed-byte 32))))
+                               (*package*
+                                 (find-package :cl)))
                            (asarray '(1 2 3))))))
   (is (array= (make-array 2 :initial-contents '("hello" "goodbye"))
               (asarray '("hello" "goodbye")))))

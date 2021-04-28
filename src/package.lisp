@@ -23,6 +23,8 @@
                              :array-displaced-to
                              :array=
                              :make-array
+                             :*array-element-type*                             
+                             :*array-element-type-alist*
                              :*array-element-print-format*
                              :print-array
                              :copy-array
@@ -46,6 +48,29 @@
        (:local-nicknames (:env :introspect-environment))))
 
 (in-package :dense-arrays)
+
+(defvar *array-element-type*)
+
+(setf (documentation '*array-element-type* 'variable)
+      "If BOUND, this is the default value of the ELEMENT-TYPE or TYPE argument.
+Overrides *ARRAY-ELEMENT-TYPE-ALIST*.
+Is overriden by explicitly passing an ELEMENT-TYPE or TYPE argument.")
+
+(defvar *array-element-type-alist* nil
+  "An ALIST mapping package to the default element-type used in that package.
+(Inspired from SWANK:*READTABLE-ALIST*)
+Overrides none.
+Is overriden by *ARRAY-ELEMENT-TYPE* when bound, or by explicitly passing an
+  ELEMENT-TYPE or TYPE argument.")
+
+(define-symbol-macro package-local-element-type
+    (cdr (assoc *package* *array-element-type-alist*)))
+
+(define-symbol-macro default-element-type
+    (or (when (boundp '*array-element-type*)
+          *array-element-type*)
+        package-local-element-type
+        t))
 
 (def-suite :dense-arrays)
 (def-suite backend-dependent :in :dense-arrays)

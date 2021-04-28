@@ -34,7 +34,7 @@
                   :if val :collect sym))))
 
 (defun make-array (dimensions &rest args
-                   &key (element-type t)
+                   &key (element-type default-element-type)
 
                      (initial-element nil initial-element-p)
                      (initial-contents nil initial-contents-p)
