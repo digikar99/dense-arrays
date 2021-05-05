@@ -137,21 +137,24 @@
 
 ;; MISC ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun transpose (array)
-  (declare (optimize speed)
-           (type dense-array array))
-  (make-dense-array :displaced-to (array-displaced-to array)
-                    :storage (array-displaced-to array)
-                    :element-type (array-element-type array)
-                    :dimensions (reverse (narray-dimensions  array))
-                    :strides (reverse (array-strides  array))
-                    :offsets (reverse (array-offsets  array))
-                    :contiguous-p nil
-                    :total-size   (array-total-size   array)
-                    :rank (array-rank array)
-                    :backend (dense-array-backend array)
-                    :root-array (or (dense-arrays::dense-array-root-array array)
-                                    array)))
+(defun transpose (array-like)
+  (let ((array (typecase array-like
+                 (dense-array array-like)
+                 (t (asarray array-like)))))
+    (declare (type dense-array array)
+             (optimize speed))
+    (make-dense-array :displaced-to (array-displaced-to array)
+                      :storage (array-displaced-to array)
+                      :element-type (array-element-type array)
+                      :dimensions (reverse (narray-dimensions  array))
+                      :strides (reverse (array-strides  array))
+                      :offsets (reverse (array-offsets  array))
+                      :contiguous-p nil
+                      :total-size   (array-total-size   array)
+                      :rank (array-rank array)
+                      :backend (dense-array-backend array)
+                      :root-array (or (dense-arrays::dense-array-root-array array)
+                                      array))))
 
 (defun split-at-keywords (args)
   "Example: (1 2 3 :a 2 :b 3) => ((1 2 3) (:a 2 :b 3))"
