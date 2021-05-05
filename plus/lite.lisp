@@ -174,13 +174,19 @@
                 ones zeros rand ones-like zeros-like))
 
 (defmacro define-splice-list-fn (name args &body body)
-  `(progn
-     (declaim (inline ,name))
-     (defun ,name (&rest args)
-       ,(format nil "LAMBDA-LIST: ~A" args)
-       (destructuring-bind ,args (split-at-keywords args)
-         ,@body))
-     (declaim (notinline ,name))))
+  (multiple-value-bind (doc body)
+      (if (and (stringp (first body))
+                      (rest body))
+          (values (first body) (rest body))
+          (values (format nil "LAMBDA-LIST: ~A" args)
+                  body))
+    `(progn
+       (declaim (inline ,name))
+       (defun ,name (&rest args)
+         ,doc
+         (destructuring-bind ,args (split-at-keywords args)
+           ,@body))
+       (declaim (notinline ,name)))))
 
 (define-splice-list-fn zeros (shape &key (type default-element-type))
   (when (listp (first shape))
