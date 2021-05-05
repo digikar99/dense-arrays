@@ -22,6 +22,7 @@
    #:ones
    #:rand
    #:eye
+   #:reshape
    #:zeros-like
    #:ones-like
    #:rand-like
@@ -193,7 +194,6 @@
                     :initial-element (coerce 1 type)))
 
 (define-splice-list-fn rand (shape &key (type default-element-type) (min 0) (max 1))
-  ;; FIXME: What if type is lisp-cuda-type
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
@@ -217,6 +217,7 @@
 (defun rand-like (array-like)
   (rand (dimensions array-like) :type (element-type array-like)))
 
+(declaim (ftype (function * simple-dense-array) eye))
 (defun eye (per-axis-size &key (rank 2) (type default-element-type))
   (declare (type size per-axis-size rank))
   (if (= 1 per-axis-size)
@@ -236,6 +237,86 @@
                    array
                    (the-size (* i stride))))
         array)))
+
+(define-condition incompatible-reshape-dimensions (error)
+  ((array-like :initarg :array-like)
+   (new-shape :initarg :new-shape))
+  (:report (lambda (c s)
+             (with-slots (array-like new-shape) c
+               (format s "Cannot reshape~%  ~S~%into shape ~S"
+                       array-like new-shape)))))
+
+(declaim (ftype (function * dense-array) reshape))
+(defun reshape (array-like new-shape &key (view nil viewp))
+  "VIEW argument is considered only if ARRAY-LIKE is a SIMPLE-DENSE-ARRAY.
+If ARRAY-LIKE is a SIMPLE-DENSE-ARRAY, it is guaranteed that when VIEW is supplied,
+- :VIEW non-NIL means that no copy of ARRAY-LIKE is created
+- :VIEW NIL a copy of the array *will be* created
+What is not guaranteed: if ARRAY-LIKE is not a SIMPLE-DENSE-ARRAY,
+then a new array is created. In the future, an attempt may be made to avoid
+creating the new array and instead return a view instead. "
+  (let ((simple-dense-array-p (typep array-like 'simple-dense-array))
+        (array (typecase array-like
+                 (simple-dense-array array-like)
+                 (dense-array (copy-array array-like))
+                 (t (asarray array-like))))
+        (new-shape (alexandria:ensure-list new-shape)))
+    (declare (type simple-dense-array array))
+    (assert (= (array-total-size array)
+               (reduce #'* new-shape :initial-value 1))
+            (new-shape)
+            'incompatible-reshape-dimensions
+            :array-like array-like
+            :new-shape new-shape)
+    (let ((maybe-view-array
+            (make-dense-array :displaced-to (array-displaced-to array)
+                              :storage (array-displaced-to array)
+                              :element-type (array-element-type array)
+                              :dimensions new-shape
+                              :strides (dense-arrays::dimensions->strides new-shape)
+                              :offsets (make-list (length new-shape) :initial-element 0)
+                              :contiguous-p nil
+                              :total-size (array-total-size array)
+                              :rank (length new-shape)
+                              :backend (dense-array-backend array)
+                              :root-array (if simple-dense-array-p
+                                              ;; In other cases, we are guaranteed
+                                              ;; that the ARRAY object created here
+                                              ;; will not be accessible from outside
+                                              ;; FIXME: Debugger?
+                                              (or (dense-arrays::dense-array-root-array
+                                                   array)
+                                                  array)
+                                              nil))))
+      (cond ((and viewp simple-dense-array-p)
+             (if view
+                 maybe-view-array
+                 (copy-array maybe-view-array)))
+            (t maybe-view-array)))))
+
+(def-test reshape ()
+  (let ((expected-value (asarray '((1) (2) (3))))
+        (actual-value (reshape (asarray '(1 2 3))
+                               '(3 1))))
+    (is (array= expected-value actual-value)))
+  (let ((expected-value (asarray '((1) (2) (3))))
+        (actual-value (reshape (asarray '(1 2 3))
+                               '(3 1)
+                               :view t)))
+    (is (array= expected-value actual-value))
+    (is-true (dense-arrays::array-view-p actual-value)))
+  (let ((expected-value (asarray '((1) (2) (3))))
+        (actual-value (reshape (asarray '(1 2 3))
+                               '(3 1)
+                               :view nil)))
+    (is (array= expected-value actual-value))
+    (is-false (dense-arrays::array-view-p actual-value)))
+  (let ((expected-value (asarray '(1 2 3 4 5 6)))
+        (actual-value (reshape (reshape (asarray '((1 2 3)
+                                                   (4 5 6)))
+                                        '(3 2))
+                               6)))
+    (is (array= expected-value actual-value))))
 
 (defun as-cl-array (array)
   (declare (type dense-array array))
