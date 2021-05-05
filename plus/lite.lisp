@@ -1,29 +1,32 @@
 (uiop:define-package :dense-arrays-plus-lite
   (:mix :dense-arrays :cl :5am)
   (:import-from
-   :dense-arrays
-   :lm
-   :default-element-type
-   :make-dense-array
-   :dense-array-backend
-   :backend-storage-accessor
-   :dense-array
-   :simple-dense-array
-   :array-offsets
-   :array-strides
-   :array-root-array)
+   #:dense-arrays
+   #:lm
+   #:size
+   #:the-size
+   #:default-element-type
+   #:make-dense-array
+   #:dense-array-backend
+   #:backend-storage-accessor
+   #:dense-array
+   #:simple-dense-array
+   #:array-offsets
+   #:array-strides
+   #:array-root-array)
   (:reexport :dense-arrays)
   (:export
-   :asarray
-   :transpose
-   :zeros
-   :ones
-   :rand
-   :zeros-like
-   :ones-like
-   :rand-like
-   :as-cl-array
-   :macro-map-array))
+   #:asarray
+   #:transpose
+   #:zeros
+   #:ones
+   #:rand
+   #:eye
+   #:zeros-like
+   #:ones-like
+   #:rand-like
+   #:as-cl-array
+   #:macro-map-array))
 
 (in-package :dense-arrays-plus-lite)
 
@@ -213,6 +216,26 @@
 
 (defun rand-like (array-like)
   (rand (dimensions array-like) :type (element-type array-like)))
+
+(defun eye (per-axis-size &key (rank 2) (type default-element-type))
+  (declare (type size per-axis-size rank))
+  (if (= 1 per-axis-size)
+      (ones (make-list rank :initial-element 1)
+            :type type)
+      (let ((array (zeros (make-list rank :initial-element per-axis-size)
+                          :type type))
+            (stride (/ (1- (expt per-axis-size rank))
+                       (1- per-axis-size)))
+            (one (coerce 1 type)))
+        (declare (type size stride)
+                 (type simple-dense-array array))
+        (dotimes (i per-axis-size)
+          (declare (type size i))
+          (funcall #'(setf row-major-aref)
+                   one
+                   array
+                   (the-size (* i stride))))
+        array)))
 
 (defun as-cl-array (array)
   (declare (type dense-array array))
