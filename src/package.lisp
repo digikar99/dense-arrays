@@ -7,28 +7,37 @@
                                      :row-major-aref
                                      :array-rank
                                      :array-storage))
-           (shadow-symbols '(:array
-                             :simple-array
-                             :array-storage-allocator
-                             :array-storage-deallocator
-                             :upgraded-array-element-type
-                             :define-dense-array-backend-specialization
-                             :make-backend
-                             :find-backend
-                             :dense-array-type-backend
-                             :*dense-array-backend*
+           (shadow-symbols '("ARRAY"
+                             "SIMPLE-ARRAY"
 
-                             :narray-dimensions
-                             :array-displacement
-                             :array-displaced-to
-                             :array=
-                             :make-array
-                             :*array-element-type*                             
-                             :*array-element-type-alist*
-                             :*array-element-print-format*
-                             :print-array
-                             :copy-array
-                             :do-arrays)))
+                             "ARRAY-STORAGE-ALLOCATOR"
+                             "ARRAY-STORAGE-DEALLOCATOR"
+                             "UPGRADED-ARRAY-ELEMENT-TYPE"
+                             "DEFINE-DENSE-ARRAY-BACKEND-SPECIALIZATION"
+                             "MAKE-BACKEND"
+                             "FIND-BACKEND"
+                             "DENSE-ARRAY-TYPE-BACKEND"
+                             "*DENSE-ARRAY-BACKEND*"
+
+                             "NARRAY-DIMENSIONS"
+                             "ARRAY-DISPLACEMENT"
+                             "ARRAY-DISPLACED-TO"
+                             "ARRAY-OFFSET"
+                             "ARRAY-OFFSETS"
+                             "ARRAY-STRIDE"
+                             "ARRAY-STRIDES"
+                             "ARRAY="
+                             "MAKE-ARRAY"
+                             "*ARRAY-ELEMENT-TYPE*"
+                             "*ARRAY-ELEMENT-TYPE-ALIST*"
+                             "*ARRAY-ELEMENT-PRINT-FORMAT*"
+                             "PRINT-ARRAY"
+                             "COPY-ARRAY"
+                             "COPY-DENSE-ARRAY"
+                             "DO-ARRAYS"
+                             "BROADCAST-ARRAY"
+                             "BROADCAST-ARRAYS"
+                             "BROADCAST-COMPATIBLE-P")))
     `(uiop:define-package :dense-arrays
        (:mix :adhoc-polymorphic-functions :abstract-arrays
              :cl :iterate :alexandria :5am :trivial-types)
@@ -213,10 +222,12 @@ Existing backend names include:~{~^~%  ~S~}"
        (loop :for o :of-type size :in (array-offsets object)
              :always (zerop o))
        (let ((total-size (array-total-size object)))
-         (loop :for s :in (array-strides object)
-               :for d :in (narray-dimensions object)
-               :always (= s (/ total-size d))
-               :do (setq total-size (floor total-size d))))))
+         (if (zerop total-size)
+             t
+             (loop :for s :in (array-strides object)
+                   :for d :in (narray-dimensions object)
+                   :always (= s (/ total-size d))
+                   :do (setq total-size (floor total-size d)))))))
 
 (define-dense-array-backend-specialization :cl)
 (deftype standard-dense-array () `(and dense-array (satisfies ,(backend-p-fn-name :cl))))
