@@ -81,8 +81,7 @@
          (class           (typecase class
                             (class class)
                             (t (find-class class))))
-         (object-constructor (backend-constructor class))
-         (element-type    (funcall (backend-element-type-upgrader class)
+         (element-type    (funcall (storage-element-type-upgrader class)
                                    element-type))
          (initial-element (cond (initial-element-p initial-element)
                                 (t (switch (element-type :test #'type=)
@@ -90,25 +89,25 @@
                                      ('double-float 0.0d0)
                                      (t 0)))))
          (storage         (or displaced-to
-                              (funcall (backend-storage-allocator class)
+                              (funcall (storage-allocator class)
                                        total-size
                                        :initial-element initial-element
                                        :element-type element-type)))
 
-         (dense-array     (funcall object-constructor
-                                   :storage storage
-                                   ;; FIXME: DISPLACED-TO is redundant with STORAGE
-                                   :displaced-to storage
-                                   :element-type element-type
-                                   :dimensions dimensions
-                                   :strides strides
-                                   :offsets offsets
-                                   :contiguous-p t
-                                   :total-size (apply #'* dimensions)
-                                   :root-array nil
-                                   :rank (length dimensions)))
-         (storage-accessor (backend-storage-accessor class))
-         (storage-deallocator (backend-storage-deallocator class)))
+         (dense-array     (make-instance class
+                                         :storage storage
+                                         ;; FIXME: DISPLACED-TO is redundant with STORAGE
+                                         :displaced-to storage
+                                         :element-type element-type
+                                         :dimensions dimensions
+                                         :strides strides
+                                         :offsets offsets
+                                         :contiguous-p t
+                                         :total-size (apply #'* dimensions)
+                                         :root-array nil
+                                         :rank (length dimensions)))
+         (storage-accessor (storage-accessor class))
+         (storage-deallocator (storage-deallocator class)))
     (when storage-deallocator
       (trivial-garbage:finalize dense-array
                                 (lambda () (funcall storage-deallocator storage))))
@@ -185,6 +184,11 @@
                 array-strides
                 array-offsets))
 
+(defun dense-array-contiguous-p (array)
+  (slot-value array 'contiguous-p))
+(defun dense-array-root-array (array)
+  (slot-value array 'root-array))
+
 (declaim (inline array-displaced-to))
 (defun array-displaced-to (array)
   (declare (type dense-array array))
@@ -194,7 +198,7 @@
 (defun narray-dimensions (array)
   "Returns the dimensions-list of the ARRAY. The list is not expected to be modified."
   (declare (type dense-array array))
-  (abstract-arrays::abstract-array-dimensions array))
+  (slot-value array 'dimensions))
 
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."
@@ -205,7 +209,7 @@
 (declaim (inline array-strides))
 (defun array-strides (array)
   (declare (type dense-array array))
-  (dense-array-strides array))
+  (slot-value array 'strides))
 
 (defun array-stride (array axis-number)
   "Return the length of stride AXIS-NUMBER of ARRAY."
@@ -216,7 +220,7 @@
 (declaim (inline array-offsets))
 (defun array-offsets (array)
   (declare (type dense-array array))
-  (dense-array-offsets array))
+  (slot-value array 'offsets))
 
 (defun array-offset (array axis-number)
   "Return the length of offset AXIS-NUMBER of ARRAY."
@@ -233,7 +237,7 @@
 (defun array-view-p (array)
   "Returns T if the ARRAY is a VIEW, otherwise returns NIL"
   (declare (type dense-array array))
-  (if (dense-array-root-array array) t nil))
+  (if (slot-value array 'root-array) t nil))
 
 (defun array-displaced-index-offset (array)
   (declare (type dense-array array))
@@ -265,7 +269,7 @@
   (let* ((*print-right-margin* (or *print-right-margin* 80))
          (sv      (array-storage array))
          (class   (class-of array))
-         (sv-ref  (fdefinition (backend-storage-accessor class)))
+         (sv-ref  (fdefinition (storage-accessor class)))
          (rank    (array-rank array))
          (rank-1  (1- (array-rank array)))
          (lines   3)

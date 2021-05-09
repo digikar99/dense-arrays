@@ -21,6 +21,8 @@
   :components ((:module "src"
                         :serial t
                 :components ((:file "package")
+                             (:file "protocol")
+                             (:file "types")
                              (:file "dense-arrays")
                              (:file "broadcast")
                              (:file "do-arrays")

@@ -37,8 +37,8 @@
         (signal 'backend-failure :form array :form-type array-type)
         (return-from aref form))
       (let*
-          ((storage-accessor (backend-storage-accessor class))
-           (storage-type     (funcall (backend-storage-type-inferrer-from-array-type
+          ((storage-accessor (storage-accessor class))
+           (storage-type     (funcall (storage-type-inferrer-from-array-type
                                        class)
                                       `(%dense-array ,elt-type ,rank)))
            (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
@@ -132,8 +132,8 @@
         (signal 'backend-failure :form array :form-type array-type)
         (return-from aref form))
       (let*
-          ((storage-accessor (backend-storage-accessor class))
-           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
+          ((storage-accessor (storage-accessor class))
+           (storage-type    (funcall (storage-type-inferrer-from-array-type
                                       class)
                                      `(%dense-array ,elt-type ,rank)))
            (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
@@ -228,8 +228,8 @@
         (signal 'backend-failure :form array :form-type array-type)
         (return-from row-major-aref form))
       (let*
-          ((storage-accessor (backend-storage-accessor class))
-           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
+          ((storage-accessor (storage-accessor class))
+           (storage-type    (funcall (storage-type-inferrer-from-array-type
                                       class)
                                      `(%dense-array ,elt-type))))
         `(the ,elt-type
@@ -249,8 +249,8 @@
         (signal 'backend-failure :form array :form-type array-type)
         (return-from row-major-aref form))
       (let*
-          ((storage-accessor (backend-storage-accessor class))
-           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
+          ((storage-accessor (storage-accessor class))
+           (storage-type    (funcall (storage-type-inferrer-from-array-type
                                       class)
                                      `(%dense-array ,elt-type))))
         `(the ,elt-type
