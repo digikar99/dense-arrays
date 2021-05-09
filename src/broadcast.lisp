@@ -5,6 +5,8 @@
   (unless (arrayp array)
     ;; Should probably warn if ARRAY is not an array
     (setq array (make-array 1 :initial-element array :element-type (type-of array))))
+  (when (equalp broadcast-dimensions (narray-dimensions array))
+    (return-from broadcast-array array))
   (with-slots (dimensions element-type strides offsets displaced-to) array
     (multiple-value-bind (strides offsets)
         (let* ((blen (length broadcast-dimensions))
@@ -91,6 +93,8 @@
                                         broadcast-dimensions-rest))))))))
 
 (defun broadcast-arrays (&rest arrays)
+  "Returns two values. The first value is the list of broadcasted arrays
+  if the second value is non-NIL."
   (declare (dynamic-extent arrays))
   (setq arrays (loop :for array :in arrays
                      :collect (if (arrayp array)
@@ -98,10 +102,14 @@
                                   (make-array 1
                                               :element-type (type-of array)
                                               :initial-element array))))
-  (let ((broadcast-dimensions (nth-value 1 (apply #'broadcast-compatible-p arrays))))
-    (loop :for array :in arrays
-          :if (equalp broadcast-dimensions (narray-dimensions array))
-            :collect array
-          :else
-            :collect (broadcast-array array broadcast-dimensions))))
+  (multiple-value-bind (broadcast-compatible-p broadcast-dimensions)
+      (apply #'broadcast-compatible-p arrays)
+    (if broadcast-compatible-p
+        (values (loop :for array :in arrays
+                      :if (equalp broadcast-dimensions (narray-dimensions array))
+                        :collect array
+                      :else
+                        :collect (broadcast-array array broadcast-dimensions))
+                t)
+        (values nil nil))))
 
