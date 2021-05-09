@@ -261,7 +261,7 @@
     (&whole form new-element array index &environment env)
   (compiler-macro-notes:with-notes
       (form :optimization-note-condition optim-speed
-            :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
+            :name (find-polymorph '(setf row-major-aref) '(t simple-dense-array t)))
     (let* ((array-type   (primary-form-type array env))
            (backend-name (dense-array-type-backend array-type env))
            (elt-type     (array-type-element-type array-type env)))

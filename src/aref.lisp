@@ -347,7 +347,7 @@
                       2)
                 a))))
 
-(defpolymorph row-major-aref ((array dense-array) index) t
+(defpolymorph (row-major-aref :inline t) ((array dense-array) index) t
   (declare (type int-index index))
   (let ((row-major-index   0)
         (apparant-strides  (rest (collect-reduce-from-end #'*
@@ -369,7 +369,7 @@
              (array-storage array)
              row-major-index)))
 
-(defpolymorph row-major-aref ((array simple-dense-array) index) t
+(defpolymorph (row-major-aref :inline t) ((array simple-dense-array) index) t
   ;; TODO: Use contiguous-dense-array instead of simple-dense-array
   (declare (type int-index index))
   (funcall (fdefinition (backend-storage-accessor
@@ -377,7 +377,7 @@
            (array-storage array)
            index))
 
-(defpolymorph (setf row-major-aref) (new-element (array dense-array) index) t
+(defpolymorph ((setf row-major-aref) :inline t) (new-element (array dense-array) index) t
   (declare (type int-index index))
   (let ((row-major-index   0)
         (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
@@ -394,7 +394,7 @@
              (array-storage array)
              row-major-index)))
 
-(defpolymorph (setf row-major-aref) (new-element (array simple-dense-array) index) t
+(defpolymorph ((setf row-major-aref) :inline t) (new-element (array simple-dense-array) index) t
   ;; TODO: Use contiguous-dense-array instead of simple-dense-array
   (declare (type int-index index))
   (funcall (fdefinition `(setf ,(backend-storage-accessor
