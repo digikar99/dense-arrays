@@ -55,7 +55,9 @@
   "Returns two values:
   The first value is a generalized boolean indicating whether the two dimensions are broadcast compatible.
   The second value is the dimensions of the array resulting from the broadcast."
-  (iter (for a = (if dim-a (first dim-a) 1))
+  (if (equalp dimensions-a dimensions-b)
+      (values t dimensions-a)
+      (iter (for a = (if dim-a (first dim-a) 1))
         (for b = (if dim-b (first dim-b) 1))
         ;; We do not use a "for in" clause because we want to terminate at the
         ;; maximum of the two lists rather than the minimum
@@ -69,12 +71,14 @@
                      (return nil))
           into broadcast-dimensions-reversed)
         (finally (return (values t
-                                 (nreverse broadcast-dimensions-reversed))))))
+                                 (nreverse broadcast-dimensions-reversed)))))))
 
 (defun broadcast-compatible-p (&rest arrays)
   "Returns two values:
   The first value is a generalized boolean indicating whether the arrays can be broadcasted.
   The second value is the dimension of the array resulting from the broadcast."
+  (declare (dynamic-extent arrays)
+           (optimize speed))
   (case (length arrays)
     (0 t)
     (1 (values t (narray-dimensions (first arrays))))
