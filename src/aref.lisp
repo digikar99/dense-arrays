@@ -21,7 +21,7 @@
   (declare (optimize speed)
            (dynamic-extent subscripts)
            (type dense-array array))
-  (with-slots (displaced-to strides offsets dimensions rank element-type) array
+  (with-slots (storage strides offsets dimensions rank element-type) array
     (multiple-value-bind (class dimensions strides offsets contiguous-p rank)
         (let ((new-offsets    nil)
               (new-dimensions nil)
@@ -77,8 +77,7 @@
                   contiguous-p
                   rank))
       (make-instance class
-                     :displaced-to displaced-to
-                     :storage displaced-to
+                     :storage storage
                      :element-type element-type
                      :dimensions dimensions
                      :strides strides

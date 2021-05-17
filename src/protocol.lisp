@@ -8,8 +8,7 @@
   ;; What can be instantiated is a CL:ARRAY with an ELEMENT-TYPE specified.
   ;; For DENSE-ARRAY, this ELEMENT-TYPE depends on the underlying storage itself.
 
-  ((displaced-to :required t)
-   (strides      :required t)
+  ((strides      :required t)
    (offsets      :required t)
    (contiguous-p :required t)
    (root-array   :required t))

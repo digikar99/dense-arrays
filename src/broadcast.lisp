@@ -7,7 +7,7 @@
     (setq array (make-array 1 :initial-element array :element-type (type-of array))))
   (when (equalp broadcast-dimensions (narray-dimensions array))
     (return-from broadcast-array array))
-  (with-slots (dimensions element-type strides offsets displaced-to) array
+  (with-slots (dimensions element-type strides offsets storage) array
     (multiple-value-bind (strides offsets)
         (let* ((blen (length broadcast-dimensions))
                (len  (length dimensions))
@@ -41,7 +41,6 @@
                        :element-type element-type
                        :strides strides
                        :offsets offsets
-                       :displaced-to displaced-to
                        ;; TODO: Raises the question of semantics of array being contiguous
                        :contiguous-p (= (first strides)
                                         (/ total-size (first broadcast-dimensions)))

@@ -96,8 +96,6 @@
 
          (dense-array     (make-instance class
                                          :storage storage
-                                         ;; FIXME: DISPLACED-TO is redundant with STORAGE
-                                         :displaced-to storage
                                          :element-type element-type
                                          :dimensions dimensions
                                          :strides strides
