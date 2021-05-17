@@ -156,7 +156,7 @@
 the BINDINGS are assumed to be the first element of the BODY.
   Otherwise, the first argument is treated as if they are BINDINGS.
   Each BINDING is of the form
-    (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (BACKEND-NAME :CL))
+    (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (CLASS-NAME :CL))
   Here, only ARRAY is evaluated.
 
 Examples
@@ -185,9 +185,9 @@ Either of the two cases might be faster depending on the number of dimensions."
                         (elt-var array
                          &optional (element-type '*)
                          ;; Could there be a case where a user wants to specify
-                         ;; the backend but not the element-type?
+                         ;; the class but not the element-type?
                          ;; Well, they could just specify the *
-                         &key (backend *dense-array-backend*))
+                         &key (class *dense-array-class*))
                         binding
                       (when (and (= 3 (env:policy-quality 'speed env))
                                  (eq element-type '*))
@@ -198,11 +198,10 @@ Either of the two cases might be faster depending on the number of dimensions."
                          (list elt-var array)))
                       (push elt-var      elt-vars)
                       (push array        arrays)
-                      (let ((backend (find-backend backend)))
-                        (push (funcall (backend-storage-type-inferrer-from-array-type backend)
-                                       `(%dense-array ,element-type))
-                              storage-types)
-                        (push (backend-storage-accessor backend) storage-accessors))))
+                      (push (funcall (storage-type-inferrer-from-array-type class)
+                                     `(%dense-array ,element-type))
+                            storage-types)
+                      (push (storage-accessor class) storage-accessors)))
           ;; Reverse - so same as given order - because, see the test below
           (list (nreverse elt-vars)
                 (nreverse arrays)

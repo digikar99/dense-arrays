@@ -1,19 +1,18 @@
 (in-package :dense-arrays)
 (in-suite :dense-arrays)
 
-(make-backend :static
-              :storage-accessor 'cl-aref
-              :storage-allocator 'static-vectors:make-static-vector
-              :storage-deallocator 'static-vectors:free-static-vector
-              :element-type-upgrader 'cl:upgraded-array-element-type
-              :storage-type-inferrer-from-array
-              (lambda (array)
-                (declare (type abstract-array array)
-                         (optimize speed))
-                `(cl:array ,(array-element-type array) 1))
-              :storage-type-inferrer-from-array-type
-              (lambda (array-type)
-                `(cl:array ,(array-type-element-type array-type) 1)))
+;; (defstruct (static-dense-array (:include dense-array)))
+
+(defclass static-dense-array-class (standard-dense-array-class) ())
+
+(defclass static-dense-array (dense-array)
+  ()
+  (:metaclass static-dense-array-class))
+
+(defmethod storage-allocator ((class static-dense-array-class))
+  'static-vectors:make-static-vector)
+(defmethod storage-deallocator ((class static-dense-array-class))
+  'static-vectors:free-static-vector)
 
 (defun static-dense-array-p (array)
   (and (dense-array-p array)

@@ -27,27 +27,20 @@
     ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
     ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
     (let* ((array-type   (primary-form-type array env))
-           (backend-name (dense-array-type-backend array-type env))
+           (class        (dense-array-type-class array-type env))
            (elt-type     (array-type-element-type array-type env))
            (rank         (array-type-rank array-type env))
            (simple-p     (subtypep array-type 'simple-dense-array)))
       (declare (ignore simple-p))
-      (when (eq 'cl:* backend-name)
+      (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
         (return-from aref form))
       (let*
-          ((backend         (handler-case (find-backend backend-name)
-                              (no-existing-backend (c)
-                                (declare (ignore c))
-                                ;; The optimization benefit would be
-                                ;; totally insignificant in this case
-                                (signal 'no-existing-backend/note :name backend-name)
-                                (return-from aref form))))
-           (storage-accessor (backend-storage-accessor backend))
-           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
-                                      backend)
-                                     `(%dense-array ,elt-type ,rank)))
+          ((storage-accessor (storage-accessor class))
+           (storage-type     (funcall (storage-type-inferrer-from-array-type
+                                       class)
+                                      `(%dense-array ,elt-type ,rank)))
            (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
            (os              (make-gensym-list (length subscripts) "OFFSET"))
            (ss              (make-gensym-list (length subscripts) "STRIDE"))
@@ -128,27 +121,20 @@
                                     :optimization-note-condition optim-speed)
     ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
     ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
-    (let* ((array-type   (primary-form-type array env))
-           (backend-name (dense-array-type-backend array-type env))
-           (elt-type     (array-type-element-type array-type env))
-           (rank         (array-type-rank array-type env))
-           (simple-p     (subtypep array-type 'simple-dense-array)))
+    (let* ((array-type (primary-form-type array env))
+           (class      (dense-array-type-class array-type env))
+           (elt-type   (array-type-element-type array-type env))
+           (rank       (array-type-rank array-type env))
+           (simple-p   (subtypep array-type 'simple-dense-array)))
       (declare (ignore simple-p))
-      (when (eq 'cl:* backend-name)
+      (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
         (return-from aref form))
       (let*
-          ((backend         (handler-case (find-backend backend-name)
-                              (no-existing-backend (c)
-                                (declare (ignore c))
-                                ;; The optimization benefit would be
-                                ;; totally insignificant in this case
-                                (signal 'no-existing-backend/note :name backend-name)
-                                (return-from aref form))))
-           (storage-accessor (backend-storage-accessor backend))
-           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
-                                      backend)
+          ((storage-accessor (storage-accessor class))
+           (storage-type    (funcall (storage-type-inferrer-from-array-type
+                                      class)
                                      `(%dense-array ,elt-type ,rank)))
            (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
            (new-value-type  (primary-form-type new-value env))
@@ -234,24 +220,17 @@
   (compiler-macro-notes:with-notes
       (form :optimization-note-condition optim-speed
             :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
-    (let* ((array-type   (primary-form-type array env))
-           (backend-name (dense-array-type-backend array-type env))
-           (elt-type     (array-type-element-type array-type env)))
-      (when (eq 'cl:* backend-name)
+    (let* ((array-type (primary-form-type array env))
+           (class      (dense-array-type-class array-type env))
+           (elt-type   (array-type-element-type array-type env)))
+      (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
         (return-from row-major-aref form))
       (let*
-          ((backend         (handler-case (find-backend backend-name)
-                              (no-existing-backend (c)
-                                (declare (ignore c))
-                                ;; The optimization benefit would be
-                                ;; totally insignificant in this case
-                                (signal 'no-existing-backend/note :name backend-name)
-                                (return-from row-major-aref form))))
-           (storage-accessor (backend-storage-accessor backend))
-           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
-                                      backend)
+          ((storage-accessor (storage-accessor class))
+           (storage-type    (funcall (storage-type-inferrer-from-array-type
+                                      class)
                                      `(%dense-array ,elt-type))))
         `(the ,elt-type
               (,storage-accessor (the ,storage-type (array-storage ,array))
@@ -263,23 +242,16 @@
       (form :optimization-note-condition optim-speed
             :name (find-polymorph '(setf row-major-aref) '(t simple-dense-array t)))
     (let* ((array-type   (primary-form-type array env))
-           (backend-name (dense-array-type-backend array-type env))
-           (elt-type     (array-type-element-type array-type env)))
-      (when (eq 'cl:* backend-name)
+           (class      (dense-array-type-class array-type env))
+           (elt-type   (array-type-element-type array-type env)))
+      (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
         (return-from row-major-aref form))
       (let*
-          ((backend         (handler-case (find-backend backend-name)
-                              (no-existing-backend (c)
-                                (declare (ignore c))
-                                ;; The optimization benefit would be
-                                ;; totally insignificant in this case
-                                (signal 'no-existing-backend/note :name backend-name)
-                                (return-from row-major-aref form))))
-           (storage-accessor (backend-storage-accessor backend))
-           (storage-type    (funcall (backend-storage-type-inferrer-from-array-type
-                                      backend)
+          ((storage-accessor (storage-accessor class))
+           (storage-type    (funcall (storage-type-inferrer-from-array-type
+                                      class)
                                      `(%dense-array ,elt-type))))
         `(the ,elt-type
               (setf (,storage-accessor

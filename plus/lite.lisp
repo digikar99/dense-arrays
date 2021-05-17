@@ -7,8 +7,7 @@
    #:the-size
    #:default-element-type
    #:make-dense-array
-   #:dense-array-backend
-   #:backend-storage-accessor
+   #:storage-accessor
    #:dense-array
    #:simple-dense-array
    #:array-offsets
@@ -110,8 +109,7 @@
                                                    (element-type array-like)
                                                    element-type)))
          (*storage*  (array-displaced-to array))
-         (*storage-accessor* (backend-storage-accessor
-                              (find-backend (dense-array-backend array))))
+         (*storage-accessor* (storage-accessor (class-of array)))
          (*index*    0))
     (traverse array-like)
     array))
@@ -143,18 +141,18 @@
                  (t (asarray array-like)))))
     (declare (type dense-array array)
              (optimize speed))
-    (make-dense-array :displaced-to (array-displaced-to array)
-                      :storage (array-displaced-to array)
-                      :element-type (array-element-type array)
-                      :dimensions (reverse (narray-dimensions  array))
-                      :strides (reverse (array-strides  array))
-                      :offsets (reverse (array-offsets  array))
-                      :contiguous-p nil
-                      :total-size   (array-total-size   array)
-                      :rank (array-rank array)
-                      :backend (dense-array-backend array)
-                      :root-array (or (dense-arrays::dense-array-root-array array)
-                                      array))))
+    (make-instance (class-of array)
+                   :displaced-to (array-displaced-to array)
+                   :storage (array-displaced-to array)
+                   :element-type (array-element-type array)
+                   :dimensions (reverse (narray-dimensions  array))
+                   :strides (reverse (array-strides  array))
+                   :offsets (reverse (array-offsets  array))
+                   :contiguous-p nil
+                   :total-size   (array-total-size   array)
+                   :rank (array-rank array)
+                   :root-array (or (dense-arrays::dense-array-root-array array)
+                                   array))))
 
 (defun split-at-keywords (args)
   "Example: (1 2 3 :a 2 :b 3) => ((1 2 3) (:a 2 :b 3))"
@@ -168,7 +166,6 @@
       '(nil)))
 
 ;; TODO: Add compiler macros to speed things up
-
 
 (declaim (ftype (function * simple-dense-array)
                 ones zeros rand ones-like zeros-like))
@@ -278,25 +275,25 @@ creating the new array and instead return a view instead. "
             :array-like array-like
             :new-shape new-shape)
     (let ((maybe-view-array
-            (make-dense-array :displaced-to (array-displaced-to array)
-                              :storage (array-displaced-to array)
-                              :element-type (array-element-type array)
-                              :dimensions new-shape
-                              :strides (dense-arrays::dimensions->strides new-shape)
-                              :offsets (make-list (length new-shape) :initial-element 0)
-                              :contiguous-p nil
-                              :total-size (array-total-size array)
-                              :rank (length new-shape)
-                              :backend (dense-array-backend array)
-                              :root-array (if simple-dense-array-p
-                                              ;; In other cases, we are guaranteed
-                                              ;; that the ARRAY object created here
-                                              ;; will not be accessible from outside
-                                              ;; FIXME: Debugger?
-                                              (or (dense-arrays::dense-array-root-array
-                                                   array)
-                                                  array)
-                                              nil))))
+            (make-instance (class-of array)
+                           :displaced-to (array-displaced-to array)
+                           :storage (array-displaced-to array)
+                           :element-type (array-element-type array)
+                           :dimensions new-shape
+                           :strides (dense-arrays::dimensions->strides new-shape)
+                           :offsets (make-list (length new-shape) :initial-element 0)
+                           :contiguous-p nil
+                           :total-size (array-total-size array)
+                           :rank (length new-shape)
+                           :root-array (if simple-dense-array-p
+                                           ;; In other cases, we are guaranteed
+                                           ;; that the ARRAY object created here
+                                           ;; will not be accessible from outside
+                                           ;; FIXME: Debugger?
+                                           (or (dense-arrays::dense-array-root-array
+                                                array)
+                                               array)
+                                           nil))))
       (cond ((and viewp simple-dense-array-p)
              (if view
                  maybe-view-array

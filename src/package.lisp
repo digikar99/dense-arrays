@@ -13,11 +13,10 @@
                              "ARRAY-STORAGE-ALLOCATOR"
                              "ARRAY-STORAGE-DEALLOCATOR"
                              "UPGRADED-ARRAY-ELEMENT-TYPE"
-                             "DEFINE-DENSE-ARRAY-BACKEND-SPECIALIZATION"
-                             "MAKE-BACKEND"
-                             "FIND-BACKEND"
-                             "DENSE-ARRAY-TYPE-BACKEND"
-                             "*DENSE-ARRAY-BACKEND*"
+                             "DENSE-ARRAY-TYPE-CLASS"
+                             "STANDARD-DENSE-ARRAY"
+                             "STANDARD-DENSE-ARRAY-CLASS"
+                             "*DENSE-ARRAY-CLASS*"
 
                              "NARRAY-DIMENSIONS"
                              "ARRAY-DISPLACEMENT"
@@ -45,7 +44,7 @@
                 ,@abstract-array-symbols)
        (:shadow ,@shadow-symbols)
        (:import-from :abstract-arrays
-                     :define-struct-with-required-slots
+                     :define-class-with-required-slots
                      :storage
                      :dimensions
                      :rank
@@ -105,140 +104,3 @@ Is overriden by *ARRAY-ELEMENT-TYPE* when bound, or by explicitly passing an
 (deftype uint32 () `(unsigned-byte 32))
 (deftype int64 () `(signed-byte 64))
 (deftype uint64 () `(unsigned-byte 64))
-
-(defparameter *dense-array-backends* nil)
-(defparameter *dense-array-backend* :cl)
-
-(define-struct-with-required-slots (backend (:constructor create-backend))
-  "
-STORAGE-ALLOCATOR
-  - a function with signature (SIZE &KEY ELEMENT-TYPE INITIAL-ELEMENT)
-    that allocates a VECTOR of length SIZE of ELEMENT-TYPE with each element as
-    INITIAL-ELEMENT for use as a STORAGE-VECTOR for the ABSTRACT-ARRAY.
-
-STORAGE-DEALLOCATOR
-  - A function to be called to delete the STORAGE when the ABSTRACT-ARRAY
-    goes out of scope. This function should take only the STORAGE object
-    as its argument. (See static-vectors.lisp and the DENSE-ARRAYS:MAKE-ARRAY
-    function for reference.)
-  "
-  (name                  nil :required t :type symbol)
-  ;; We need an accessor with a setf expansion, to play nice in do-arrays
-  (storage-accessor      nil :required t :type function-name)
-  (storage-allocator     nil :required t :type function-designator)
-  (storage-deallocator   nil :required t :type (or null function-designator))
-  (element-type-upgrader nil :required t :type function-designator)
-  (storage-type-inferrer-from-array nil :required t :type function-designator)
-  (storage-type-inferrer-from-array-type nil :required t :type function-designator))
-
-(defmethod print-object ((o backend) s)
-  (print-unreadable-object (o s :type t :identity t)
-    (write (backend-name o) :stream s)))
-
-(defun make-backend (name &rest args &key storage-type-inferrer-from-array-type
-                                       storage-type-inferrer-from-array
-                                       storage-accessor
-                                       storage-allocator
-                                       storage-deallocator
-                                       element-type-upgrader)
-  (declare (ignore storage-type-inferrer-from-array-type
-                   storage-type-inferrer-from-array
-                   storage-accessor
-                   storage-allocator
-                   storage-deallocator
-                   element-type-upgrader))
-  (let ((backend (apply #'create-backend :name name args)))
-    (removef *dense-array-backends* name :key #'backend-name)
-    (push backend *dense-array-backends*)
-    backend))
-
-(define-condition no-existing-backend (error)
-  ((name :initarg :name
-         :accessor no-existing-backend-name))
-  (:report (lambda (condition stream)
-             (format stream "There is no backend with name ~S.
-Existing backend names include:~{~^~%  ~S~}"
-                     (no-existing-backend-name condition)
-                     (mapcar #'backend-name *dense-array-backends*)))))
-
-(defun find-backend (name)
-  (or (find name *dense-array-backends* :key #'backend-name)
-      (error 'no-existing-backend :name name)))
-
-;;; Some implementations like CCL do not have a #'(setf cl:aref)
-(declaim (inline cl-aref (setf cl-aref)))
-(defun cl-aref (array index)
-  (cl:row-major-aref array index))
-(defun (setf cl-aref) (new array index)
-  (setf (cl:row-major-aref array index) new))
-
-(defparameter *standard-dense-array-backend*
-  (make-backend :cl
-                :storage-accessor 'cl-aref
-                :storage-allocator 'cl:make-array
-                :storage-deallocator nil
-                :element-type-upgrader 'cl:upgraded-array-element-type
-                :storage-type-inferrer-from-array
-                (lambda (array)
-                  (declare (type abstract-array array)
-                           (optimize speed))
-                  `(cl:simple-array ,(array-element-type array) 1))
-                :storage-type-inferrer-from-array-type
-                (lambda (array-type)
-                  `(cl:simple-array ,(array-type-element-type array-type) 1))))
-
-(define-struct-with-required-slots (dense-array (:include abstract-array)
-                                                (:predicate dense-array-p)
-                                                (:constructor make-dense-array)
-                                                (:copier copy-dense-array))
-  ;; TODO: Add more documentation with a proper example
-  "- DIMENSIONS is a list of dimensions.
-- STRIDES is a list of strides along each dimension.
-- OFFSETS is a list of offsets along each dimension."
-  (displaced-to nil :required t)
-  (strides      nil :required t)
-  (offsets      nil :required t :type list)
-  (contiguous-p nil :required t)
-  (backend      *dense-array-backend* :read-only t :type symbol)
-  (root-array   nil :required t))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun backend-p-fn-name (backend-name)
-    (check-type backend-name (and symbol (not (eql nil)))) ; any other names to disallow?
-    (intern (uiop:strcat "DENSE-ARRAY-BACKEND-"
-                         (write-to-string backend-name)
-                         "-P")
-            :dense-arrays)))
-
-(defmacro define-dense-array-backend-specialization (backend-name)
-  (check-type backend-name symbol)
-  (let ((fn-name (backend-p-fn-name backend-name)))
-    `(defun ,fn-name (object)
-       (and (dense-array-p object)
-            (eq ,backend-name (dense-array-backend object))))))
-
-(defun simple-dense-array-p (object)
-  (declare (optimize speed))
-  (and (dense-array-p object)
-       (loop :for o :of-type size :in (array-offsets object)
-             :always (zerop o))
-       (let ((total-size (array-total-size (the array object))))
-         (if (zerop total-size)
-             t
-             (loop :for s :of-type int-index :in (array-strides object)
-                   :for d :of-type size :in (narray-dimensions object)
-                   :always (= s (/ total-size d))
-                   :always (zerop (rem total-size d))
-                   :do (setq total-size (the size (/ total-size d))))))))
-
-(define-dense-array-backend-specialization :cl)
-(deftype standard-dense-array () `(and dense-array (satisfies ,(backend-p-fn-name :cl))))
-(deftype simple-dense-array   () `(and dense-array (satisfies simple-dense-array-p)))
-
-(define-array-specialization-type array standard-dense-array)
-;;; TODO: Put simple-array type to use
-(define-array-specialization-type simple-array (and standard-dense-array
-                                                    simple-dense-array))
-
-;; For internal usage
-(define-array-specialization-type %dense-array dense-array)
