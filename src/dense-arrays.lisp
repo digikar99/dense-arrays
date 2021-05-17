@@ -184,11 +184,6 @@
                 array-strides
                 array-offsets))
 
-(defun dense-array-contiguous-p (array)
-  (slot-value array 'contiguous-p))
-(defun dense-array-root-array (array)
-  (slot-value array 'root-array))
-
 (declaim (inline array-displaced-to))
 (defun array-displaced-to (array)
   (declare (type dense-array array))
@@ -198,7 +193,7 @@
 (defun narray-dimensions (array)
   "Returns the dimensions-list of the ARRAY. The list is not expected to be modified."
   (declare (type dense-array array))
-  (slot-value array 'dimensions))
+  (array-dimensions array))
 
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."
@@ -209,7 +204,7 @@
 (declaim (inline array-strides))
 (defun array-strides (array)
   (declare (type dense-array array))
-  (slot-value array 'strides))
+  (dense-array-strides array))
 
 (defun array-stride (array axis-number)
   "Return the length of stride AXIS-NUMBER of ARRAY."
@@ -220,7 +215,7 @@
 (declaim (inline array-offsets))
 (defun array-offsets (array)
   (declare (type dense-array array))
-  (slot-value array 'offsets))
+  (dense-array-offsets array))
 
 (defun array-offset (array axis-number)
   "Return the length of offset AXIS-NUMBER of ARRAY."
@@ -237,7 +232,7 @@
 (defun array-view-p (array)
   "Returns T if the ARRAY is a VIEW, otherwise returns NIL"
   (declare (type dense-array array))
-  (if (slot-value array 'root-array) t nil))
+  (if (dense-array-root-array array) t nil))
 
 (defun array-displaced-index-offset (array)
   (declare (type dense-array array))

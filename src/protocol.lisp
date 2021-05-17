@@ -2,12 +2,7 @@
 
 (defclass dense-array-class (abstract-array-class) ())
 
-;; (:include abstract-array)
-;;  (:predicate dense-array-p)
-;;  (:constructor nil)
-;;  (:copier copy-dense-array)
-
-(define-class-with-required-slots dense-array (abstract-array)
+(define-array-class dense-array
   ;; TODO: Add more documentation with a proper example
   ;; Like CL:ARRAY, DENSE-ARRAY can actually never be instantiated.
   ;; What can be instantiated is a CL:ARRAY with an ELEMENT-TYPE specified.
@@ -15,29 +10,19 @@
 
   ((displaced-to :required t)
    (strides      :required t)
-   (offsets      :required t :type list)
+   (offsets      :required t)
    (contiguous-p :required t)
    (root-array   :required t))
   (:documentation "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.
-- OFFSETS is a list of offsets along each dimension.")
-  (:metaclass dense-array-class))
-
-;; (defmethod initialize-instance :before ((object dense-array) &key)
-;;   t)
-
+- OFFSETS is a list of offsets along each dimension."))
 
 ;;; Below, we are using CLASS instead of CLASS-NAME because the CLASS objects
 ;;; will have a hierarchy, not the CLASS-NAMEs. This allows for partial specialization.
 ;;; An example of a preprovided partial specialization is STATIC-DENSE-ARRAY
 ;;; as a subclass of STANDARD-DENSE-ARRAY with the partial specializations:
-;;; - DENSE-ARRAY-CONSTRUCTOR
 ;;; - STORAGE-ALLOCATOR
 ;;; - STORAGE-DEALLOCATOR
-
-;; (defgeneric dense-array-constructor (class)
-;;   (:documentation "Returns a SYMBOL that is fbound to a function that constructs
-;; DENSE-ARRAYs of class CLASS-NAME."))
 
 (defgeneric storage-accessor (class)
   (:documentation "Returns a SYMBOL that is fbound to a function that takes
@@ -79,7 +64,6 @@ subclass of DENSE-ARRAY." ',name)))))
 
 ;;; STANDARD-DENSE-ARRAY
 
-;; (defstruct (standard-dense-array (:include dense-array)))
 (defclass standard-dense-array-class (dense-array-class) ())
 (defclass standard-dense-array (dense-array)
   ()
@@ -94,8 +78,6 @@ subclass of DENSE-ARRAY." ',name)))))
 (defun (setf cl-aref) (new array index)
   (setf (cl:row-major-aref array index) new))
 
-;; (defmethod dense-array-constructor ((class *dense-array-class*))
-;;   'make-standard-dense-array)
 (defmethod storage-accessor ((class standard-dense-array-class))
   'cl-aref)
 (defmethod storage-allocator ((class standard-dense-array-class))

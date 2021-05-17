@@ -1,12 +1,13 @@
-#.(cl:let ((abstract-array-symbols '(:arrayp
-                                     :array-dimensions
-                                     :array-dimension
-                                     :array-element-type
-                                     :array-total-size
-                                     :aref
-                                     :row-major-aref
-                                     :array-rank
-                                     :array-storage))
+#.(cl:let ((abstract-array-symbols '("ARRAYP"
+                                     "ARRAY-DIMENSIONS"
+                                     "ARRAY-DIMENSION"
+                                     "ARRAY-ELEMENT-TYPE"
+                                     "ARRAY-TOTAL-SIZE"
+                                     "AREF"
+                                     "ROW-MAJOR-AREF"
+                                     "ARRAY-RANK"
+                                     "ARRAY-STORAGE"
+                                     "DEFINE-ARRAY-CLASS"))
            (shadow-symbols '("ARRAY"
                              "SIMPLE-ARRAY"
 
@@ -18,13 +19,13 @@
                              "STANDARD-DENSE-ARRAY-CLASS"
                              "*DENSE-ARRAY-CLASS*"
 
-                             "NARRAY-DIMENSIONS"
                              "ARRAY-DISPLACEMENT"
                              "ARRAY-DISPLACED-TO"
                              "ARRAY-OFFSET"
                              "ARRAY-OFFSETS"
                              "ARRAY-STRIDE"
                              "ARRAY-STRIDES"
+                             "NARRAY-DIMENSIONS"
                              "ARRAY="
                              "MAKE-ARRAY"
                              "*ARRAY-ELEMENT-TYPE*"
@@ -44,12 +45,13 @@
                 ,@abstract-array-symbols)
        (:shadow ,@shadow-symbols)
        (:import-from :abstract-arrays
-                     :define-class-with-required-slots
-                     :storage
-                     :dimensions
-                     :rank
-                     :element-type
-                     :intersection-type-types)
+                     #:+abstract-array-slot-order+
+                     #:define-ordered-class-with-required-slots
+                     #:storage
+                     #:dimensions
+                     #:rank
+                     #:element-type
+                     #:intersection-type-types)
        (:import-from :trivial-form-type
                      #:primary-form-type
                      #:primary-form-typep)
