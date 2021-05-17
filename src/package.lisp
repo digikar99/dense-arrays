@@ -13,7 +13,6 @@
 
                              "ARRAY-STORAGE-ALLOCATOR"
                              "ARRAY-STORAGE-DEALLOCATOR"
-                             "UPGRADED-ARRAY-ELEMENT-TYPE"
                              "DENSE-ARRAY-TYPE-CLASS"
                              "STANDARD-DENSE-ARRAY"
                              "STANDARD-DENSE-ARRAY-CLASS"

@@ -75,7 +75,9 @@
          ;; FIXME: Handle displaced-index-offset correctly
          (offsets         (if displaced-index-offset
                               (nconc (list displaced-index-offset)
-                                     (make-list (1- rank) :initial-element 0))
+                                     (if (> rank 0)
+                                         (make-list (1- rank) :initial-element 0)
+                                         ()))
                               offsets))
 
          (class           (typecase class
@@ -187,6 +189,16 @@
   (declare (type dense-array array))
   (array-storage array))
 
+(declaim (inline array-displacement))
+(defun array-displacement (array)
+  "Returns two values:
+- ARRAY-STORAGE
+- and OFFSET along first axis
+Consequences are undefined if ARRAY is displaced along multiple axis."
+  (declare (type dense-array array))
+  (values (array-storage array)
+          (first (array-offsets array))))
+
 (declaim (inline narray-dimensions))
 (defun narray-dimensions (array)
   "Returns the dimensions-list of the ARRAY. The list is not expected to be modified."
@@ -261,8 +273,6 @@
   ;; (print (type-of array))
   (let* ((*print-right-margin* (or *print-right-margin* 80))
          (sv      (array-storage array))
-         (class   (class-of array))
-         (sv-ref  (fdefinition (storage-accessor class)))
          (rank    (array-rank array))
          (rank-1  (1- (array-rank array)))
          (lines   3)
@@ -326,7 +336,7 @@
                             (dotimes (i indent) (write-char #\space stream))
                             (setq column indent)))
                      (cond ((= *axis-number* rank)
-                            (print-respecting-margin (funcall sv-ref sv (+ offset start))
+                            (print-respecting-margin (aref sv (+ offset start))
                                                      column))
                            (t
                             (let ((dim               (array-dimension array *axis-number*))

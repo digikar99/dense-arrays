@@ -22,6 +22,8 @@
 
 (defun simple-dense-array-p (object)
   (and (typep object 'dense-array)
+       (not (type= (class-of object)
+                   (class-of (array-storage object))))
        (loop :for o :of-type size :in (array-offsets object)
              :always (zerop o))
        (let ((total-size (array-total-size object)))
