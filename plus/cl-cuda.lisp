@@ -18,11 +18,11 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (trivial-package-local-nicknames:add-package-local-nickname :cu :cl-cuda))
 
-(define-struct-with-required-slots (lisp-cuda-type)
-  (lisp nil  :required t)
-  (cuda nil  :required t)
-  (size nil  :required t)
-  (c    nil :required t))
+(defstruct (lisp-cuda-type)
+  (lisp nil)
+  (cuda nil)
+  (size nil)
+  (c    nil))
 
 (declaim (inline lisp-type cuda-type type-size c-type))
 (defun lisp-type (lisp-cuda-type)
@@ -97,30 +97,50 @@
             (= 1 (the bit new)))
       (setf (cu:memory-block-aref memory-block index) new)))
 
-(define-dense-array-backend-specialization :cuda)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (deftype cuda-dense-array () `(and dense-array (satisfies ,(backend-p-fn-name :cuda))))
-  (define-array-specialization-type cuda-array cuda-dense-array)
-  (define-array-specialization-type simple-cuda-array (and cuda-dense-array simple-dense-array))
-  (export '(cuda-array simple-cuda-array) :dense-arrays))
+(defpolymorph aref ((memory-block cl-cuda.api.memory::memory-block) &rest indices) t
+  (assert (null (rest indices)))
+  (cu:memory-block-aref memory-block (first indices)))
 
-(make-backend :cuda
-              :storage-accessor 'cuda-memory-block-aref
-              :storage-allocator 'make-cuda-vector
-              :storage-deallocator 'free-cuda-vector
-              :element-type-upgrader 'upgraded-cuda-array-element-type
-              ;; TODO: Would additional types help in optimization?
-              :storage-type-inferrer-from-array
-              (lambda (array)
-                (declare (ignore array))
-                'cl-cuda.api.memory::memory-block)
-              :storage-type-inferrer-from-array-type
-              (lambda (array)
-                (declare (ignore array))
-                'cl-cuda.api.memory::memory-block))
+;;; FIXME: Compiling the below block results in style-warnings
+;; (let ((*dense-array-class* 'cuda-dense-array))
+;;   (aref (the (cuda-array single-float 2)
+;;              (make-array '(2 2) :element-type 'single-float
+;;                                 :initial-element 1.0))
+;;         0 1))
+
+(defclass cuda-dense-array-class (dense-array-class) ())
+
+(defclass cuda-dense-array (dense-array)
+  ()
+  (:metaclass cuda-dense-array-class))
+
+(defmethod storage-element-type-upgrader ((class cuda-dense-array-class))
+  'upgraded-cuda-array-element-type)
+(defmethod storage-allocator ((class cuda-dense-array-class))
+  'make-cuda-vector)
+(defmethod storage-deallocator ((class cuda-dense-array-class))
+  'free-cuda-vector)
+(defmethod storage-accessor ((class cuda-dense-array-class))
+  'cuda-memory-block-aref)
+(defmethod storage-type-inferrer-from-array ((class cuda-dense-array-class))
+  (lambda (array)
+    (declare (ignore array))
+    'cl-cuda.api.memory::memory-block))
+(defmethod storage-type-inferrer-from-array-type ((class cuda-dense-array-class))
+  (lambda (array-type)
+    (declare (ignore array-type))
+    'cl-cuda.api.memory::memory-block))
+
+(define-array-specialization-type cuda-array cuda-dense-array)
+(define-array-specialization-type simple-cuda-array (and cuda-dense-array
+                                                         simple-dense-array))
 
 (defpolymorph array-element-type ((memory-block cl-cuda.api.memory::memory-block)) t
   (lisp-type (find (cl-cuda:memory-block-type memory-block)
                    *lisp-cuda-types*
                    :key #'cuda-type)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (export '(cuda-dense-array cuda-array simple-cuda-array)
+          (find-package :dense-arrays)))
 

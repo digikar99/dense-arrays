@@ -13,6 +13,7 @@
              ;; Other tests won't pass because do-arrays is a compile time thing.
              ;; Or, they make certain assumptions about the backend.
              (eval (read-from-string "(LET ((CL-CUDA:*SHOW-MESSAGES* NIL)
-                                            (DENSE-ARRAYS:*DENSE-ARRAY-BACKEND* :CUDA))
+                                            (DENSE-ARRAYS:*DENSE-ARRAY-CLASS*
+                                               'DENSE-ARRAYS:CUDA-DENSE-ARRAY))
                                         (5AM:RUN 'DENSE-ARRAYS::BACKEND-INDEPENDENT)))"))))
  

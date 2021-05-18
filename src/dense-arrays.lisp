@@ -266,8 +266,14 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
 (define-condition print-lines-exhausted (condition)
   ((axis-number :initarg :axis-number :accessor axis-number)))
 
+
+;;; FIXME: Someone read up http://www.lispworks.com/documentation/lw51/CLHS/Body/22_b.htm
+;;; to do things better
 (defvar *array-element-print-format* nil
-  "The format constrol string used to print the elements of DENSE-ARRAYS:ARRAY.")
+  "The format control string used to print the elements of DENSE-ARRAYS:ARRAY.
+Also see:
+- https://en.wikipedia.org/wiki/Format_(Common_Lisp)
+- http://www.gigamonkeys.com/book/a-few-format-recipes.html")
 
 (defmethod print-object ((array dense-array) stream)
   ;; (print (type-of array))

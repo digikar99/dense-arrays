@@ -142,7 +142,6 @@
     (declare (type dense-array array)
              (optimize speed))
     (make-instance (class-of array)
-                   :displaced-to (array-displaced-to array)
                    :storage (array-displaced-to array)
                    :element-type (array-element-type array)
                    :dimensions (reverse (narray-dimensions  array))
@@ -276,7 +275,6 @@ creating the new array and instead return a view instead. "
             :new-shape new-shape)
     (let ((maybe-view-array
             (make-instance (class-of array)
-                           :displaced-to (array-displaced-to array)
                            :storage (array-displaced-to array)
                            :element-type (array-element-type array)
                            :dimensions new-shape

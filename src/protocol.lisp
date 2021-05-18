@@ -50,8 +50,11 @@ take only the STORAGE object as its argument.
 (macrolet ((def (name)
              `(progn
                 (defmethod ,name (class)
-                  (error "Illegal to call ~S on something that is not the name of a
-subclass of DENSE-ARRAY." ',name)))))
+                  (if (subtypep class 'dense-array)
+                      (error "Method ~S has not been specialized for ~S"
+                             ',name (class-of class))
+                      (error "Illegal to call ~S on something that is not the name of a
+subclass of DENSE-ARRAY." ',name))))))
   (def dense-array-constructor)
   (def storage-accessor)
   (def storage-allocator)
