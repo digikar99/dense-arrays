@@ -1,3 +1,4 @@
+
 (in-package :dense-arrays)
 
 (defun array= (array1 array2 &key (test #'equalp))
@@ -136,21 +137,23 @@
   (cond ((and (= (array-rank array) (length subscripts))
               (every #'integerp subscripts))
          (let* ((dense-array-class (class-of array)))
-           (funcall (storage-accessor dense-array-class)
-                    (array-storage array)
-                    (the int-index
-                         (let ((index 0))
-                           (declare (type size index))
-                           ;; TODO: Better error reporting for negative indices
-                           (loop :for stride :of-type int-index :in (array-strides array)
-                                 :for subscript :of-type int-index :in subscripts
-                                 :for offset :of-type size :in (array-offsets array)
-                                 :for dimension :of-type size :in (narray-dimensions array)
-                                 :do (incf index (+ offset
-                                                    (the-size
-                                                     (* stride
-                                                        (normalize-index subscript dimension))))))
-                           index)))))
+           (assert-type
+            (funcall (storage-accessor dense-array-class)
+                     (array-storage array)
+                     (the int-index
+                          (let ((index 0))
+                            (declare (type size index))
+                            ;; TODO: Better error reporting for negative indices
+                            (loop :for stride :of-type int-index :in (array-strides array)
+                                  :for subscript :of-type int-index :in subscripts
+                                  :for offset :of-type size :in (array-offsets array)
+                                  :for dimension :of-type size :in (narray-dimensions array)
+                                  :do (incf index (+ offset
+                                                     (the-size
+                                                      (* stride
+                                                         (normalize-index subscript dimension))))))
+                            index)))
+            (array-element-type array))))
         ((or (some #'cl:arrayp subscripts)
              (some #'arrayp subscripts))
          (apply #'%aref array subscripts))
@@ -183,11 +186,12 @@
              (iter (for subscript in subscripts)
                (if (typep subscript (env:typexpand '(%dense-array bit)))
                    (appending (nonzero subscript))
-                   (collect   subscript))))
+                   (collect   subscript))))    
     (cond
       ((= (length subscripts) (array-rank array))
        (let ((rank   (array-rank        new-array))
-             (dims   (narray-dimensions new-array)))
+             (dims   (narray-dimensions new-array))
+             (elt-type (array-element-type array)))
          (declare (type size rank))
          (labels ((ss-iter (depth ss-idx)
                     (declare (type size depth))
@@ -196,7 +200,8 @@
                                                 (apply #'aref array ss-idx))
                                               subscripts)))
                           (setf (apply #'aref array ss-elt)
-                                (apply #'aref new-array ss-idx)))
+                                (assert-type (apply #'aref new-array ss-idx)
+                                             elt-type)))
                         (loop :for i :from 0 :below (the size (nth depth dims))
                               :do (setf (nth depth ss-idx) i)
                                   (ss-iter (1+ depth) ss-idx)
@@ -214,6 +219,7 @@
   (with-slots (storage element-type strides offsets dimensions rank) array
     (cond ((and (= rank (length subscripts))
                 (every #'integerp subscripts))
+           (assert-type new-element/s (array-element-type array))
            (let* ((dense-array-class (class-of array)))
              (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
                       new-element/s
@@ -226,11 +232,11 @@
                               :for offset :of-type size :in offsets
                               :for dimension :of-type size :in (narray-dimensions array)
                               :do (incf index
-                                        (the-size
-                                         (+ offset
-                                            (the-int-index
-                                             (* stride
-                                                (normalize-index subscript dimension)))))))
+                                      (the-size
+                                       (+ offset
+                                          (the-int-index
+                                           (* stride
+                                              (normalize-index subscript dimension)))))))
                         index))))
           ((or (some #'cl:arrayp subscripts)
                (some #'arrayp subscripts))
@@ -340,19 +346,22 @@
           :do (incf row-major-index (the-int-index (+ o (the-int-index
                                                          (* s (floor index as))))))
               (setf index (rem index as)))
-    (funcall (fdefinition (storage-accessor (class-of array)))
-             (array-storage array)
-             row-major-index)))
+    (assert-type (funcall (fdefinition (storage-accessor (class-of array)))
+                          (array-storage array)
+                          row-major-index)
+                 (array-element-type array))))
 
 (defpolymorph (row-major-aref :inline t) ((array simple-dense-array) index) t
   ;; TODO: Use contiguous-dense-array instead of simple-dense-array
   (declare (type int-index index))
-  (funcall (fdefinition (storage-accessor (class-of array)))
-           (array-storage array)
-           index))
+  (assert-type (funcall (fdefinition (storage-accessor (class-of array)))
+                        (array-storage array)
+                        index)
+               (array-element-type array)))
 
 (defpolymorph ((setf row-major-aref) :inline t) (new-element (array dense-array) index) t
   (declare (type int-index index))
+  (assert-type new-element (array-element-type array))
   (let ((row-major-index   0)
         (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
     (declare (type int-index row-major-index))
@@ -370,6 +379,7 @@
 (defpolymorph ((setf row-major-aref) :inline t) (new-element (array simple-dense-array) index) t
   ;; TODO: Use contiguous-dense-array instead of simple-dense-array
   (declare (type int-index index))
+  (assert-type new-element (array-element-type array))
   (funcall (fdefinition `(setf ,(storage-accessor (class-of array))))
            new-element
            (array-storage array)

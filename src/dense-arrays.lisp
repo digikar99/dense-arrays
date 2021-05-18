@@ -33,6 +33,13 @@
                   :for val :in (list ,@symbols)
                   :if val :collect sym))))
 
+(defun assert-type (value type &optional datum &rest datum-args)
+  (if (typep value type)
+      value
+      (if datum
+          (apply #'warn datum datum-args)
+          (warn "Expectation unmet for ~S to be of type ~S" value type))))
+
 (defun make-array (dimensions &rest args
                    &key (element-type default-element-type)
 
@@ -85,11 +92,17 @@
                             (t (find-class class))))
          (element-type    (funcall (storage-element-type-upgrader class)
                                    element-type))
-         (initial-element (cond (initial-element-p initial-element)
-                                (t (switch (element-type :test #'type=)
-                                     ('single-float 0.0f0)
-                                     ('double-float 0.0d0)
-                                     (t 0)))))
+         (initial-element (let ((elt (cond (initial-element-p initial-element)
+                                           (t (switch (element-type :test #'type=)
+                                                ('single-float 0.0f0)
+                                                ('double-float 0.0d0)
+                                                (t 0))))))
+                            (unless (or initial-contents
+                                        constructor)
+                              (assert-type elt element-type
+                                           "The initial element ~S is not of type ~S"
+                                           elt element-type))
+                            elt))
          (storage         (or displaced-to
                               (funcall (storage-allocator class)
                                        total-size
@@ -125,7 +138,8 @@
                         ;; (princ (list row-major-index :stride stride subscripts))
                         (if (< r 0)
                             (funcall (fdefinition `(setf ,storage-accessor))
-                                     (apply constructor subscripts)
+                                     (assert-type (apply constructor subscripts)
+                                                  element-type)
                                      storage row-major-index)
                             (loop :for i :of-type size :below (nth r dimensions)
                                   :with 1-r :of-type int-index := (1- r)
@@ -137,8 +151,8 @@
                                              subscripts)
                                       (incf row-major-index s)
                                   :finally (decf row-major-index
-                                                 (the size (* (the size (nth r dimensions))
-                                                              (the size (nth r strides)))))))))
+                                               (the size (* (the size (nth r dimensions))
+                                                            (the size (nth r strides)))))))))
                (construct (1- rank)))))
           (initial-contents-p
            (let ((row-major-index 0))
@@ -149,16 +163,18 @@
                           (list
                            (loop :for e :in elt
                                  :do (set-displaced-to e)))
-                          (string
+                          (string                           
                            (funcall (fdefinition `(setf ,storage-accessor))
-                                    elt storage row-major-index)
+                                    (assert-type elt element-type)
+                                    storage row-major-index)
                            (incf row-major-index))
                           (cl:vector
                            (loop :for e :across elt
                                  :do (set-displaced-to e)))
                           (t
                            (funcall (fdefinition `(setf ,storage-accessor))
-                                    elt storage row-major-index)
+                                    (assert-type elt element-type)
+                                    storage row-major-index)
                            (incf row-major-index)))))
                (set-displaced-to initial-contents)))))
     dense-array))

@@ -28,11 +28,13 @@
                              (:file "do-arrays")
                              (:file "argwhere")
                              (:file "aref")
-                             (:file "copy")))
+                             (:file "copy")
+                             (:file "unupgraded")))
                (:module "optim"
                         :serial t
                 :components ((:file "misc")
-                             (:file "aref"))))
+                             (:file "aref")
+                             (:file "unupgraded"))))
   :perform (test-op (o c)
              (declare (ignore o c))
              (eval (read-from-string "(LET ((5AM:*ON-ERROR* :DEBUG)

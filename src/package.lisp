@@ -36,7 +36,11 @@
                              "DO-ARRAYS"
                              "BROADCAST-ARRAY"
                              "BROADCAST-ARRAYS"
-                             "BROADCAST-COMPATIBLE-P")))
+                             "BROADCAST-COMPATIBLE-P"
+
+                             "UNUPGRADED-DENSE-ARRAY"
+                             "UNUPGRADED-ARRAY"
+                             "SIMPLE-UNUPGRADED-ARRAY")))
     `(uiop:define-package :dense-arrays
        (:mix :adhoc-polymorphic-functions :abstract-arrays
              :cl :iterate :alexandria :5am :trivial-types)
