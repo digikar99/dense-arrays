@@ -102,6 +102,7 @@
   (cu:memory-block-aref memory-block (first indices)))
 
 ;;; FIXME: Compiling the below block results in style-warnings
+;;; It probably comes from cuda-memory-block-aref above - we are not sure
 ;; (let ((*dense-array-class* 'cuda-dense-array))
 ;;   (aref (the (cuda-array single-float 2)
 ;;              (make-array '(2 2) :element-type 'single-float

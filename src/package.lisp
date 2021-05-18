@@ -51,9 +51,8 @@
                      #:rank
                      #:element-type
                      #:intersection-type-types)
-       (:import-from :trivial-form-type
-                     #:primary-form-type
-                     #:primary-form-typep)
+       (:import-from :cl-form-types
+                     #:nth-form-type)
        (:local-nicknames (:env :introspect-environment))))
 
 (in-package :dense-arrays)

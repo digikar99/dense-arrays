@@ -1,5 +1,8 @@
 (cl:in-package :dense-arrays)
 
+(defun primary-form-type (form env)
+  (nth-form-type form env 0 t t))
+
 (defun dense-array-type-class (array-type &optional env) ; backend-name
   (let ((array-type (introspect-environment:typexpand array-type env)))
     (assert (subtypep array-type 'dense-array)

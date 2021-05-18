@@ -14,7 +14,7 @@
                "iterate"
                "trivial-garbage"
                "trivial-package-local-nicknames"
-               "trivial-form-type"
+               "cl-form-types"
                "trivial-types"
                "uiop")
   :serial t
