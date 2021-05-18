@@ -24,8 +24,14 @@
 ;;; - STORAGE-DEALLOCATOR
 
 (defgeneric storage-accessor (class)
-  (:documentation "Returns a SYMBOL that is fbound to a function that takes
- () as arguments ... (incomplete doc)"))
+  (:documentation "Returns a SYMBOL that is fbound to an accessor function that takes
+ (STORAGE INDEX) as arguments and returns the element at INDEX in STORAGE.
+The function is an accessor function in the sense that SYMBOL should also be
+associated with (SETF SYMBOL) function that takes (NEW-VALUE STORAGE INDEX) as
+arguments and sets the STORAGE element at INDEX to NEW-VALUE.
+  This function is primarily used inside AREF, ROW-MAJOR-AREF and DO-ARRAYS,
+and their SETF counterparts.
+  See src/protocol.lisp and plus/cl-cuda.lisp for reference."))
 
 (defgeneric storage-allocator (class)
   (:documentation "Returns a symbol fbound to a function with signature
@@ -37,14 +43,26 @@ INITIAL-ELEMENT for use as a STORAGE-VECTOR for the ABSTRACT-ARRAY."))
   (:documentation "Returns either NIL or a symbol fbound to a function to be called
 to delete the STORAGE when the ABSTRACT-ARRAY goes out of scope. This function should
 take only the STORAGE object as its argument.
- (See static-vectors.lisp and the DENSE-ARRAYS:MAKE-ARRAY function for reference.)"))
+  Internally, this function plays a role in the finalizer of the garbage collection
+using TRIVIAL-GARBAGE.
+  See plus/static-vectors.lisp and the DENSE-ARRAYS:MAKE-ARRAY function for reference."))
 
-(defgeneric storage-element-type-upgrader (class))
+(defgeneric storage-element-type-upgrader (class)
+  (:documentation "Equivalent to the CL:UPGRADED-ARRAY-ELEMENT-TYPE, this returns a function
+that takes a single argument element-type as input and returns the upgraded
+array element type for the array class given by CLASS used for STORAGE.
+The upgraded array element type is then stored in the dense-array object and
+used for other tasks downstream.
+  See plus/cl-cuda.lisp and the DENSE-ARRAYS:MAKE-ARRAY function for reference."))
 
-(defgeneric storage-type-inferrer-from-array (class))
-
-(defgeneric storage-type-inferrer-from-array-type (class))
-
+(defgeneric storage-type-inferrer-from-array-type (class)
+  (:documentation "This should return a function that takes as input the ARRAY-TYPE and returns
+the possibly specialized type of storage that the corresponding array object
+will have. This is primarily used for optimization purposes inside DENSE-ARRAYS:DO-ARRAYS
+and the compiler macros of DENSE-ARRAYS:AREF DENSE-ARRAYS:ROW-MAJOR-AREF and SETF
+counterparts.
+  See src/protocol.lisp, plus/cl-cuda.lisp, src/do-arrays.lisp and optim/aref.lisp
+for reference."))
 
 
 (macrolet ((def (name)
@@ -60,7 +78,6 @@ subclass of DENSE-ARRAY." ',name))))))
   (def storage-allocator)
   (def storage-deallocator)
   (def storage-element-type-upgrader)
-  (def storage-type-inferrer-from-array)
   (def storage-type-inferrer-from-array-type))
 
 
@@ -88,11 +105,6 @@ subclass of DENSE-ARRAY." ',name))))))
   nil)
 (defmethod storage-element-type-upgrader ((class standard-dense-array-class))
   'cl:upgraded-array-element-type)
-(defmethod storage-type-inferrer-from-array ((class standard-dense-array-class))
-  (lambda (array)
-    (declare (type abstract-array array)
-             (optimize speed))
-    `(cl:simple-array ,(array-element-type array) 1)))
 (defmethod storage-type-inferrer-from-array-type ((class standard-dense-array-class))
   (lambda (array-type)
     `(cl:simple-array ,(array-type-element-type array-type) 1)))
