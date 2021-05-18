@@ -38,7 +38,7 @@ All lisp performances are in the absence of SIMD.
 *** Native CL
 
 #+BEGIN_SRC lisp
-;; 0.12 seconds of real time
+;;; 0.12 seconds of real time
 (let ((a (cl:make-array '(100 100) :element-type 'double-float
                                    :initial-element 0.0d0))
       (b 0.0d0))
@@ -83,7 +83,7 @@ timeit(1000)[1]
 *** aref (unoptimized)
 
 #+BEGIN_SRC lisp
-;; 3.97 seconds of real time
+;;; 3.97 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
@@ -96,7 +96,8 @@ timeit(1000)[1]
 *** aref (optimized)
 
 #+BEGIN_SRC lisp
-;; 0.35 seconds of real time
+;;; 0.59 seconds of real time
+;;; (after repeated evaluations, after generic-function cache is warmed up (?))
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
@@ -110,7 +111,7 @@ timeit(1000)[1]
 *** do-arrays
 
 #+BEGIN_SRC lisp
-;; do-arrays - 0.15 seconds of real time:
+;;; do-arrays - 0.15 seconds of real time:
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))

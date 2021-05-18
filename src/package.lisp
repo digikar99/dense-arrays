@@ -56,10 +56,11 @@
                      #:element-type
                      #:intersection-type-types)
        (:import-from :cl-form-types
-                     #:nth-form-type)
-       (:local-nicknames (:env :introspect-environment))))
+                     #:nth-form-type)))
 
 (in-package :dense-arrays)
+
+(trivial-package-local-nicknames:add-package-local-nickname :env :introspect-environment)
 
 (defvar *array-element-type*)
 

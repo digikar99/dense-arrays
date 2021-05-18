@@ -3,9 +3,8 @@
   :author "Shubhamkar B. Ayare"
   :description "Numpy like array objects for Common Lisp"
   :license "MIT"
-  :version "0.0.0" ; alpha - no versioning maintained at the moment
-  :depends-on ((:version "asdf" "3.3.4")
-               "abstract-arrays"
+  :version "0.1.0" ; beta
+  :depends-on ("abstract-arrays"
                "adhoc-polymorphic-functions"
                "alexandria"
                "compiler-macro-notes"
