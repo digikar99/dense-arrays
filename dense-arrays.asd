@@ -5,7 +5,7 @@
   :license "MIT"
   :version "0.1.0" ; beta
   :depends-on ("abstract-arrays"
-               "adhoc-polymorphic-functions"
+               "polymorphic-functions"
                "alexandria"
                "compiler-macro-notes"
                "closer-mop"
