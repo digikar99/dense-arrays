@@ -101,13 +101,12 @@
 
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
-(defun asarray (array-like &optional
-                             (element-type default-element-type))
+(defun asarray (array-like &key (type default-element-type))
   (let* ((dimensions (dimensions array-like))
          (array      (make-array dimensions
-                                 :element-type (if (eq :auto element-type)
+                                 :element-type (if (eq :auto type)
                                                    (element-type array-like)
-                                                   element-type)))
+                                                   type)))
          (*storage*  (array-displaced-to array))
          (*storage-accessor* (storage-accessor (class-of array)))
          (*index*    0))
@@ -118,10 +117,10 @@
   (is (array= (make-array '(2 1 3) :initial-contents '(((1 2 3))
                                                      ((1 2 3)))
                                    :element-type '(unsigned-byte 2))
-              (asarray '(#2a((1 2 3)) #2a((1 2 3))) '(integer 0 3))))
+              (asarray '(#2a((1 2 3)) #2a((1 2 3))) :type '(integer 0 3))))
   (is (array= (make-array '(1 3) :initial-contents '((1 2 3))
                                  :element-type '(unsigned-byte 2))
-              (asarray '(#(1 2 3)) '(integer 0 3))))
+              (asarray '(#(1 2 3)) :type '(integer 0 3))))
   (is (alexandria:type= '(signed-byte 32)
                         (array-element-type
                          (let ((*array-element-type-alist*
@@ -154,7 +153,7 @@
                                    array))))
 
 (defun split-at-keywords (args)
-  "Example: (1 2 3 :a 2 :b 3) => ((1 2 3) (:a 2 :b 3))"
+  "Example: (1 2 3 :a 2 :b 3) => ((1 2 3) :a 2 :b 3)"
   (if args
       (if (keywordp (car args))
           (cons nil args)
