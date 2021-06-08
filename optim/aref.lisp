@@ -20,7 +20,7 @@
 
 (defpolymorph-compiler-macro aref (dense-array &rest)
     (&whole form array &rest subscripts &environment env)
-  (compiler-macro-notes:with-notes (form
+  (compiler-macro-notes:with-notes (form env
                                     :name (find-polymorph 'aref '(dense-array &rest))
                                     :unwind-on-signal nil
                                     :optimization-note-condition optim-speed)
@@ -115,7 +115,7 @@
 
 (defpolymorph-compiler-macro (setf aref) (t dense-array &rest)
     (&whole form new-value array &rest subscripts &environment env)
-  (compiler-macro-notes:with-notes (form
+  (compiler-macro-notes:with-notes (form env
                                     :name (find-polymorph 'aref '(dense-array &rest))
                                     :unwind-on-signal nil
                                     :optimization-note-condition optim-speed)
@@ -218,8 +218,8 @@
 (defpolymorph-compiler-macro row-major-aref (simple-dense-array t)
     (&whole form array index &environment env)
   (compiler-macro-notes:with-notes
-      (form :optimization-note-condition optim-speed
-            :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
+      (form env :optimization-note-condition optim-speed
+                :name (find-polymorph 'row-major-aref '(simple-dense-array t)))
     (let* ((array-type (primary-form-type array env))
            (class      (dense-array-type-class array-type env))
            (elt-type   (array-type-element-type array-type env)))
@@ -239,8 +239,8 @@
 (defpolymorph-compiler-macro (setf row-major-aref) (t simple-dense-array t)
     (&whole form new-element array index &environment env)
   (compiler-macro-notes:with-notes
-      (form :optimization-note-condition optim-speed
-            :name (find-polymorph '(setf row-major-aref) '(t simple-dense-array t)))
+      (form env :optimization-note-condition optim-speed
+                :name (find-polymorph '(setf row-major-aref) '(t simple-dense-array t)))
     (let* ((array-type   (primary-form-type array env))
            (class      (dense-array-type-class array-type env))
            (elt-type   (array-type-element-type array-type env)))
