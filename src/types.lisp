@@ -10,6 +10,7 @@
     #-sbcl the
     size ,form))
 
+(deftype int-index () `(signed-byte 62))
 (defmacro the-int-index (form)
   `(#+sbcl sb-ext:truly-the
     #-sbcl the
@@ -21,17 +22,19 @@
 (deftype uint64 () `(unsigned-byte 64))
 
 (defun simple-dense-array-p (object)
+  (declare (optimize speed))
   (and (typep object 'dense-array)
-       (or (null (dense-array-root-array object))
-           (and (not (type= (class-of object)
-                            (class-of (array-storage object))))
-                (loop :for o :of-type size :in (array-offsets object)
-                      :always (zerop o))
-                (let ((total-size (array-total-size object)))
-                  (loop :for s :in (array-strides object)
-                        :for d :in (narray-dimensions object)
-                        :always (= s (/ total-size d))
-                        :do (setq total-size (floor total-size d))))))))
+       (locally (declare (type dense-array object))
+         (or (null (dense-array-root-array object))
+             (and (not (type= (class-of object)
+                              (class-of (array-storage object))))
+                  (loop :for o :of-type size :in (array-offsets object)
+                        :always (zerop o))
+                  (let ((total-size (array-total-size object)))
+                    (loop :for s :of-type int-index :in (array-strides object)
+                          :for d :of-type size :in (narray-dimensions object)
+                          :always (= s (/ total-size d))
+                          :do (setq total-size (floor total-size d)))))))))
 
 (deftype simple-dense-array   () `(and dense-array (satisfies simple-dense-array-p)))
 
