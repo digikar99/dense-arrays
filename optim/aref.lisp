@@ -5,7 +5,6 @@
   ;; the type declarations; so, we use a compiler macro. See
   ;;   https://stackoverflow.com/questions/67149358/portable-type-propagation-in-common-lisp-inlined-functions-without-compiler-macr
   ;; for some details
-  ;; TODO: Create a PORTABLE-INLINABLE-FUNCTIONS library to preserve environment
   (with-gensyms (array1-sym array2-sym)
     `(let ((,array1-sym ,array1)
            (,array2-sym ,array2))
