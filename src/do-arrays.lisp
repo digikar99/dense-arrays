@@ -151,6 +151,14 @@
                                                           is os ss))))))
              (nest-loop ,dimensions ,@strides ,@offsets)))))))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (define-condition do-arrays/element-type-failure
+      (compiler-macro-notes:optimization-failure-note)
+    ((binding-form :initarg :binding-form))
+    (:report (lambda (c s)
+               (format s "Unable to derive ELEMENT-TYPE from the environment or the BINDING-FORM ~%  ~S~%"
+                       (slot-value c 'binding-form))))))
+
 (defmacro do-arrays (&whole form rank/bindings &body body &environment env)
   "  If the argument is of type SIZE, it'd be treated as the rank of the arrays. Then,
 the BINDINGS are assumed to be the first element of the BODY.
@@ -180,28 +188,36 @@ Either of the two cases might be faster depending on the number of dimensions."
          (body     (if rankp (rest body) body)))
     (destructuring-bind (elt-vars arrays storage-types storage-accessors)
         (let (elt-vars arrays storage-types storage-accessors)
-          (loop :for binding :in bindings
-                :do (destructuring-bind
-                        (elt-var array
-                         &optional (element-type '*)
-                         ;; Could there be a case where a user wants to specify
-                         ;; the class but not the element-type?
-                         ;; Well, they could just specify the *
-                         &key (class *dense-array-class*))
-                        binding
-                      (when (and (= 3 (env:policy-quality 'speed env))
-                                 (eq element-type '*))
-                        (format
-                         *error-output*
-                         "~&Unable to optimize~%  ~S~%because element-type (third argument) is not provided in~%  ~S~%"
-                         form
-                         (list elt-var array)))
-                      (push elt-var      elt-vars)
-                      (push array        arrays)
-                      (push (funcall (storage-type-inferrer-from-array-type class)
-                                     `(%dense-array ,element-type))
-                            storage-types)
-                      (push (storage-accessor class) storage-accessors)))
+          (compiler-macro-notes:with-notes
+              (form env
+               :name (format nil "~%  ~S~%" (macro-function 'do-arrays))
+               :unwind-on-signal nil
+               :optimization-note-condition optim-speed)
+            (loop :for binding :in bindings
+                  :do (destructuring-bind
+                          (elt-var array
+                           &optional (element-type
+                                      (let ((array-type
+                                              (cl-form-types:nth-form-type
+                                               array env 0)))
+                                        (if (subtypep array-type
+                                                      'dense-array)
+                                            (array-type-element-type array-type)
+                                            'cl:*)))
+                           ;; Could there be a case where a user wants to specify
+                           ;; the class but not the element-type?
+                           ;; Well, they could just specify the *
+                           &key (class *dense-array-class*))
+                          binding
+                        (when (and (eq element-type '*))
+                          (signal 'do-arrays/element-type-failure
+                                  :binding-form (list elt-var array)))
+                        (push elt-var      elt-vars)
+                        (push array        arrays)
+                        (push (funcall (storage-type-inferrer-from-array-type class)
+                                       `(%dense-array ,element-type))
+                              storage-types)
+                        (push (storage-accessor class) storage-accessors))))
           ;; Reverse - so same as given order - because, see the test below
           (list (nreverse elt-vars)
                 (nreverse arrays)

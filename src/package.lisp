@@ -56,7 +56,10 @@
                      #:element-type
                      #:intersection-type-types)
        (:import-from :cl-form-types
-                     #:nth-form-type)))
+                     #:nth-form-type)
+       (:import-from :polymorphic-functions
+                     #:optim-speed
+                     #:env)))
 
 (in-package :dense-arrays)
 

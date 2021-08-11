@@ -5,7 +5,8 @@
 (defun argwhere (bit-array)
   (declare (optimize speed)
            ;; TODO: Optimize
-           (type (array bit) bit-array))
+           (type (array bit) bit-array)
+           (compiler-macro-notes:muffle compiler-macro-notes:note))
   (let ((elt-count 0)
         (rank      (array-rank bit-array))
         (dims      (narray-dimensions bit-array)))
@@ -40,7 +41,8 @@
 (defun nonzero (bit-array)
   (declare (optimize speed)
            ;; TODO: Optimize
-           (type (%dense-array bit) bit-array))
+           (type (%dense-array bit) bit-array)
+           (compiler-macro-notes:muffle compiler-macro-notes:note))
   (let ((elt-count 0)
         (rank      (array-rank bit-array))
         (dims      (narray-dimensions bit-array)))
