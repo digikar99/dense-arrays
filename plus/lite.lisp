@@ -202,7 +202,7 @@
     (assert (null (rest shape)))
     (setq shape (first shape)))
   (let ((a     (zeros shape :type type))
-        (range (coerce (- max min) type))
+        (range (- max min))
         (min   (coerce min type)))
     (declare (type simple-dense-array a))
     (dotimes (index (array-total-size a))
