@@ -118,8 +118,7 @@
          (declare (type int-index ,@is)
                   ;; (optimize speed) ; check before finalizing
                   ,@(mapcar (lm st sv `(type ,st ,sv))
-                            storage-types svs)
-                  (ignorable ,@svs))
+                            storage-types svs))
          ;; TODO: A proper let form would aid debugging, but doesn't allow setf-ing
          (symbol-macrolet (,@(mapcar (lm elt-var sa sv i `(,elt-var (,sa ,sv ,i)))
                                      elt-vars storage-accessors svs is))
