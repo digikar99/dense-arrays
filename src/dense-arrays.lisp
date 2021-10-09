@@ -219,7 +219,7 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
 (defun narray-dimensions (array)
   "Returns the dimensions-list of the ARRAY. The list is not expected to be modified."
   (declare (type dense-array array))
-  (array-dimensions array))
+  (abstract-array-dimensions array))
 
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."
