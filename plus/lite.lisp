@@ -46,16 +46,50 @@
     (dense-array (array-dimensions array-like))
     (t           ())))
 
+
+(defun type-max (type-1 type-2)
+  (cond ((subtypep type-1 type-2)
+         type-2)
+        ((subtypep type-2 type-1)
+         type-1)
+        ((or (alexandria:type= type-1 'double-float)
+             (alexandria:type= type-2 'double-float))
+         'double-float)
+        ((or (alexandria:type= type-1 'single-float)
+             (alexandria:type= type-2 'single-float))
+         'single-float)
+        ;; At this point, none of the types are floats
+        ;; FIXME: Operate better on impl with other float types
+        ((and (subtypep type-1 '(unsigned-byte *))
+              (subtypep type-2 '(signed-byte *)))
+         (loop :for num-bits :in '(8 16 32 64)
+               :if (subtypep type-1 `(signed-byte ,num-bits))
+                 :do (return-from type-max `(signed-byte ,num-bits))
+               :finally (return-from type-max 'single-float)))
+        ((and (subtypep type-1 '(signed-byte *))
+              (subtypep type-2 '(unsigned-byte *)))
+         (loop :for num-bits :in '(8 16 32 64)
+               :if (subtypep type-2 `(signed-byte ,num-bits))
+                 :do (return-from type-max `(signed-byte ,num-bits))
+               :finally (return-from type-max 'single-float)))
+        (t
+         (error "Don't know how to find TYPE-MAX of ~S and ~S" type-1 type-2))))
+
 (defun element-type (array-like)
   "Consequences of ARRAY-LIKE having elements of different element-type is undefined."
   (typecase array-like
     (string      t)
-    (sequence    (if (> (length array-like) 0)
-                     (element-type (elt array-like 0))
+    (sequence    (if (< 0 (length array-like))
+                     (loop :for i :from 1 :below (length array-like)
+                           :with max-type := (element-type (elt array-like 0))
+                           :do (setq max-type
+                                     (type-max max-type
+                                               (element-type (elt array-like i))))
+                           :finally (return max-type))
                      'null))
     (cl:array    (cl:array-element-type array-like))
     (dense-array (array-element-type (array-displaced-to array-like)))
-    (t           t)))
+    (t           (type-of array-like))))
 
 (def-test dimensions ()
   (is (equalp '(3)   (dimensions '(1 2 3))))
@@ -102,6 +136,7 @@
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
 (defun asarray (array-like &key (type default-element-type))
+  "TYPE can also be :AUTO"
   (let* ((dimensions (dimensions array-like))
          (array      (make-array dimensions
                                  :element-type (if (eq :auto type)
