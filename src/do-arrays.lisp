@@ -93,7 +93,9 @@
                     ,@(mapcar (lm offsets array-var
                                   `(size ,offsets (array-offsets ,array-var)))
                               all-offsets array-vars))
-                 ,(nest-loop dimensions all-strides all-offsets)))))))))
+                 ,(if dimensions
+                      (nest-loop dimensions all-strides all-offsets)
+                      `(locally ,@body))))))))))
 
 (define-macro-helper expand-do-arrays-without-rank
     (elt-vars array-vars storage-types storage-accessors body)
@@ -149,7 +151,9 @@
                                                                (+ ,%2
                                                                   (the-int-index (* ,d ,%3))))
                                                           is os ss))))))
-             (nest-loop ,dimensions ,@strides ,@offsets)))))))
+             (if ,dimensions
+                 (nest-loop ,dimensions ,@strides ,@offsets)
+                 (locally ,@body))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (define-condition do-arrays/element-type-failure

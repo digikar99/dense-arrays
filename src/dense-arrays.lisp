@@ -81,10 +81,10 @@
 
          ;; FIXME: Handle displaced-index-offset correctly
          (offsets         (if displaced-index-offset
-                              (nconc (list displaced-index-offset)
-                                     (if (> rank 0)
-                                         (make-list (1- rank) :initial-element 0)
-                                         ()))
+                              (if (= rank 0)
+                                  ()
+                                  (nconc (list displaced-index-offset)
+                                         (make-list (1- rank) :initial-element 0)))
                               offsets))
 
          (class           (typecase class
@@ -311,10 +311,14 @@ Also see:
     (declare (special *axis-number*))
     (print-unreadable-object (array stream :identity t :type t)
       ;; header
-      (format stream "~A~{~S~^x~} ~S "
-              (if (array-view-p array) "(VIEW) " "")
-              (narray-dimensions array)
-              (array-element-type array))
+      (if (zerop rank)
+          (format stream "~ANIL ~S "
+                  (if (array-view-p array) "(VIEW) " "")
+                  (array-element-type array))
+          (format stream "~A~{~S~^x~} ~S "
+                  (if (array-view-p array) "(VIEW) " "")
+                  (narray-dimensions array)
+                  (array-element-type array)))
       (when *print-array*
         ;; elements
         ;; DONE: *print-level*
@@ -408,11 +412,13 @@ Also see:
                                   (write-string "" stream))
                               0)))))))
             (handler-case
-                (progn
-                  (print-array 0
-                               0
-                               indent)
-                  (terpri stream))
+                (if (zerop rank)
+                    (format stream fmt-control (aref sv 0))
+                    (progn
+                      (print-array 0
+                                   0
+                                   indent)
+                      (terpri stream)))
               (print-lines-exhausted (condition)
                 (write-string " ..." stream)
                 (dotimes (i (axis-number condition)) (write-char #\) stream))
