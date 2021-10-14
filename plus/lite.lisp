@@ -47,7 +47,7 @@
     (t           ())))
 
 
-(defun type-max (type-1 type-2)
+(defun max-type (type-1 type-2)
   (cond ((subtypep type-1 type-2)
          type-2)
         ((subtypep type-2 type-1)
@@ -64,16 +64,16 @@
               (subtypep type-2 '(signed-byte *)))
          (loop :for num-bits :in '(8 16 32 64)
                :if (subtypep type-1 `(signed-byte ,num-bits))
-                 :do (return-from type-max `(signed-byte ,num-bits))
-               :finally (return-from type-max 'single-float)))
+                 :do (return-from max-type `(signed-byte ,num-bits))
+               :finally (return-from max-type 'single-float)))
         ((and (subtypep type-1 '(signed-byte *))
               (subtypep type-2 '(unsigned-byte *)))
          (loop :for num-bits :in '(8 16 32 64)
                :if (subtypep type-2 `(signed-byte ,num-bits))
-                 :do (return-from type-max `(signed-byte ,num-bits))
-               :finally (return-from type-max 'single-float)))
+                 :do (return-from max-type `(signed-byte ,num-bits))
+               :finally (return-from max-type 'single-float)))
         (t
-         (error "Don't know how to find TYPE-MAX of ~S and ~S" type-1 type-2))))
+         (error "Don't know how to find MAX-TYPE of ~S and ~S" type-1 type-2))))
 
 (defun element-type (array-like)
   "Consequences of ARRAY-LIKE having elements of different element-type is undefined."
@@ -83,7 +83,7 @@
                      (loop :for i :from 1 :below (length array-like)
                            :with max-type := (element-type (elt array-like 0))
                            :do (setq max-type
-                                     (type-max max-type
+                                     (max-type max-type
                                                (element-type (elt array-like i))))
                            :finally (return max-type))
                      'null))
@@ -232,7 +232,9 @@
   (make-array shape :element-type type
                     :initial-element (coerce 1 type)))
 
-(define-splice-list-fn rand (shape &key (type default-element-type) (min 0) (max 1))
+(define-splice-list-fn rand (shape &key (type default-element-type)
+                                   (min (coerce 0 type))
+                                   (max (coerce 1 type)))
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
@@ -370,7 +372,7 @@ creating the new array and instead return a view instead. "
 ;; TODO: Write a functional version of this
 ;; TODO: Optimize this
 (defmacro macro-map-array (result-array function &rest arrays)
-  (alexandria:with-gensyms (result i)
+  (alexandria:with-gensyms (result i result-type)
     (let ((array-syms (alexandria:make-gensym-list (length arrays) "ARRAY"))
           (function   (cond ((eq 'quote (first function)) (second function))
                             ((eq 'function (first function)) (second function))
@@ -380,10 +382,13 @@ creating the new array and instead return a view instead. "
                      :collect `(,sym ,array-expr)))
          (declare (type dense-array ,@array-syms))
          ;; TODO: Optimize this
-         (let ((,result (or ,result-array (zeros-like ,(first array-syms)))))
+         (let* ((,result (or ,result-array (zeros-like ,(first array-syms))))
+                (,result-type (array-element-type ,result)))
            (dotimes (,i (array-total-size ,(first array-syms)))
              (funcall #'(setf row-major-aref)
-                      (,function ,@(mapcar (lm array-sym `(row-major-aref ,array-sym ,i))
-                                           array-syms))
+                      (trivial-coerce:coerce
+                       (,function ,@(mapcar (lm array-sym `(row-major-aref ,array-sym ,i))
+                                            array-syms))
+                       ,result-type)
                       ,result ,i))
            ,result)))))

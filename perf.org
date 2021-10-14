@@ -143,12 +143,13 @@ DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
                          (j 0))
                      (declare (optimize speed))
                      (aref a i j))
-; Optimization of
+; (Compiler) Macro of
+;    #<POLYMORPHIC-FUNCTIONS:POLYMORPHIC-FUNCTION AREF (2)> 
+; is unable to optimize
 ;   (AREF A I J)
-; is left to SBCL because ADHOC-POLYMORPHIC-FUNCTIONS
-; is unable to optimize it because
+; because:
 ;   
-;   Type of 
+;   Type of
 ;     A
 ;   could not be determined
 0
@@ -166,7 +167,12 @@ DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
 ; .
 ;    A I J)
 ; because:
-;   Rank of array A is not declared
+;   
+;   Unable to identify the ABSTRACT-ARRAYS::RANK of FORM
+;     A
+;   derived to be of type (AND STANDARD-DENSE-ARRAY
+;                              (SATISFIES
+;                               ABSTRACT-ARRAYS::ABSTRACT-ARRAY-ELEMENT-TYPE-T-P))
 0
 DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
                          (i 0)
@@ -182,6 +188,7 @@ DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
 ; .
 ;    A I J)
 ; because:
+;
 ;   Type of subscripts (I J) were derived to be non-integers (T T)
 0
 DENSE-ARRAYS-PLUS> (let ((a (make-array '(1 1)))
@@ -212,16 +219,21 @@ DENSE-ARRAYS-PLUS> (locally (declare (optimize speed))
                      (do-arrays ((a (make-array '(2 3)))
                                  (b (make-array '(2 3))))
                        (print (list a b))))
-; Unable to optimize
+; (Compiler) Macro of
+;   
+;   #<FUNCTION (MACRO-FUNCTION DO-ARRAYS) {53F55D4B}>
+; 
+; is unable to optimize
 ;   (DO-ARRAYS ((A (MAKE-ARRAY '(2 3))) (B (MAKE-ARRAY '(2 3))))
 ;     (PRINT (LIST A B)))
-; because element-type (third argument) is not provided in
-;   (A (MAKE-ARRAY '(2 3)))
-; Unable to optimize
-;   (DO-ARRAYS ((A (MAKE-ARRAY '(2 3))) (B (MAKE-ARRAY '(2 3))))
-;     (PRINT (LIST A B)))
-; because element-type (third argument) is not provided in
-;   (B (MAKE-ARRAY '(2 3)))
+; because:
+;   
+;   Unable to derive ELEMENT-TYPE from the environment or the BINDING-FORM 
+;     (A (MAKE-ARRAY '(2 3)))
+;   
+;   Unable to derive ELEMENT-TYPE from the environment or the BINDING-FORM 
+;     (B (MAKE-ARRAY '(2 3)))
+;   
 
 (0 0)
 (0 0)
