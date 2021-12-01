@@ -301,12 +301,10 @@ Also see:
          (*axis-number* 0)
          (indent  3)
          (fmt-control (or *array-element-print-format*
-                          (if (type-specifier-p (array-element-type array))
-                              (switch ((array-element-type array) :test #'type=)
-                                ('double-float "~,15,3@e")
-                                ('single-float "~,7,2@e")
-                                (t             "~s"))
-                              "~S"))))
+                          (switch ((array-element-type array) :test #'type=)
+                            ('double-float "~,15,3@e")
+                            ('single-float "~,7,2@e")
+                            (t             "~s")))))
     ;; Do this before just to save some horizontal space
     (declare (special *axis-number*))
     (print-unreadable-object (array stream :identity t :type t)
