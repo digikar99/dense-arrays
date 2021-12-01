@@ -12,7 +12,6 @@
                "fiveam"
                "iterate"
                "trivial-garbage"
-               "trivial-package-local-nicknames"
                "cl-form-types"
                "trivial-types"
                "uiop")

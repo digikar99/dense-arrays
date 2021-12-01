@@ -3,7 +3,6 @@
   :license "MIT"
   :version "0.0.0" ; alpha - no versioning maintained at the moment
   :depends-on ("dense-arrays"
-               "trivial-package-local-nicknames"
                "cl-cuda")
   :serial t
   :components ((:module "plus"

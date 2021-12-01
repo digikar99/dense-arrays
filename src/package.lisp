@@ -58,12 +58,12 @@
        (:import-from :cl-form-types
                      #:nth-form-type)
        (:import-from :polymorphic-functions
+                     #:typexpand
+                     #:policy-quality
                      #:optim-speed
                      #:env)))
 
 (in-package :dense-arrays)
-
-(trivial-package-local-nicknames:add-package-local-nickname :env :introspect-environment)
 
 (defvar *array-element-type*)
 

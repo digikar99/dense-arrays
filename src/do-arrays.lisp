@@ -229,7 +229,7 @@ Either of the two cases might be faster depending on the number of dimensions."
                 (nreverse storage-accessors)))
       (let ((array-vars (make-gensym-list (length arrays) "ARRAY")))
         `(let (,@(mapcar (lm var arr `(,var ,arr)) array-vars arrays))
-           ,(unless (zerop (env:policy-quality 'safety env))
+           ,(unless (zerop (policy-quality 'safety env))
               `(assert (every (lm a (equalp (narray-dimensions ,(first array-vars))
                                             (narray-dimensions a)))
                               (list ,@(rest array-vars)))

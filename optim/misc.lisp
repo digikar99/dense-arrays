@@ -15,8 +15,8 @@
             :do (return-from dense-array-type-class class)
           :finally (return-from dense-array-type-class 'cl:*))))
 
-(define-symbol-macro optim-speed (and (/= 3 (env:policy-quality 'debug env))
-                                      (= 3 (env:policy-quality 'speed env))))
+(define-symbol-macro optim-speed (and (/= 3 (policy-quality 'debug env))
+                                      (= 3 (policy-quality 'speed env))))
 
 (define-condition slot-type-failure (compiler-macro-notes:optimization-failure-note)
   ((form :initarg :form :reader form)
