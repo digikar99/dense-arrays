@@ -73,7 +73,7 @@ This object is to be used through the following types provided for optimization 
 
 * Customizing the behavior of dense-array
 
-  Examples of customization are provided in [[plus/static-vectors.lisp]] and [[plus/cl-cuda.lisp]]. The actual protocol rests in [[src/protocol.lisp]].
+Examples of customization are provided in [[plus/static-vectors.lisp]], [[plus/cl-cuda.lisp]], and [[file:plus/magicl.lisp][plus/magicl.lisp]]. The actual protocol rests in [[src/protocol.lisp]].
 
 1. Thus, the first task is to subclass =dense-array-class= (or some other metaclass such as =standard-dense-array-class=, =static-dense-array-class=, =cuda-dense-array-class=). This creates a metaclass, let's call it =my-dense-array-class=.
 2. Then, create a class with =my-dense-array-class= as the metaclass and =dense-array= as the superclass.

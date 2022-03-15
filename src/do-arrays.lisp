@@ -216,6 +216,8 @@ Either of the two cases might be faster depending on the number of dimensions."
                         (when (and (eq element-type '*))
                           (signal 'do-arrays/element-type-failure
                                   :binding-form (list elt-var array)))
+                        (unless (typep class 'class)
+                          (setq class (find-class class)))
                         (push elt-var      elt-vars)
                         (push array        arrays)
                         (push (funcall (storage-type-inferrer-from-array-type class)
