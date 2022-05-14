@@ -45,3 +45,14 @@
 
 ;; For internal usage
 (define-array-specialization-type %dense-array dense-array)
+
+#+extensible-compound-types
+(defmethod %subtypep ((n1 (eql '%dense-array)) (n2 (eql 'abstract-array))
+                      t1 t2 &optional env)
+  (declare (ignore n1 n2 t1 env))
+  (if (or (symbolp t2)
+          (and (listp t2)
+               (first t2)
+               (null (cdr t2))))
+      (values t t)
+      (values nil nil)))

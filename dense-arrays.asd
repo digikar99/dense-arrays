@@ -9,6 +9,7 @@
                "alexandria"
                "compiler-macro-notes"
                "closer-mop"
+               (:feature :extensible-compound-types "extensible-compound-types-cl")
                "fiveam"
                "iterate"
                "trivial-garbage"
@@ -17,7 +18,7 @@
                "uiop")
   :serial t
   :components ((:module "src"
-                        :serial t
+                :serial t
                 :components ((:file "package")
                              (:file "protocol")
                              (:file "types")
@@ -29,7 +30,7 @@
                              (:file "copy")
                              (:file "unupgraded")))
                (:module "optim"
-                        :serial t
+                :serial t
                 :components ((:file "misc")
                              (:file "aref")
                              (:file "unupgraded"))))

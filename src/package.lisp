@@ -41,9 +41,16 @@
                              "UNUPGRADED-DENSE-ARRAY"
                              "UNUPGRADED-ARRAY"
                              "SIMPLE-UNUPGRADED-ARRAY")))
-    `(uiop:define-package :dense-arrays
-       (:mix :polymorphic-functions :abstract-arrays
-             :cl :iterate :alexandria :5am :trivial-types)
+    `(polymorphic-functions.defpackage:defpackage :dense-arrays
+       (:shadowing-import-exported-symbols :abstract-arrays
+                                           :trivial-types
+                                           #+extensible-compound-types
+                                           :extensible-compound-types)
+       (:use
+        :polymorphic-functions
+        #-extensible-compound-types :cl
+        #+extensible-compound-types :extensible-compound-types-cl
+        :iterate :alexandria :5am :trivial-types)
        (:export ,@shadow-symbols
                 ,@abstract-array-symbols)
        (:shadow ,@shadow-symbols)
@@ -53,11 +60,11 @@
                      #:storage
                      #:dimensions
                      #:rank
-                     #:element-type
-                     #:intersection-type-types)
+                     #:element-type)
        (:import-from :cl-form-types
                      #:nth-form-type)
        (:import-from :polymorphic-functions
+                     #-extensible-compound-types
                      #:typexpand
                      #:policy-quality
                      #:optim-speed
