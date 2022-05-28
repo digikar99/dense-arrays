@@ -40,6 +40,7 @@
           (apply #'warn datum datum-args)
           (warn "Expectation unmet for ~S to be of type ~S" value type))))
 
+(declaim (ftype (function * dense-array) make-array))
 (defun make-array (dimensions &rest args
                    &key (element-type default-element-type)
 
@@ -51,6 +52,7 @@
                      (adjustable nil adjustable-p)
                      (fill-pointer nil fill-pointer-p)
                      (class *dense-array-class*)
+                     (layout :row-major)
 
                      (displaced-to nil displaced-to-p)
                      (offsets nil offsets-p)
@@ -61,7 +63,8 @@
   ;; TODO: Take displaced-index-offset and strides into account while calculating dimensions
   (declare ;; (optimize speed)
    (ignore args adjustable fill-pointer displaced-to-p)
-   (type function-designator constructor))
+   (type function-designator constructor)
+   (type (member :row-major :column-major) layout))
   (ensure-single initial-element-p
                  initial-contents-p
                  constructor-p)
@@ -77,7 +80,12 @@
          (total-size      (apply #'* dimensions))
          (strides         (if strides-p
                               strides
-                              (dimensions->strides dimensions)))
+                              (dimensions->strides (ecase layout
+                                                     (:row-major dimensions)
+                                                     (:column-major (reverse dimensions))))))
+         (strides         (ecase layout
+                            (:row-major strides)
+                            (:column-major (reverse strides))))
 
          ;; FIXME: Handle displaced-index-offset correctly
          (offsets         (if displaced-index-offset
@@ -118,7 +126,8 @@
                                          :contiguous-p t
                                          :total-size (apply #'* dimensions)
                                          :root-array nil
-                                         :rank (length dimensions)))
+                                         :rank (length dimensions)
+                                         :layout layout))
          (storage-accessor (storage-accessor class))
          (storage-deallocator (storage-deallocator class)))
     (when storage-deallocator
@@ -151,32 +160,36 @@
                                              subscripts)
                                       (incf row-major-index s)
                                   :finally (decf row-major-index
-                                               (the size (* (the size (nth r dimensions))
-                                                            (the size (nth r strides)))))))))
+                                                 (the size (* (the size (nth r dimensions))
+                                                              (the size (nth r strides)))))))))
                (construct (1- rank)))))
           (initial-contents-p
            (let ((row-major-index 0))
              (declare (type (signed-byte 31) row-major-index)
                       (optimize (speed 1)))
-             (labels ((set-displaced-to (elt)
+             (labels ((set-displaced-to (elt axis)
                         (typecase elt
                           (list
                            (loop :for e :in elt
-                                 :do (set-displaced-to e)))
-                          (string                           
+                                 :do (set-displaced-to e (1+ axis))
+                                     (incf row-major-index (nth axis strides))
+                                 :finally (decf row-major-index (* (nth axis dimensions)
+                                                                   (nth axis strides)))))
+                          (string
                            (funcall (fdefinition `(setf ,storage-accessor))
                                     (assert-type elt element-type)
-                                    storage row-major-index)
-                           (incf row-major-index))
+                                    storage row-major-index))
                           (cl:vector
                            (loop :for e :across elt
-                                 :do (set-displaced-to e)))
+                                 :do (set-displaced-to e (1+ axis))
+                                     (incf row-major-index (nth axis strides))
+                                 :finally (decf row-major-index (* (nth axis dimensions)
+                                                                   (nth axis strides)))))
                           (t
                            (funcall (fdefinition `(setf ,storage-accessor))
                                     (assert-type elt element-type)
-                                    storage row-major-index)
-                           (incf row-major-index)))))
-               (set-displaced-to initial-contents)))))
+                                    storage row-major-index)))))
+               (set-displaced-to initial-contents 0)))))
     dense-array))
 
 (def-test make-array (:suite backend-dependent)
@@ -309,6 +322,7 @@ Also see:
     (declare (special *axis-number*))
     (print-unreadable-object (array stream :identity t :type t)
       ;; header
+      (format stream "~S " (dense-array-layout array))
       (if (zerop rank)
           (format stream "~ANIL ~S "
                   (if (array-view-p array) "(VIEW) " "")

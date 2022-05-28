@@ -11,6 +11,8 @@
   ((strides      :required t)
    (offsets      :required t)
    (contiguous-p :required t)
+   (layout       :required t
+                 :type (member :row-major :column-major))
    (root-array   :required t))
   (:documentation "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.

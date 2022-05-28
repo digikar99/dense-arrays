@@ -53,7 +53,7 @@ NIL
 - `dense-arrays-plus-lite`: some utilities
 - `dense-arrays+static-vectors`: provides and exports a `static-array` type that is essentially a wrapper around [static-vectors](https://github.com/sionescu/static-vectors)
 - `dense-arrays+cuda`: provides and export an array using `cl-cuda`
-- `dense-arrays+magicl`: provides and export an array using `magicl`, as well as a helper function `magicl-funcall`
+- `dense-arrays+magicl`: provides helper functions `magicl-funcall from-magicl-tensor as-magicl-tensor` for interoperating between `standard-dense-array` and `magicl:vector magicl:matrix magicl:tensor`
 - `dense-arrays-plus`: more utilities as well as static-vectors
 
 Minimalists would want to stick to the first four. The last one also introduces
