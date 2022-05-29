@@ -45,6 +45,7 @@ NIL
 - `aref` can be 5-6 times slower than `cl:aref` even after optimization; the work-around for this is `do-arrays` which can be up to 25% slower. See [perf.org](./perf.org) for example optimizations.
 - cannot be a drop-in replacement for built-in arrays because `cl:array` is both a class and a specializing type-specifier; IIUC, non-builtins can only either be one of class or specializing type-specifier.
 - `(setf aref)` and `(setf row-major-aref)` may need to be used using `(funcall #'(setf aref) ...)` since some implementations like SBCL "lose" the type information from the environment in an attempt to use `once-only` 
+- Although `:layout` has been provided recently, support for it is likely to be buggy. Bug reports will be appreciated!
 
 
 ### Included Systems

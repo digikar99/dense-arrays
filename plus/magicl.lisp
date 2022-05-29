@@ -86,4 +86,4 @@ Converts the results back to STANDARD-DENSE-ARRAY"
                  :finally (return arguments)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (export '(magic-funcall as-magicl-tensor from-magicl-tensor) :dense-arrays))
+  (export '(magicl-funcall as-magicl-tensor from-magicl-tensor) :dense-arrays))
