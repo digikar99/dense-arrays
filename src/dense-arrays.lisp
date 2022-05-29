@@ -299,11 +299,35 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
 (define-condition print-lines-exhausted (condition)
   ((axis-number :initarg :axis-number :accessor axis-number)))
 
+(defun pretty-print-number (stream arg colon-modifier-p at-modifier-p)
+  (declare (ignore colon-modifier-p at-modifier-p))
+  (unless (typep arg 'number)
+    (return-from pretty-print-number (print-object arg stream)))
+  (let ((number arg))
+    (if (or (>= (abs number) 100) (< (abs number) 0.001))
+        (format stream
+                (typecase number
+                  (float (if (< number 0)
+                             " ~9,3,2e"
+                             " ~10,3,2e"))
+                  (t     "~s"))
+              arg)
+        (format stream
+                (typecase number
+                  (float (if (< number 0)
+                             "~7,3,,,f    "
+                             "~7,3,,,f    "))
+                  (t      "~s"))
+              arg))))
 
 ;;; FIXME: Someone read up http://www.lispworks.com/documentation/lw51/CLHS/Body/22_b.htm
 ;;; to do things better
-(defvar *array-element-print-format* nil
+(defvar *array-element-print-format* "~/DENSE-ARRAYS::PRETTY-PRINT-NUMBER/"
   "The format control string used to print the elements of DENSE-ARRAYS:ARRAY.
+
+It is possible to set this value to \"~/USER-DEFINED-FUNCTION/\" where
+USER-DEFINED-FUNCTION should accept at least four arguments.
+
 Also see:
 - https://en.wikipedia.org/wiki/Format_(Common_Lisp)
 - http://www.gigamonkeys.com/book/a-few-format-recipes.html")
@@ -351,7 +375,7 @@ Also see:
               ((check-lines ()
                  (when (and *print-lines* (> lines *print-lines*))
                    (signal 'print-lines-exhausted :axis-number *axis-number*)))
-               (print-respecting-margin (object column)
+               (print-respecting-margin (object column indent)
                  (declare (type fixnum column))
                  (let ((string (format nil fmt-control object)))
                    (cond ((> (+ column (length string))
@@ -359,6 +383,7 @@ Also see:
                           (terpri stream)
                           (check-lines)
                           (incf lines)
+                          (dotimes (i (1- indent)) (write-char #\space stream))
                           (write-string string stream)
                           nil)
                          (t
@@ -378,7 +403,8 @@ Also see:
                             (setq column indent)))
                      (cond ((= *axis-number* rank)
                             (print-respecting-margin (aref sv (+ offset start))
-                                                     column))
+                                                     column
+                                                     indent))
                            (t
                             (let ((dim               (array-dimension array *axis-number*))
                                   (stride            (array-stride array *axis-number*))
@@ -393,7 +419,7 @@ Also see:
                                     :with last := (1- dim)
                                     :do (cond
                                           ((print-level-reached-p)
-                                           (let ((rv (print-respecting-margin "#" column)))
+                                           (let ((rv (print-respecting-margin "#" column indent)))
                                              (if rv
                                                  (incf column rv)
                                                  (setq column indent))
