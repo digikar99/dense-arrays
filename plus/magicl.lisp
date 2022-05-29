@@ -24,6 +24,7 @@
 If COPY is non-NIL then avoids making a copy of the storage of STANDARD-DENSE-ARRAY
 only if the STANDARD-DENSE-ARRAY is a non-view. In other words, a copy will be created
 if STANDARD-DENSE-ARRAY is a view (see ARRAY-VIEW-P) regardless of the value of COPY."
+  (declare (optimize speed))
   (let* ((a standard-dense-array)
          (a (if (or copy (array-view-p a))
                 (copy-array a)
@@ -41,6 +42,7 @@ if STANDARD-DENSE-ARRAY is a view (see ARRAY-VIEW-P) regardless of the value of 
   "Converts MAGICL:ABSTRACT-TENSOR to a STANDARD-DENSE-ARRAY
 
 If COPY is non-NIL, this copies over the underlying MAGICL::STORAGE"
+  (declare (optimize speed))
   (let* ((rank         (magicl:order magicl-tensor))
          (storage      (slot-value magicl-tensor 'magicl::storage))
          (storage      (if copy (alexandria:copy-array storage) storage))

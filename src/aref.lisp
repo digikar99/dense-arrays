@@ -79,9 +79,7 @@
                      :dimensions dimensions
                      :strides strides
                      :offsets offsets
-                     :layout (if (every #'zerop offsets)
-                                 layout
-                                 nil)
+                     :layout nil
                      :total-size (apply #'* dimensions)
                      :root-array (or (dense-array-root-array array) array)
                      :rank rank))))
