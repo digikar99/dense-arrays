@@ -38,12 +38,11 @@
       (let ((total-size (apply #'* broadcast-dimensions)))
         (make-instance (class-of array)
                        :dimensions broadcast-dimensions
+                       :layout (when (equal broadcast-dimensions (narray-dimensions array))
+                                 (dense-array-layout array))
                        :element-type element-type
                        :strides strides
                        :offsets offsets
-                       ;; TODO: Raises the question of semantics of array being contiguous
-                       :contiguous-p (= (first strides)
-                                        (/ total-size (first broadcast-dimensions)))
                        :total-size total-size
                        :root-array (or (dense-array-root-array array) array)
                        :rank (length broadcast-dimensions)

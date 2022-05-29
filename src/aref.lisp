@@ -22,12 +22,11 @@
   (declare (optimize speed)
            (dynamic-extent subscripts)
            (type dense-array array))
-  (with-slots (storage strides offsets dimensions rank element-type) array
-    (multiple-value-bind (class dimensions strides offsets contiguous-p rank)
+  (with-slots (storage strides offsets dimensions rank element-type layout) array
+    (multiple-value-bind (class dimensions strides offsets rank)
         (let ((new-offsets    nil)
               (new-dimensions nil)
               (new-strides    nil)
-              (contiguous-p   (dense-array-contiguous-p array))
               (rank           rank)
               (dim            dimensions)
               (strides        strides)
@@ -59,8 +58,6 @@
                                      end   (normalize-index end   d))
                               (when (and (< step 0) (not endp))
                                 (setq end -1))
-                              (when contiguous-p
-                                (setq contiguous-p (and (= s 1) (= step 1))))
                               (push (ceiling (- end start) step) new-dimensions)
                               (push (the-int-index (* s step)) new-strides)
                               (push (the-size (+ o offset-carry (the-int-index (* start s))))
@@ -75,7 +72,6 @@
                   (append (nreverse new-dimensions) dim)
                   (append (nreverse new-strides) strides)
                   (nreverse new-offsets)
-                  contiguous-p
                   rank))
       (make-instance class
                      :storage storage
@@ -83,7 +79,9 @@
                      :dimensions dimensions
                      :strides strides
                      :offsets offsets
-                     :contiguous-p contiguous-p
+                     :layout (if (every #'zerop offsets)
+                                 layout
+                                 nil)
                      :total-size (apply #'* dimensions)
                      :root-array (or (dense-array-root-array array) array)
                      :rank rank))))

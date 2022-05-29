@@ -7,7 +7,8 @@
                                      "ROW-MAJOR-AREF"
                                      "ARRAY-RANK"
                                      "ARRAY-STORAGE"
-                                     "DEFINE-ARRAY-CLASS"))
+                                     "DEFINE-ARRAY-CLASS"
+                                     "ARRAY-LAYOUT"))
            (shadow-symbols '("ARRAY"
                              "SIMPLE-ARRAY"
 

@@ -10,9 +10,10 @@
 
   ((strides      :required t)
    (offsets      :required t)
-   (contiguous-p :required t)
    (layout       :required t
-                 :type (member :row-major :column-major))
+                 ;; LAYOUT can be NIL in the case of a non SIMPLE-ARRAY
+                 ;; LAYOUT will be ROW-MAJOR or COLUMN-MAJOR only for SIMPLE-ARRAY
+                 :type (member nil :row-major :column-major))
    (root-array   :required t))
   (:documentation "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.

@@ -178,10 +178,10 @@
     (make-instance (class-of array)
                    :storage (array-displaced-to array)
                    :element-type (array-element-type array)
+                   :layout (array-layout array)
                    :dimensions (reverse (narray-dimensions  array))
                    :strides (reverse (array-strides  array))
                    :offsets (reverse (array-offsets  array))
-                   :contiguous-p nil
                    :total-size   (array-total-size   array)
                    :rank (array-rank array)
                    :root-array (or (dense-arrays::dense-array-root-array array)
@@ -288,7 +288,7 @@
                        array-like new-shape)))))
 
 (declaim (ftype (function * dense-array) reshape))
-(defun reshape (array-like new-shape &key (view nil viewp))
+(defun reshape (array-like new-shape &key (view nil viewp) (layout nil layoutp))
   "VIEW argument is considered only if ARRAY-LIKE is a SIMPLE-DENSE-ARRAY.
 If ARRAY-LIKE is a SIMPLE-DENSE-ARRAY, it is guaranteed that when VIEW is supplied,
 - :VIEW non-NIL means that no copy of ARRAY-LIKE is created
@@ -298,8 +298,14 @@ then a new array is created. In the future, an attempt may be made to avoid
 creating the new array and instead return a view instead. "
   (let ((simple-dense-array-p (typep array-like 'simple-dense-array))
         (array (typecase array-like
-                 (simple-dense-array array-like)
-                 (dense-array (copy-array array-like))
+                 (simple-dense-array (cond ((and layoutp
+                                                 (eq layout (array-layout array-like)))
+                                            array-like)
+                                           (t
+                                            array-like)))
+                 (dense-array (copy-array array-like :layout (if layoutp
+                                                                 layout
+                                                                 (array-layout array-like))))
                  (t (asarray array-like))))
         (new-shape (alexandria:ensure-list new-shape)))
     (declare (type simple-dense-array array))
@@ -309,29 +315,32 @@ creating the new array and instead return a view instead. "
             'incompatible-reshape-dimensions
             :array-like array-like
             :new-shape new-shape)
-    (let ((maybe-view-array
-            (make-instance (class-of array)
-                           :storage (array-displaced-to array)
-                           :element-type (array-element-type array)
-                           :dimensions new-shape
-                           :strides (dense-arrays::dimensions->strides new-shape)
-                           :offsets (make-list (length new-shape) :initial-element 0)
-                           :contiguous-p nil
-                           :total-size (array-total-size array)
-                           :rank (length new-shape)
-                           :root-array (if simple-dense-array-p
-                                           ;; In other cases, we are guaranteed
-                                           ;; that the ARRAY object created here
-                                           ;; will not be accessible from outside
-                                           ;; FIXME: Debugger?
-                                           (or (dense-arrays::dense-array-root-array
+    (let* ((maybe-view-array
+             (make-instance (class-of array)
+                            :storage (array-displaced-to array)
+                            :layout nil
+                            :element-type (array-element-type array)
+                            :dimensions new-shape
+                            :strides
+                            (dense-arrays::dimensions->strides new-shape (array-layout array))
+                            :offsets (make-list (length new-shape) :initial-element 0)
+                            :total-size (array-total-size array)
+                            :rank (length new-shape)
+                            :root-array (if simple-dense-array-p
+                                            ;; In other cases, we are guaranteed
+                                            ;; that the ARRAY object created here
+                                            ;; will not be accessible from outside
+                                            ;; FIXME: Debugger?
+                                            (or (dense-arrays::dense-array-root-array
+                                                 array)
                                                 array)
-                                               array)
-                                           nil))))
+                                            nil))))
       (cond ((and viewp simple-dense-array-p)
              (if view
                  maybe-view-array
-                 (copy-array maybe-view-array)))
+                 (copy-array maybe-view-array :layout (if layoutp
+                                                          layout
+                                                          (array-layout array-like)))))
             (t maybe-view-array)))))
 
 (def-test reshape ()

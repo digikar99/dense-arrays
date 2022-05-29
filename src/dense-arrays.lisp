@@ -7,23 +7,26 @@
   (is (subtypep '(array single-float 2) '(array single-float 2)))
   (is (subtypep '(array single-float 2) 'array)))
 
-(defun dimensions->strides (dimensions)
-  (cond ((null dimensions) ())
-        ((null (rest dimensions))
-         (list 1))
-        (t
-         (let ((strides-so-far (dimensions->strides (rest dimensions))))
-           (cons (* (first strides-so-far) (second dimensions))
-                 strides-so-far)))))
+(defun dimensions->strides (dimensions layout)
+  (ecase layout
+    (:column-major (nreverse (dimensions->strides (reverse dimensions) :row-major)))
+    ((:row-major nil)
+     (cond ((null dimensions) ())
+           ((null (rest dimensions))
+            (list 1))
+           (t
+            (let ((strides-so-far (dimensions->strides (rest dimensions) :row-major)))
+              (cons (* (first strides-so-far) (second dimensions))
+                    strides-so-far)))))))
 
 (def-test dimensions->strides ()
-  (is (equalp '()  (dimensions->strides '())))
-  (is (equalp '(1) (dimensions->strides '(1))))
-  (is (equalp '(1) (dimensions->strides '(5))))
+  (is (equalp '()  (dimensions->strides '()  :row-major)))
+  (is (equalp '(1) (dimensions->strides '(1) :row-major)))
+  (is (equalp '(1) (dimensions->strides '(5) :row-major)))
   (is (equalp '(2 1)
-              (dimensions->strides '(3 2))))
+              (dimensions->strides '(3 2) :row-major)))
   (is (equalp '(6 2 1)
-              (dimensions->strides '(1 3 2)))))
+              (dimensions->strides '(1 3 2) :row-major))))
 
 (defmacro ensure-single (&rest symbols)
   `(when (rest (remove-if #'null (list ,@symbols)))
@@ -80,12 +83,7 @@
          (total-size      (apply #'* dimensions))
          (strides         (if strides-p
                               strides
-                              (dimensions->strides (ecase layout
-                                                     (:row-major dimensions)
-                                                     (:column-major (reverse dimensions))))))
-         (strides         (ecase layout
-                            (:row-major strides)
-                            (:column-major (reverse strides))))
+                              (dimensions->strides dimensions layout)))
 
          ;; FIXME: Handle displaced-index-offset correctly
          (offsets         (if displaced-index-offset
@@ -123,7 +121,6 @@
                                          :dimensions dimensions
                                          :strides strides
                                          :offsets offsets
-                                         :contiguous-p t
                                          :total-size (apply #'* dimensions)
                                          :root-array nil
                                          :rank (length dimensions)
@@ -207,6 +204,13 @@
                                            :class 'standard-dense-array)))))
 
 ;; trivial function definitions
+
+(declaim (ftype (function (dense-array) (member :row-major :column-major nil))
+                array-layout))
+(declaim (inline array-layout))
+(defun array-layout (array)
+  (declare (type dense-array array))
+  (dense-array-layout array))
 
 (declaim (ftype (function (dense-array) list)
                 narray-dimensions
@@ -308,6 +312,7 @@ Also see:
   ;; (print (type-of array))
   (let* ((*print-right-margin* (or *print-right-margin* 80))
          (sv      (array-storage array))
+         (layout  (array-layout array))
          (rank    (array-rank array))
          (rank-1  (1- (array-rank array)))
          (lines   3)
@@ -322,13 +327,11 @@ Also see:
     (declare (special *axis-number*))
     (print-unreadable-object (array stream :identity t :type t)
       ;; header
-      (format stream "~S " (dense-array-layout array))
+      (format stream "~S " layout)
       (if (zerop rank)
-          (format stream "~ANIL ~S "
-                  (if (array-view-p array) "(VIEW) " "")
+          (format stream "NIL ~S"
                   (array-element-type array))
-          (format stream "~A~{~S~^x~} ~S "
-                  (if (array-view-p array) "(VIEW) " "")
+          (format stream "~{~S~^x~} ~S"
                   (narray-dimensions array)
                   (array-element-type array)))
       (when *print-array*
