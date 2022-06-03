@@ -163,12 +163,17 @@
                (format s "Unable to derive ELEMENT-TYPE from the environment or the BINDING-FORM ~%  ~S~%"
                        (slot-value c 'binding-form))))))
 
+;; TODO: Perhaps provide an option for traversing in column-major order
+
 (defmacro do-arrays (&whole form rank/bindings &body body &environment env)
-  "  If the argument is of type SIZE, it'd be treated as the rank of the arrays. Then,
-the BINDINGS are assumed to be the first element of the BODY.
+  "  Traverses the arrays in row-major order.
+
+  If the first argument RANK/BINDINGS is of type SIZE, it'd be treated as the rank
+  of the arrays. Then, the BINDINGS are assumed to be the first element of the BODY.
+
   Otherwise, the first argument is treated as if they are BINDINGS.
   Each BINDING is of the form
-    (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (CLASS-NAME :CL))
+    (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (CLASS-NAME *DENSE-ARRAY-CLASS*))
   Here, only ARRAY is evaluated.
 
 Examples

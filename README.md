@@ -1,16 +1,18 @@
 # dense-arrays
 
-[Last README update: 18th May 2021]
+[Last README update: 3rd June 2022]
 
 This system provides
 
 - a metaclass `dense-array-class`
 - a class `dense-array` with
   - multidimensional strides and offsets: CL arrays can only have a single offset
-  - customizable behavior, especially storage slot: depending on the exact class of `dense-array`, the storage object and associated meta-information could correspond to usual `(cl:simple-array element-type 1)` or [static-vectors](https://github.com/sionescu/static-vectors) or [cl-cuda](https://github.com/takagi/cl-cuda) or [magicl](https://github.com/quil-lang/magicl)! See [DOC.org](./DOC.org) for more details about customization.
+  - an option for layout: row-major or column-major to play nice with libraries like  or [magicl](https://github.com/quil-lang/magicl). NIL layout implies either non-contiguous arrays or an unknown layout.
+  - customizable behavior, especially storage slot: depending on the exact class of `dense-array`, the storage object and associated meta-information could correspond to usual `(cl:simple-array element-type 1)` or [static-vectors](https://github.com/sionescu/static-vectors) or [cl-cuda](https://github.com/takagi/cl-cuda)[DOC.org](./DOC.org) for more details about customization.
 - [a rich aref](#basic-demonstration)
 - a nicer default print-object that respects `*print-array* *print-length* *print-level* *print-lines*` and is customizable via `*array-element-print-format*`; this could be improved and integrated further with builtins once someone wraps their head around [The Lisp Pretty Printer](http://www.lispworks.com/documentation/lw51/CLHS/Body/22_b.htm).
 - a `unupgraded-array` and `simple-unupgraded-array` types that use `(cl:simple-array * 1)` for storage but do not upgrade the types; this can be helpful for better type checking
+- dynamic variables: `*array-element-type* *array-element-type-alist* *dense-array-class*`
 
 The multidimensional strides and offsets enable copy-free slicing and broadcasting.
 
@@ -43,9 +45,9 @@ NIL
 
 - adjustable-arrays are not handled yet
 - `aref` can be 5-6 times slower than `cl:aref` even after optimization; the work-around for this is `do-arrays` which can be up to 25% slower. See [perf.org](./perf.org) for example optimizations.
-- cannot be a drop-in replacement for built-in arrays because `cl:array` is both a class and a specializing type-specifier; IIUC, non-builtins can only either be one of class or specializing type-specifier.
+- cannot be a drop-in replacement for built-in arrays because `cl:array` is both a class and a specializing type-specifier; IIUC, non-builtins can only either be one of class or specializing type-specifier. However, this can now be rectified using [extensible-compound-types](https://github.com/digikar99/extensible-compound-types), however one needs to also think about playing nice in the presence or absence of extensible-compound-types.
 - `(setf aref)` and `(setf row-major-aref)` may need to be used using `(funcall #'(setf aref) ...)` since some implementations like SBCL "lose" the type information from the environment in an attempt to use `once-only` 
-- Although `:layout` has been provided recently, support for it is likely to be buggy. Bug reports will be appreciated!
+- Although `:layout` has been provided recently, support for it can be buggy. Bug reports will be appreciated!
 
 
 ### Included Systems
@@ -81,36 +83,36 @@ CL-USER> (setq *print-length* 10) ; also intends to respect (*print-level* *prin
 
 ```lisp
 DENSE-ARRAYS-DEMO> (make-array '(2 3 4) :constructor #'+)
-#<STANDARD-DENSE-ARRAY 2x3x4 T
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 2x3x4 T
    ((0 1 2 3)
     (1 2 3 4)
     (2 3 4 5))
    ((1 2 3 4)
     (2 3 4 5)
     (3 4 5 6))
- {102F298243}>
+ {100980B593}>
 DENSE-ARRAYS-DEMO> (aref * 1 '(0 :step 2))
-#<STANDARD-DENSE-ARRAY (VIEW) 2x4 T
+#<STANDARD-DENSE-ARRAY NIL 2x4 T
    (1 2 3 4)
    (3 4 5 6)
- {102F299973}>
+ {1009810073}>
 DENSE-ARRAYS-DEMO> (aref ** 1 '(-1 :step -2))
-#<STANDARD-DENSE-ARRAY (VIEW) 2x4 T
+#<STANDARD-DENSE-ARRAY NIL 2x4 T
    (3 4 5 6)
    (1 2 3 4)
- {102F29AAF3}>
+ {1009811E73}>
 DENSE-ARRAYS-DEMO> (make-array '(2 10))
-#<STANDARD-DENSE-ARRAY 2x10 T
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 2x10 T
    (0 0 0 0 0 0 0 0 0 0)
    (0 0 0 0 0 0 0 0 0 0)
- {102F29B933}>
+ {1009813D63}>
 DENSE-ARRAYS-DEMO> (make-array '(2 100))
-#<STANDARD-DENSE-ARRAY 2x100 T
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 2x100 T
    (0 0 0 0 0 0 0 0 0 0 ...)
    (0 0 0 0 0 0 0 0 0 0 ...)
- {102F29CEA3}>
+ {10098286B3}>
 DENSE-ARRAYS-DEMO> (describe (make-array '(2 10)))
-#<STANDARD-DENSE-ARRAY 2x10 T  {102F29E383}>
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 2x10 T {100982C243}>
   [standard-object]
 
 Slots with :INSTANCE allocation:
@@ -121,19 +123,19 @@ Slots with :INSTANCE allocation:
   TOTAL-SIZE                     = 20
   STRIDES                        = (10 1)
   OFFSETS                        = (0 0)
-  CONTIGUOUS-P                   = T
+  LAYOUT                         = :ROW-MAJOR
   ROOT-ARRAY                     = NIL
 ; No value
 DENSE-ARRAYS-DEMO> (defparameter a (make-array '(4 10) :constructor #'+))
 A
 DENSE-ARRAYS-DEMO> (print-array a "~2d")
 
-#<STANDARD-DENSE-ARRAY 4x10 T
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 4x10 T
    ( 0  1  2  3  4  5  6  7  8  9)
    ( 1  2  3  4  5  6  7  8  9 10)
    ( 2  3  4  5  6  7  8  9 10 11)
    ( 3  4  5  6  7  8  9 10 11 12)
- {102F3D3503}>
+ {1009837073}> 
 NIL
  ```
 
@@ -141,51 +143,51 @@ NIL
 
 ```lisp
 DENSE-ARRAYS-DEMO> (aref a nil 1)
-#<STANDARD-DENSE-ARRAY (VIEW) 4 T
+#<STANDARD-DENSE-ARRAY NIL 4 T
    1 2 3 4
- {102F3E05E3}>
+ {100984D933}>
 DENSE-ARRAYS-DEMO> (aref a nil -1)
-#<STANDARD-DENSE-ARRAY (VIEW) 4 T
+#<STANDARD-DENSE-ARRAY NIL 4 T
    9 10 11 12
- {102F3E1163}>
+ {100984ECC3}>
 DENSE-ARRAYS-DEMO> (aref a 1)
-#<STANDARD-DENSE-ARRAY (VIEW) 10 T
+#<STANDARD-DENSE-ARRAY NIL 10 T
    1 2 3 4 5 6 7 8 9 10
- {102F3E1D73}>
+ {100984FFA3}>
 DENSE-ARRAYS-DEMO> (aref a '(1 :end 3) '(1 :end 3))
-#<STANDARD-DENSE-ARRAY (VIEW) 2x2 T
+#<STANDARD-DENSE-ARRAY NIL 2x2 T
    (2 3)
    (3 4)
- {102F3E2B63}>
+ {10098622A3}>
 DENSE-ARRAYS-DEMO> (defparameter b (aref a '(1 :end 3) '(1 :end 8 :step 2)))
 B
 DENSE-ARRAYS-DEMO> b
-#<STANDARD-DENSE-ARRAY (VIEW) 2x4 T
+#<STANDARD-DENSE-ARRAY NIL 2x4 T
    (2 4 6 8)
    (3 5 7 9)
- {102F3E4113}>
+ {1009863FF3}>
 DENSE-ARRAYS-DEMO> (aref b (make-array '(2 4) :initial-contents '((0 1 0 0) (1 1 0 0))
                                        :element-type 'bit))
-#<STANDARD-DENSE-ARRAY 3 T
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 3 T
    4 3 5
- {102F3E6903}>
+ {1009867F13}>
 DENSE-ARRAYS-DEMO> (setf (aref b (make-array '(2 4)
                                              :initial-contents '((0 1 0 0) (1 1 0 0))
                                              :element-type 'bit))
                          0)
 0
 DENSE-ARRAYS-DEMO> b
-#<STANDARD-DENSE-ARRAY (VIEW) 2x4 T
+#<STANDARD-DENSE-ARRAY NIL 2x4 T
    (2 0 6 8)
    (0 0 7 9)
- {102F3E4113}>
+ {1009863FF3}>
 DENSE-ARRAYS-DEMO> a
-#<STANDARD-DENSE-ARRAY 4x10 T
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 4x10 T
    (0 1 2 3 4 5 6 7 8 9)
    (1 2 3 0 5 6 7 8 9 10)
    (2 0 4 0 6 7 8 9 10 11)
    (3 4 5 6 7 8 9 10 11 12)
- {102F3D3503}>
+ {1009837073}>
 ```
 
 Tests are also littered throughout out the system and may serve as examples, for instance [plus/py4cl2.lisp](plus/py4cl2.lisp).
@@ -205,6 +207,7 @@ and two, the version of trivial-types in quicklisp needs an update
    - my copy of [trivial-types](https://github.com/digikar99/trivial-types/) (original has been archived by the author)
    - [abstract-arrays](https://github.com/digikar99/abstract-arrays)
    - [compiler-macro-notes](https://github.com/digikar99/compiler-macro-notes)
+   - optionally [extensible-compound-types](https://github.com/digikar99/extensible-compound-types)
    - perhaps a few other alpha-stage things not added to quicklisp yet (raise an issue!)
 1. Clone into `$QUICKLISP_HOME/local-projects`. (See `ql:*local-project-directories*`.)
 2. `(ql:quickload "dense-arrays")` - or dense-arrays-plus or dense-arrays-plus-lite
