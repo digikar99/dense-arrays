@@ -1,6 +1,7 @@
 (in-package :dense-arrays)
 
-(defclass dense-array-class (abstract-array-class) ())
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass dense-array-class (abstract-array-class) ()))
 
 (define-array-class dense-array
   ;; TODO: Add more documentation with a proper example
@@ -15,6 +16,7 @@
                  ;; LAYOUT will be ROW-MAJOR or COLUMN-MAJOR only for SIMPLE-ARRAY
                  :type (member nil :row-major :column-major))
    (root-array   :required t))
+  (:metaclass dense-array-class)
   (:documentation "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.
 - OFFSETS is a list of offsets along each dimension."))
