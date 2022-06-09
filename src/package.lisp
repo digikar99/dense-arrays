@@ -44,14 +44,13 @@
                              "SIMPLE-UNUPGRADED-ARRAY")))
     `(polymorphic-functions.defpackage:defpackage :dense-arrays
        (:shadowing-import-exported-symbols :abstract-arrays
-                                           :trivial-types
                                            #+extensible-compound-types
                                            :extensible-compound-types)
        (:use
         :polymorphic-functions
         #-extensible-compound-types :cl
         #+extensible-compound-types :extensible-compound-types-cl
-        :iterate :alexandria :5am :trivial-types)
+        :iterate :alexandria :5am)
        (:export ,@shadow-symbols
                 ,@abstract-array-symbols)
        (:shadow ,@shadow-symbols)
@@ -64,6 +63,8 @@
                      #:element-type)
        (:import-from :cl-form-types
                      #:nth-form-type)
+       (:import-from :trivial-types
+                     #:function-designator)
        (:import-from :polymorphic-functions
                      #-extensible-compound-types
                      #:typexpand
