@@ -1,6 +1,8 @@
+#|
+
 (in-package :cl-cuda)
 
-;;; FIXME: We probably shouldn't do such a global initialization
+;;; We probably shouldn't do such a global initialization
 ;;; None-the-less, this lets us play in REPL,
 ;;; albeit, sometimes, one can run into issues:
 ;;; https://github.com/takagi/cl-cuda/issues/99
@@ -13,10 +15,9 @@
           *nvcc-options*
           (cl-cuda.api.context::append-arch *nvcc-options* 0)))
 
-(in-package :dense-arrays)
+|#
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (trivial-package-local-nicknames:add-package-local-nickname :cu :cl-cuda))
+(in-package :dense-arrays)
 
 (defstruct (lisp-cuda-type)
   (lisp nil)
@@ -43,19 +44,19 @@
 
 (defparameter *lisp-cuda-types*
   (list (make-lisp-cuda-type :lisp 'single-float
-                             :cuda 'cu:float
+                             :cuda 'cl-cuda:float
                              :size 4
                              :c :float)
         (make-lisp-cuda-type :lisp 'double-float
-                             :cuda 'cu:double
+                             :cuda 'cl-cuda:double
                              :size 8
                              :c :double)
         (make-lisp-cuda-type :lisp '(signed-byte 32)
-                             :cuda 'cu:int
+                             :cuda 'cl-cuda:int
                              :size 4
                              :c :int)
         (make-lisp-cuda-type :lisp 'bit
-                             :cuda 'cu:bool
+                             :cuda 'cl-cuda:bool
                              ;; well the size is 1 bit, not 1 byte!
                              :size 1
                              :c :bool)))
@@ -63,15 +64,15 @@
 (defun make-cuda-vector (size &key element-type initial-element)
   (let* ((lisp-cuda-type (find element-type *lisp-cuda-types*
                                :key #'lisp-type :test #'type=))
-         (block (cu:alloc-memory-block (cuda-type lisp-cuda-type) size)))
+         (block (cl-cuda:alloc-memory-block (cuda-type lisp-cuda-type) size)))
     (loop :for i :below size
           :do (setf (cuda-memory-block-aref block i) initial-element))
     ;; TODO: A faster option; but there are better things to optimize than this
-    (cu:sync-memory-block block :host-to-device)
+    (cl-cuda:sync-memory-block block :host-to-device)
     block))
 
 (defun free-cuda-vector (memory-block)
-  (cu:free-memory-block memory-block))
+  (cl-cuda:free-memory-block memory-block))
 
 (defun upgraded-cuda-array-element-type (element-type)
   (if (lisp-cuda-type-p element-type)
@@ -85,21 +86,21 @@
 (declaim (inline cuda-memory-block-aref (setf cuda-memory-block-aref)))
 (defun cuda-memory-block-aref (memory-block index)
   (declare (optimize speed))
-  (let ((value (cu:memory-block-aref memory-block index)))
+  (let ((value (cl-cuda:memory-block-aref memory-block index)))
     (case value
       ((t) 1)
       ((nil) 0)
       (t value))))
 (defun (setf cuda-memory-block-aref) (new memory-block index)
   (declare (optimize speed))
-  (if (eq 'cu:bool (cu:memory-block-type memory-block))
-      (setf (cu:memory-block-aref memory-block index)
+  (if (eq 'cl-cuda:bool (cl-cuda:memory-block-type memory-block))
+      (setf (cl-cuda:memory-block-aref memory-block index)
             (= 1 (the bit new)))
-      (setf (cu:memory-block-aref memory-block index) new)))
+      (setf (cl-cuda:memory-block-aref memory-block index) new)))
 
 (defpolymorph aref ((memory-block cl-cuda.api.memory::memory-block) &rest indices) t
   (assert (null (rest indices)))
-  (cu:memory-block-aref memory-block (first indices)))
+  (cl-cuda:memory-block-aref memory-block (first indices)))
 
 ;;; FIXME: Compiling the below block results in style-warnings
 ;;; It probably comes from cuda-memory-block-aref above - we are not sure
