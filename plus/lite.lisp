@@ -175,23 +175,34 @@
 
 ;; MISC ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun transpose (array-like)
+(defun transpose (array-like &optional axes)
   (let ((array (typecase array-like
                  (dense-array array-like)
                  (t (asarray array-like)))))
     (declare (type dense-array array)
              (optimize speed))
-    (make-instance (class-of array)
-                   :storage (array-displaced-to array)
-                   :element-type (array-element-type array)
-                   :layout (array-layout array)
-                   :dimensions (reverse (narray-dimensions  array))
-                   :strides (reverse (array-strides  array))
-                   :offsets (reverse (array-offsets  array))
-                   :total-size   (array-total-size   array)
-                   :rank (array-rank array)
-                   :root-array (or (dense-arrays::dense-array-root-array array)
-                                   array))))
+    (multiple-value-bind (dimensions strides offsets)
+        (if axes
+            (loop :for i :of-type size :below (array-rank array)
+                  :for axis :in axes
+                  :collect (array-dimension array axis) :into dimensions
+                  :collect (array-stride array axis) :into strides
+                  :collect (array-offset array axis) :into offsets
+                  :finally (return (values dimensions strides offsets)))
+            (values (reverse (narray-dimensions array))
+                    (reverse (array-strides    array))
+                    (reverse (array-offsets    array))))
+      (make-instance (class-of array)
+                     :storage (array-displaced-to array)
+                     :element-type (array-element-type array)
+                     :layout (array-layout array)
+                     :dimensions dimensions
+                     :strides strides
+                     :offsets offsets
+                     :total-size (array-total-size array)
+                     :rank (array-rank array)
+                     :root-array (or (dense-arrays::dense-array-root-array array)
+                                     array)))))
 
 (defun split-at-keywords (args)
   "Example: (1 2 3 :a 2 :b 3) => ((1 2 3) :a 2 :b 3)"
