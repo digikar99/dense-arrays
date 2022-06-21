@@ -238,6 +238,7 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
   (declare (type dense-array array))
   (abstract-array-dimensions array))
 
+(declaim (inline array-dimension))
 (defun array-dimension (array axis-number)
   "Return the length of dimension AXIS-NUMBER of ARRAY."
   (declare (type dense-array array)
@@ -249,6 +250,7 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
   (declare (type dense-array array))
   (dense-array-strides array))
 
+(declaim (inline array-stride))
 (defun array-stride (array axis-number)
   "Return the length of stride AXIS-NUMBER of ARRAY."
   (declare (type dense-array array)
@@ -260,6 +262,7 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
   (declare (type dense-array array))
   (dense-array-offsets array))
 
+(declaim (inline array-offset))
 (defun array-offset (array axis-number)
   "Return the length of offset AXIS-NUMBER of ARRAY."
   (declare (type dense-array array)
