@@ -135,19 +135,24 @@
 
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
-(defun asarray (array-like &key (type default-element-type) (layout :row-major))
+(defun asarray (array-like &key (out nil outp) (type default-element-type) (layout :row-major))
   "TYPE can also be :AUTO"
-  (let* ((dimensions (dimensions array-like))
-         (array      (make-array dimensions
-                                 :element-type (if (eq :auto type)
-                                                   (element-type array-like)
-                                                   type)
-                                 :layout layout))
-         (*storage*  (array-displaced-to array))
-         (*storage-accessor* (storage-accessor (class-of array)))
-         (*index*    0))
-    (traverse array-like)
-    array))
+  (let* ((dimensions (dimensions array-like)))
+    (when outp
+      (check-type out dense-array)
+      (assert (equalp dimensions (narray-dimensions out)) (out))
+      (assert (type= type (array-element-type out)) (out)))
+    (let* ((array      (or out
+                           (make-array dimensions
+                                       :element-type (if (eq :auto type)
+                                                         (element-type array-like)
+                                                         type)
+                                       :layout layout)))
+           (*storage*  (array-displaced-to array))
+           (*storage-accessor* (storage-accessor (class-of array)))
+           (*index*    0))
+      (traverse array-like)
+      array)))
 
 (def-test asarray ()
   (is (array= (make-array '(2 1 3) :initial-contents '(((1 2 3))
