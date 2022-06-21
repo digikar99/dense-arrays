@@ -246,11 +246,8 @@
         (range (- max min))
         (min   (coerce min type)))
     (declare (type simple-dense-array a))
-    (dotimes (index (array-total-size a))
-      (funcall #'(setf row-major-aref)
-               (+ min (random range))
-               a
-               index))
+    (do-arrays ((a-elt a))
+      (setf a-elt (+ min (random range))))
     a))
 
 (defun zeros-like (array-like)
