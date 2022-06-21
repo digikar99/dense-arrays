@@ -135,13 +135,14 @@
 
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
-(defun asarray (array-like &key (type default-element-type))
+(defun asarray (array-like &key (type default-element-type) (layout :row-major))
   "TYPE can also be :AUTO"
   (let* ((dimensions (dimensions array-like))
          (array      (make-array dimensions
                                  :element-type (if (eq :auto type)
                                                    (element-type array-like)
-                                                   type)))
+                                                   type)
+                                 :layout layout))
          (*storage*  (array-displaced-to array))
          (*storage-accessor* (storage-accessor (class-of array)))
          (*index*    0))
@@ -218,27 +219,30 @@
            ,@body))
        (declaim (notinline ,name)))))
 
-(define-splice-list-fn zeros (shape &key (type default-element-type))
+(define-splice-list-fn zeros (shape &key (type default-element-type) (layout :row-major))
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
   (make-array shape :element-type type
-                    :initial-element (coerce 0 type)))
+                    :initial-element (coerce 0 type)
+                    :layout layout))
 
-(define-splice-list-fn ones (shape &key (type default-element-type))
+(define-splice-list-fn ones (shape &key (type default-element-type) (layout :row-major))
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
   (make-array shape :element-type type
-                    :initial-element (coerce 1 type)))
+                    :initial-element (coerce 1 type)
+                    :layout layout))
 
 (define-splice-list-fn rand (shape &key (type default-element-type)
+                                   (layout :row-major)
                                    (min (coerce 0 type))
                                    (max (coerce 1 type)))
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
-  (let ((a     (zeros shape :type type))
+  (let ((a     (zeros shape :type type :layout layout))
         (range (- max min))
         (min   (coerce min type)))
     (declare (type simple-dense-array a))
