@@ -1,5 +1,5 @@
 (uiop:define-package :dense-arrays-plus-lite
-  (:mix :dense-arrays :cl :5am)
+  (:mix :dense-arrays #+extensible-compound-types :extensible-compound-types-cl :cl :5am)
   (:import-from
    #:dense-arrays
    #:lm
