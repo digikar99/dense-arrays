@@ -20,11 +20,13 @@
    #:zeros
    #:ones
    #:rand
+   #:full
    #:eye
    #:reshape
    #:zeros-like
    #:ones-like
    #:rand-like
+   #:full-like
    #:as-cl-array
    #:macro-map-array))
 
@@ -266,6 +268,16 @@
       (setf a-elt (+ min (random range))))
     a))
 
+(define-splice-list-fn full (shape &key (type default-element-type)
+                                   (layout :row-major)
+                                   value)
+  (when (listp (first shape))
+    (assert (null (rest shape)))
+    (setq shape (first shape)))
+  (make-array shape :element-type type
+                    :initial-element (coerce value type)
+                    :layout layout))
+
 (defun zeros-like (array-like)
   (zeros (dimensions array-like) :type (element-type array-like)))
 
@@ -274,6 +286,9 @@
 
 (defun rand-like (array-like)
   (rand (dimensions array-like) :type (element-type array-like)))
+
+(defun full-like (array-like value)
+  (full (dimensions array-like) :value value :type (element-type array-like)))
 
 (declaim (ftype (function * simple-dense-array) eye))
 (defun eye (per-axis-size &key (rank 2) (type default-element-type))
