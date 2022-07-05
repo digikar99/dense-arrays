@@ -28,20 +28,13 @@
          (and (null (dense-array-root-array object))
               (not (type= (class-of object)
                           (class-of (array-storage object))))
-              (loop :for o :of-type size :in (array-offsets object)
-                    :always (zerop o))
-              (let ((total-size (array-total-size object)))
-                (loop :for s :of-type int-index :in (array-strides object)
-                      :for d :of-type size :in (narray-dimensions object)
-                      :always (= s (/ total-size d))
-                      :do (setq total-size (floor total-size d))))))))
+              (dense-array-layout object)))))
 
 (deftype simple-dense-array   () `(and dense-array (satisfies simple-dense-array-p)))
 
 (define-array-specialization-type array standard-dense-array)
-;;; TODO: Put simple-array type to use
-(define-array-specialization-type simple-array (and standard-dense-array
-                                                    simple-dense-array))
+(define-array-specialization-type simple-array
+    (and standard-dense-array simple-dense-array))
 
 ;; For internal usage
 (define-array-specialization-type %dense-array dense-array)

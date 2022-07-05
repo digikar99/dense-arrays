@@ -347,14 +347,6 @@
                           row-major-index)
                  (array-element-type array))))
 
-(defpolymorph (row-major-aref :inline t) ((array simple-dense-array) index) t
-  ;; TODO: Use contiguous-dense-array instead of simple-dense-array
-  (declare (type int-index index))
-  (assert-type (funcall (fdefinition (storage-accessor (class-of array)))
-                        (array-storage array)
-                        index)
-               (array-element-type array)))
-
 (defpolymorph ((setf row-major-aref) :inline t) (new-element (array dense-array) index) t
   (declare (type int-index index))
   (assert-type new-element (array-element-type array))
@@ -371,15 +363,6 @@
              new-element
              (array-storage array)
              row-major-index)))
-
-(defpolymorph ((setf row-major-aref) :inline t) (new-element (array simple-dense-array) index) t
-  ;; TODO: Use contiguous-dense-array instead of simple-dense-array
-  (declare (type int-index index))
-  (assert-type new-element (array-element-type array))
-  (funcall (fdefinition `(setf ,(storage-accessor (class-of array))))
-           new-element
-           (array-storage array)
-           index))
 
 (def-test row-major-aref (:suite backend-independent)
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))
