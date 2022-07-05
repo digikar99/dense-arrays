@@ -263,7 +263,7 @@
   (let ((a     (zeros shape :type type :layout layout))
         (range (- max min))
         (min   (coerce min type)))
-    (declare (type simple-dense-array a))
+    (declare (type dense-array a))
     (do-arrays ((a-elt a))
       (setf a-elt (+ min (random range))))
     a))
