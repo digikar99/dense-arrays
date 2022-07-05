@@ -177,12 +177,12 @@ This system provides
 - a metaclass `dense-array-class`
 - a class `dense-array` with
   - multidimensional strides and offsets: CL arrays can only have a single offset
-  - an option for layout: row-major or column-major to play nice with libraries like  or [magicl](https://github.com/quil-lang/magicl). NIL layout implies either non-contiguous arrays or an unknown layout.
+  - an option for layout: row-major or column-major to play nice with libraries like or [magicl](https://github.com/quil-lang/magicl). NIL layout implies either non-contiguous arrays or an unknown layout.
   - customizable behavior, especially storage slot: depending on the exact class of `dense-array`, the storage object and associated meta-information could correspond to usual `(cl:simple-array element-type 1)` or [static-vectors](https://github.com/sionescu/static-vectors) or [cl-cuda](https://github.com/takagi/cl-cuda)[DOC.org](./DOC.org) for more details about customization.
 - [a rich aref](#basic-demonstration)
 - a nicer default print-object that respects `*print-array* *print-length* *print-level* *print-lines*` and is customizable via `*array-element-print-format*`; this could be improved and integrated further with builtins once someone wraps their head around [The Lisp Pretty Printer](http://www.lispworks.com/documentation/lw51/CLHS/Body/22_b.htm).
 - a `unupgraded-array` and `simple-unupgraded-array` types that use `(cl:simple-array * 1)` for storage but do not upgrade the types; this can be helpful for better type checking
-- dynamic variables: `*array-element-type* *array-element-type-alist* *dense-array-class*`
+- dynamic variables: `*array-element-type* *array-element-type-alist* *dense-array-class* *array-layout*`
 
 The multidimensional strides and offsets enable copy-free slicing and broadcasting.
 

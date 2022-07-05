@@ -38,8 +38,7 @@
       (let ((total-size (apply #'* broadcast-dimensions)))
         (make-instance (class-of array)
                        :dimensions broadcast-dimensions
-                       :layout (when (equal broadcast-dimensions (narray-dimensions array))
-                                 (dense-array-layout array))
+                       :layout nil
                        :element-type element-type
                        :strides strides
                        :offsets offsets

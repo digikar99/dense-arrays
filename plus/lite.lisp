@@ -147,7 +147,7 @@
 
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
-(defun asarray (array-like &key (out nil outp) (type default-element-type) (layout :row-major))
+(defun asarray (array-like &key (out nil outp) (type default-element-type) (layout *array-layout*))
   "TYPE can also be :AUTO"
   (let* ((dimensions (dimensions array-like)))
     (when outp
@@ -260,7 +260,7 @@
            ,@body))
        (declaim (notinline ,name)))))
 
-(define-splice-list-fn zeros (shape &key (type default-element-type) (layout :row-major))
+(define-splice-list-fn zeros (shape &key (type default-element-type) (layout *array-layout*))
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
@@ -268,7 +268,7 @@
                     :initial-element (coerce 0 type)
                     :layout layout))
 
-(define-splice-list-fn ones (shape &key (type default-element-type) (layout :row-major))
+(define-splice-list-fn ones (shape &key (type default-element-type) (layout *array-layout*))
   (when (listp (first shape))
     (assert (null (rest shape)))
     (setq shape (first shape)))
@@ -277,7 +277,7 @@
                     :layout layout))
 
 (define-splice-list-fn rand (shape &key (type default-element-type)
-                                   (layout :row-major)
+                                   (layout *array-layout*)
                                    (min (coerce 0 type))
                                    (max (coerce 1 type)))
   (when (listp (first shape))
@@ -292,7 +292,7 @@
     a))
 
 (define-splice-list-fn full (shape &key (type default-element-type)
-                                   (layout :row-major)
+                                   (layout *array-layout*)
                                    value)
   (when (listp (first shape))
     (assert (null (rest shape)))
@@ -307,7 +307,7 @@
 ;;   ;; Escape if there are no keywords
 ;;   (unless (some #'keywordp args) (return-from rand form))
 ;;   (destructuring-bind (shape &key (type nil typep)
-;;                                (layout :row-major)
+;;                                (layout *array-layout*)
 ;;                                (min nil minp)
 ;;                                (max nil maxp))
 ;;       (split-at-keywords args)
@@ -456,9 +456,19 @@ creating the new array and instead return a view instead. "
     (is-false (dense-arrays::array-view-p actual-value)))
   (let ((expected-value (asarray '(1 2 3 4 5 6)))
         (actual-value (reshape (reshape (asarray '((1 2 3)
-                                                   (4 5 6)))
+                                                   (4 5 6))
+                                                 :layout :row-major)
                                         '(3 2))
-                               6)))
+                               6
+                               :layout :row-major)))
+    (is (array= expected-value actual-value)))
+  (let ((expected-value (asarray '(1 4 2 5 3 6)))
+        (actual-value (reshape (reshape (asarray '((1 2 3)
+                                                   (4 5 6))
+                                                 :layout :column-major)
+                                        '(3 2))
+                               6
+                               :layout :column-major)))
     (is (array= expected-value actual-value))))
 
 (defun as-cl-array (array)

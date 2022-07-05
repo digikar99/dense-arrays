@@ -7,7 +7,7 @@ is a VIEW (see ARRAY-VIEW-P)."
   (let ((new-array (make-array (array-dimensions array)
                                :element-type (array-element-type array)
                                :initial-element (row-major-aref array 0)
-                               :layout (or layout :row-major))))
+                               :layout (or layout *array-layout*))))
     (do-arrays ((new new-array)
                 (old array))
       (setf new old))

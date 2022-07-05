@@ -31,6 +31,7 @@
                              "*ARRAY-ELEMENT-TYPE*"
                              "*ARRAY-ELEMENT-TYPE-ALIST*"
                              "*ARRAY-ELEMENT-PRINT-FORMAT*"
+                             "*ARRAY-LAYOUT*"
                              "PRINT-ARRAY"
                              "COPY-ARRAY"
                              "COPY-DENSE-ARRAY"
@@ -75,6 +76,7 @@
 (in-package :dense-arrays)
 
 (defvar *array-element-type*)
+(defvar *array-layout* :row-major)
 
 (setf (documentation '*array-element-type* 'variable)
       "If BOUND, this is the default value of the ELEMENT-TYPE or TYPE argument.

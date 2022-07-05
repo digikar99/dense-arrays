@@ -55,7 +55,7 @@
                      (adjustable nil adjustable-p)
                      (fill-pointer nil fill-pointer-p)
                      (class *dense-array-class*)
-                     (layout :row-major)
+                     (layout *array-layout*)
 
                      (displaced-to nil displaced-to-p)
                      (offsets nil offsets-p)
@@ -191,10 +191,14 @@
 
 (def-test make-array (:suite backend-dependent)
   (is (equalp #(0 1 2 1 2 3)
-              (array-storage (make-array '(2 3) :constructor #'+ :element-type 'int32))))
+              (array-storage (make-array '(2 3) :constructor #'+ :element-type 'int32
+                                         :layout :row-major))))
   (is (equalp #(0 1 2 3 1 2 3 4 2 3 4 5 1 2 3 4 2 3 4 5 3 4 5 6)
-              (array-storage (make-array '(2 3 4)
-                                         :constructor #'+ :element-type 'int32))))
+              (array-storage (make-array '(2 3 4) :layout :row-major
+                                                  :constructor #'+ :element-type 'int32))))
+  (is (equalp #(0 1 1 2 2 3)
+              (array-storage (make-array '(2 3) :constructor #'+ :element-type 'int32
+                                         :layout :column-major))))
 
   (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
     (is (typep a '(%dense-array int32)))
