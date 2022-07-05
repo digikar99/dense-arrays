@@ -113,4 +113,3 @@ subclass of DENSE-ARRAY." ',name))))))
 (defmethod storage-type-inferrer-from-array-type ((class standard-dense-array-class))
   (lambda (array-type)
     `(cl:simple-array ,(array-type-element-type array-type) 1)))
-

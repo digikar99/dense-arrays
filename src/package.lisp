@@ -101,23 +101,3 @@ Is overriden by *ARRAY-ELEMENT-TYPE* when bound, or by explicitly passing an
 (def-suite backend-dependent :in :dense-arrays)
 (def-suite backend-independent :in :dense-arrays
   :description "DENSE-ARRAY tests that are supposed to pass irrespective of the backend.")
-
-(in-suite :dense-arrays)
-
-(deftype size () `(unsigned-byte 62))
-(deftype int-index () `(signed-byte 62))
-
-(defmacro the-size (form)
-  `(#+sbcl sb-ext:truly-the
-    #-sbcl the
-    size ,form))
-
-(defmacro the-int-index (form)
-  `(#+sbcl sb-ext:truly-the
-    #-sbcl the
-    int-index ,form))
-
-(deftype int32 () `(signed-byte 32))
-(deftype uint32 () `(unsigned-byte 32))
-(deftype int64 () `(signed-byte 64))
-(deftype uint64 () `(unsigned-byte 64))
