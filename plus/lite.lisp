@@ -200,7 +200,7 @@
 
 ;; MISC ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun transpose (array-like &optional axes)
+(defun transpose (array-like &key axes)
   (let ((array (typecase array-like
                  (dense-array array-like)
                  (t (asarray array-like)))))
