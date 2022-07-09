@@ -258,7 +258,29 @@
          ,doc
          (destructuring-bind ,args (split-at-keywords args)
            ,@body))
-       (declaim (notinline ,name)))))
+       (declaim (notinline ,name))
+
+       (defmethod cl-form-types:custom-form-type ((op (eql ',name)) args env)
+         (let* ((type-position (position :type args))
+                (elt-type-form (if type-position
+                                   (nth (1+ type-position) args)
+                                   (return-from cl-form-types:custom-form-type 'simple-array)))
+                (elt-type (if (constantp elt-type-form env)
+                              (introspect-environment:constant-form-value elt-type-form env)
+                              (return-from cl-form-types:custom-form-type 'simple-array)))
+                (dim-form/s (subseq args 0 type-position))
+                (rank (cond ((< 1 (length dim-form/s))
+                             (length dim-form/s))
+                            (t
+                             (let ((dim-form-type (cl-form-types:form-type (first dim-form/s) env)))
+                               (if (type= t dim-form-type)
+                                   'cl:*
+                                   (multiple-value-bind (subtypep knownp)
+                                       (subtypep dim-form-type 'cons env)
+                                     (if knownp
+                                         (if subtypep 'cl:* 1)
+                                         'cl:*))))))))
+           `(simple-array ,elt-type ,rank))))))
 
 (define-splice-list-fn zeros (shape &key (type default-element-type) (layout *array-layout*))
   (when (listp (first shape))
