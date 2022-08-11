@@ -314,15 +314,30 @@ NIL
 ```lisp
 DENSE-ARRAYS-DEMO> (aref a nil 1)
 #<STANDARD-DENSE-ARRAY NIL 4 T
-   1 2 3 4
+   1
+   2
+   3
+   4
  {100984D933}>
 DENSE-ARRAYS-DEMO> (aref a nil -1)
 #<STANDARD-DENSE-ARRAY NIL 4 T
-   9 10 11 12
+   9
+   10
+   11
+   12
  {100984ECC3}>
 DENSE-ARRAYS-DEMO> (aref a 1)
 #<STANDARD-DENSE-ARRAY NIL 10 T
-   1 2 3 4 5 6 7 8 9 10
+   1
+   2
+   3
+   4
+   5
+   6
+   7
+   8
+   9
+   10
  {100984FFA3}>
 DENSE-ARRAYS-DEMO> (aref a '(1 :end 3) '(1 :end 3))
 #<STANDARD-DENSE-ARRAY NIL 2x2 T
@@ -339,7 +354,9 @@ DENSE-ARRAYS-DEMO> b
 DENSE-ARRAYS-DEMO> (aref b (make-array '(2 4) :initial-contents '((0 1 0 0) (1 1 0 0))
                                        :element-type 'bit))
 #<STANDARD-DENSE-ARRAY :ROW-MAJOR 3 T
-   4 3 5
+   4
+   3
+   5
  {1009867F13}>
 DENSE-ARRAYS-DEMO> (setf (aref b (make-array '(2 4)
                                              :initial-contents '((0 1 0 0) (1 1 0 0))
