@@ -342,135 +342,63 @@ Also see:
 (defmethod print-object ((array dense-array) stream)
   ;; (print (type-of array))
   (let* ((*print-right-margin* (or *print-right-margin* 80))
+         (*print-level* (if *print-level* (+ 1 *print-level*)))
          (sv      (array-storage array))
          (layout  (array-layout array))
          (rank    (array-rank array))
-         (rank-1  (1- (array-rank array)))
-         (lines   3)
-         (*axis-number* 0)
-         (indent  3)
+         (index   0)
          (fmt-control (or *array-element-print-format*
                           (switch ((array-element-type array) :test #'type=)
                             ('double-float "~,15,3@e")
                             ('single-float "~,7,2@e")
                             (t             "~s")))))
-    ;; Do this before just to save some horizontal space
-    (declare (special *axis-number*))
-    (print-unreadable-object (array stream :identity t :type t)
-      ;; header
-      (format stream "~S " layout)
-      (if (zerop rank)
-          (format stream "NIL ~S"
-                  (array-element-type array))
-          (format stream "~{~S~^x~} ~S"
-                  (narray-dimensions array)
-                  (array-element-type array)))
-      (when *print-array*
-        ;; elements
+    ;; Do variable declarations before just to save some horizontal space
+    (pprint-logical-block (stream nil)
+      (print-unreadable-object (array stream :identity t :type t)
+        ;; header
+        (format stream "~S " layout)
+        (if (zerop rank)
+            (format stream "NIL ~S"
+                    (array-element-type array))
+            (format stream "~{~S~^x~} ~S"
+                    (narray-dimensions array)
+                    (array-element-type array)))
         ;; DONE: *print-level*
         ;; DONE: *print-lines*
         ;; DONE: *print-length*
-        ;; TODO: Simplify this
-        (unless (or (zerop (array-total-size array))
-                    (and *print-lines* (< *print-lines* 3))
-                    (and *print-level*
-                         (< *print-level* 1)
-                         (progn
-                           (write-string " #" stream)
-                           t)))
-          (labels
-              ((check-lines ()
-                 (when (and *print-lines* (> lines *print-lines*))
-                   (signal 'print-lines-exhausted :axis-number *axis-number*)))
-               (print-respecting-margin (object column indent)
-                 (declare (type fixnum column))
-                 (let ((string (format nil fmt-control object)))
-                   (cond ((> (+ column (length string))
-                             *print-right-margin*)
-                          (terpri stream)
-                          (check-lines)
-                          (incf lines)
-                          (dotimes (i (1- indent)) (write-char #\space stream))
-                          (write-string string stream)
-                          nil)
-                         (t
-                          (write-string string stream)
-                          (length string)))))
-               (print-level-reached-p ()
-                 (and *print-level* (>= (1+ *axis-number*) *print-level*)))
-               ;; TODO: Handle multi-axis offsets
-               (print-array (offset start indent &optional column)
-                 ;; (print (list offset start))
-                 (let ((column (or column indent)))
-                   (flet ((newline ()
-                            (check-lines)
-                            (incf lines)
-                            (terpri stream)
-                            (dotimes (i indent) (write-char #\space stream))
-                            (setq column indent)))
-                     (cond ((= *axis-number* rank)
-                            (print-respecting-margin (aref sv (+ offset start))
-                                                     column
-                                                     indent))
+        (when (and *print-array*
+                   (not (or (zerop (array-total-size array))
+                            (and *print-lines* (< *print-lines* 3))
+                            (and *print-level*
+                                 (< *print-level* 1)
+                                 (progn
+                                   (write-string " #" stream)
+                                   t)))))
+          ;; print the array elements
+          (labels ((data-as-lol (&optional (depth 0))
+                     ;; Get the relevant data from storage vector as a potentially nested list
+                     (cond ((= depth rank)
+                            (format nil fmt-control (aref sv index)))
+                           ((and *print-level* (= depth *print-level*))
+                            "#")
                            (t
-                            (let ((dim               (array-dimension array *axis-number*))
-                                  (stride            (array-stride array *axis-number*))
-                                  (additional-offset (array-offset array *axis-number*)))
-                              (when (zerop *axis-number*)
-                                (newline))
-                              (loop :for i :from 0
-                                    :repeat (if *print-length*
-                                                (min *print-length*
-                                                     dim)
-                                                dim)
-                                    :with last := (1- dim)
-                                    :do (cond
-                                          ((print-level-reached-p)
-                                           (let ((rv (print-respecting-margin "#" column indent)))
-                                             (if rv
-                                                 (incf column rv)
-                                                 (setq column indent))
-                                             (unless (= i last)
-                                               (incf column)
-                                               (write-char #\space stream))))
-                                          (t
-                                           (unless (= *axis-number* rank-1)
-                                             (incf column)
-                                             (write-char #\( stream))
-                                           (let* ((*axis-number* (1+ *axis-number*))
-                                                  (rv (print-array (+ offset additional-offset)
-                                                                   (+ start (* stride i))
-                                                                   (1+ indent)
-                                                                   column)))
-                                             (declare (special *axis-number*))
-                                             (if rv
-                                                 (incf column rv)
-                                                 (setq column indent)))
-                                           (if (= *axis-number* rank-1)
-                                               (unless (= i last)
-                                                 (incf column)
-                                                 (write-char #\space stream))
-                                               (progn
-                                                 (write-char #\) stream)
-                                                 (unless (= i last)
-                                                   (newline)))))))
-                              (if (and *print-length*
-                                       (> dim *print-length*))
-                                  (write-string "..." stream)
-                                  (write-string "" stream))
-                              0)))))))
-            (handler-case
-                (if (zerop rank)
-                    (format stream fmt-control (aref sv 0))
-                    (progn
-                      (print-array 0
-                                   0
-                                   indent)
-                      (terpri stream)))
-              (print-lines-exhausted (condition)
-                (write-string " ..." stream)
-                (dotimes (i (axis-number condition)) (write-char #\) stream))
-                (terpri stream)))))))))
+                            (loop :with dim := (array-dimension array depth)
+                                  :with print-length := (min dim *print-length*)
+                                  :with offset := (array-offset array depth)
+                                  :with stride := (array-stride array depth)
+                                    :initially (incf index offset)
+                                  :repeat print-length
+                                  :collect (data-as-lol (1+ depth)) :into data
+                                  :do (incf index stride)
+                                  :finally (decf index (+ offset (* stride print-length)))
+                                           (return (nconc data (if (< print-length dim) '("...")))))))))
+            (cond ((zerop rank)
+                   (format stream " ~A" (aref sv 0)))
+                  (t
+                   (dolist (item (data-as-lol))
+                     (format stream "~%  ~A" item))
+                   (pprint-indent :block -2 stream)
+                   (pprint-newline :mandatory stream)))))))))
 
 (defun print-array (array &optional array-element-print-format &key level length
                                                                  (stream nil streamp))
@@ -508,4 +436,4 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
       (is (>= 4 (count #\newline (len 1))))
       (is (= 5 (count #\newline (len 2))))
       (is (= 1 (count #\newline (level 0))))
-      (is (= 3 (count #\newline (level 1)))))))
+      (is (= 7 (count #\newline (level 1)))))))
