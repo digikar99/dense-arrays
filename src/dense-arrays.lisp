@@ -376,7 +376,8 @@ Also see:
                                    t)))))
           ;; print the array elements
           (labels ((data-as-lol (&optional (depth 0))
-                     ;; Get the relevant data from storage vector as a potentially nested list
+                     ;; Get the relevant data from storage vector as a
+                     ;; potentially nested list (list of lists)
                      (cond ((= depth rank)
                             (format nil fmt-control (aref sv index)))
                            ((and *print-level* (= depth *print-level*))
@@ -396,7 +397,8 @@ Also see:
                    (format stream " ~A" (aref sv 0)))
                   (t
                    (dolist (item (data-as-lol))
-                     (format stream "~%  ~A" item))
+                     (pprint-newline :mandatory stream)
+                     (format stream "~A" item))
                    (pprint-indent :block -2 stream)
                    (pprint-newline :mandatory stream)))))))))
 
