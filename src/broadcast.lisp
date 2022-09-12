@@ -93,17 +93,17 @@ Arrays with the following dimensions are not compatible:
 See https://numpy.org/doc/stable/user/basics.broadcasting.html for an elaborate discussion."
   (declare (dynamic-extent arrays)
            (optimize speed))
-  (let ((first-array  (first arrays))
-        (second-array (second arrays)))
-    (declare (type dense-array first-array second-array))
+  (macrolet ((tda (form)
+               `(the dense-array ,form)))
     (case (length arrays)
       (0 t)
-      (1 (values t (narray-dimensions first-array)))
-      (2 (%broadcast-compatible-p first-array second-array))
+      (1 (values t (narray-dimensions (tda (first arrays)))))
+      (2 (%broadcast-compatible-p (narray-dimensions (tda (first arrays)))
+                                  (narray-dimensions (tda (second arrays)))))
       (t (multiple-value-bind (compatible-p broadcast-dimensions)
              (%broadcast-compatible-p
-              (narray-dimensions first-array)
-              (narray-dimensions second-array))
+              (narray-dimensions (tda (first arrays)))
+              (narray-dimensions (tda (second arrays))))
            ;; Can this be simplified?
            (when compatible-p
              (multiple-value-bind (compatible-p-rest broadcast-dimensions-rest)
