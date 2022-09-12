@@ -78,7 +78,6 @@ for reference."))
                              ',name (class-of class))
                       (error "Illegal to call ~S on something that is not the name of a
 subclass of DENSE-ARRAY." ',name))))))
-  (def dense-array-constructor)
   (def storage-accessor)
   (def storage-allocator)
   (def storage-deallocator)
@@ -93,7 +92,9 @@ subclass of DENSE-ARRAY." ',name))))))
   ()
   (:metaclass standard-dense-array-class))
 
-(defvar *dense-array-class* (find-class 'standard-dense-array))
+(defvar *dense-array-class* (find-class 'standard-dense-array)
+  "Specifies the default value of CLASS in DENSE-ARRAYS:MAKE-ARRAY
+and other functions. (TODO: Specify these other functions.)")
 
 ;;; Some implementations like CCL do not have a #'(setf cl:aref)
 (declaim (inline cl-aref (setf cl-aref)))

@@ -19,12 +19,12 @@ The =dense-arrays::dense-array= object is essentially a wrapper around a 1-dimen
 
 #+BEGIN_SRC lisp
 DENSE-ARRAYS> (make-array '(2 3) :constructor #'+)
-#<STANDARD-DENSE-ARRAY 2x3 T
+#<STANDARD-DENSE-ARRAY 2x3 :ROW-MAJOR T
    (0 1 2)
    (1 2 3)
  {100330F653}>
 DENSE-ARRAYS> (describe *)
-#<STANDARD-DENSE-ARRAY 2x3 T  {100330F653}>
+#<STANDARD-DENSE-ARRAY 2x3 :ROW-MAJOR T {100330F653}>
   [standard-object]
 
 Slots with :INSTANCE allocation:
@@ -35,19 +35,22 @@ Slots with :INSTANCE allocation:
   TOTAL-SIZE                     = 6
   STRIDES                        = (3 1)
   OFFSETS                        = (0 0)
-  CONTIGUOUS-P                   = T
+  LAYOUT                         = :ROW-MAJOR
   ROOT-ARRAY                     = NIL
 ; No value
 DENSE-ARRAYS> (aref (make-array '(2 3) :constructor #'+) 1)
-#<STANDARD-DENSE-ARRAY (VIEW) 3 T
-   1 2 3
+#<STANDARD-DENSE-ARRAY NIL 3 T
+   1
+   2
+   3
  {10033B1543}>
 DENSE-ARRAYS> (aref (make-array '(2 3) :constructor #'+) nil 1)
-#<STANDARD-DENSE-ARRAY (VIEW) 2 T
-   1 2
+#<STANDARD-DENSE-ARRAY NIL 2 T
+   1
+   2
  {10033B23E3}>
 DENSE-ARRAYS> (describe *)
-#<STANDARD-DENSE-ARRAY (VIEW) 2 T  {10033B23E3}>
+#<STANDARD-DENSE-ARRAY NIL 2 T  {10033B23E3}>
   [standard-object]
 
 Slots with :INSTANCE allocation:

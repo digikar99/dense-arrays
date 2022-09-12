@@ -2,6 +2,84 @@
 
 [Last README update: 5th June 2022. To skip rant, click [here](#introduction).]
 
+<!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
+**Table of Contents**
+
+- [dense-arrays](#dense-arrays)
+    - [Rant](#rant)
+    - [Introduction](#introduction)
+        - [Included Systems](#included-systems)
+    - [Basic Demonstration](#basic-demonstration)
+    - [Usage](#usage)
+        - [Using Ultralisp](#using-ultralisp)
+        - [Without using Ultralisp](#without-using-ultralisp)
+    - [API Reference](#api-reference)
+        - [\*array-element-print-format\*](#array-element-print-format)
+        - [\*array-element-type\*](#array-element-type)
+        - [\*array-element-type-alist\*](#array-element-type-alist)
+        - [\*array-layout\*](#array-layout)
+        - [\*dense-array-class\*](#dense-array-class)
+        - [aref](#aref)
+            - [Polymorph: `((common-lisp:array common-lisp:array) &rest abstract-arrays::subscripts)`](#polymorph-common-lisparray-common-lisparray-rest-abstract-arrayssubscripts)
+            - [Polymorph: `((array dense-array) &rest subscripts)`](#polymorph-array-dense-array-rest-subscripts)
+        - [array](#array)
+        - [array-dimension](#array-dimension)
+        - [array-dimensions](#array-dimensions)
+            - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray)
+            - [Polymorph: `((common-lisp:array abstract-array))`](#polymorph-common-lisparray-abstract-array)
+        - [array-displaced-to](#array-displaced-to)
+        - [array-displacement](#array-displacement)
+        - [array-element-type](#array-element-type)
+            - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-1)
+            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array)
+        - [array-layout](#array-layout)
+        - [array-offset](#array-offset)
+        - [array-offsets](#array-offsets)
+        - [array-rank](#array-rank)
+            - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-2)
+            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array-1)
+        - [array-storage](#array-storage)
+            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array-2)
+            - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-3)
+        - [array-storage-allocator](#array-storage-allocator)
+        - [array-storage-deallocator](#array-storage-deallocator)
+        - [array-stride](#array-stride)
+        - [array-strides](#array-strides)
+        - [array-total-size](#array-total-size)
+            - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-4)
+            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array-3)
+        - [array=](#array)
+        - [arrayp](#arrayp)
+        - [broadcast-array](#broadcast-array)
+        - [broadcast-arrays](#broadcast-arrays)
+        - [broadcast-compatible-p](#broadcast-compatible-p)
+        - [copy-array](#copy-array)
+        - [copy-dense-array](#copy-dense-array)
+        - [define-array-class](#define-array-class)
+        - [dense-array-type-class](#dense-array-type-class)
+        - [do-arrays](#do-arrays)
+        - [make-array](#make-array)
+        - [narray-dimensions](#narray-dimensions)
+            - [Polymorph: `((common-lisp:array abstract-array))`](#polymorph-common-lisparray-abstract-array-1)
+        - [print-array](#print-array)
+        - [row-major-aref](#row-major-aref)
+            - [Polymorph: `((common-lisp:array common-lisp:array) (abstract-arrays::index t))`](#polymorph-common-lisparray-common-lisparray-abstract-arraysindex-t)
+            - [Polymorph: `((array dense-array) (index t))`](#polymorph-array-dense-array-index-t)
+        - [simple-array](#simple-array)
+        - [simple-unupgraded-array](#simple-unupgraded-array)
+        - [standard-dense-array](#standard-dense-array)
+        - [standard-dense-array-class](#standard-dense-array-class)
+        - [storage-accessor](#storage-accessor)
+        - [storage-allocator](#storage-allocator)
+        - [storage-deallocator](#storage-deallocator)
+        - [storage-element-type-upgrader](#storage-element-type-upgrader)
+        - [storage-type-inferrer-from-array-type](#storage-type-inferrer-from-array-type)
+        - [unupgraded-array](#unupgraded-array)
+        - [unupgraded-dense-array](#unupgraded-dense-array)
+
+<!-- markdown-toc end -->
+
+
 ## Rant
 
 Quick! Tell me the dimensions of
@@ -237,7 +315,7 @@ Minimalists would want to stick to the first four. The last one also introduces
 - and perhaps more things!
 
 
-# Basic Demonstration
+## Basic Demonstration
 
 ```lisp
 CL-USER> (uiop:define-package :dense-arrays-demo
@@ -379,7 +457,7 @@ DENSE-ARRAYS-DEMO> a
 
 Tests are also littered throughout out the system and may serve as examples, for instance [plus/py4cl2.lisp](plus/py4cl2.lisp).
 
-# Usage
+## Usage
 
 ### Using Ultralisp
 
@@ -401,3 +479,579 @@ and two, the version of trivial-types in quicklisp needs an update
 3. Optionally: `(asdf:test-system "dense-arrays")`- or dense-arrays-plus or dense-arrays-plus-lite
 
 Feel free to raise an issue!
+
+## API Reference
+
+### \*array-element-print-format\*
+
+```lisp
+Variable
+Default Value: "~/DENSE-ARRAYS::PRETTY-PRINT-NUMBER/"
+```
+
+The format control string used to print the elements of [dense-arrays:array](#array).
+
+It is possible to set this value to "~/USER-DEFINED-FUNCTION/" where
+USER-DEFINED-FUNCTION should accept at least four arguments.
+
+Also see:
+- https://en.wikipedia.org/wiki/Format_(Common_Lisp)
+- http://www.gigamonkeys.com/book/a-few-format-recipes.html
+
+### \*array-element-type\*
+
+```lisp
+Variable
+Default Unbound
+```
+
+If BOUND, this is the default value of the ELEMENT-TYPE or TYPE argument.
+Overrides [\*array-element-type-alist\*](#array-element-type-alist).
+Is overriden by explicitly passing an ELEMENT-TYPE or TYPE argument.
+
+### \*array-element-type-alist\*
+
+```lisp
+Variable
+Default Value: NIL
+```
+
+An ALIST mapping package to the default element-type used in that package.
+(Inspired from SWANK:*READTABLE-ALIST*)
+Overrides none.
+Is overriden by [\*array-element-type\*](#array-element-type) when bound, or by explicitly passing an
+  ELEMENT-TYPE or TYPE argument.
+
+### \*array-layout\*
+
+```lisp
+Variable
+Default Value: :ROW-MAJOR
+```
+
+Specifies the default layout constructed by [dense-arrays:make-array](#make-array) and
+constructor functions like ASARRAY, ZEROS, ONES, etc in the
+DENSE-ARRAYS-PLUS-LITE package.
+
+### \*dense-array-class\*
+
+```lisp
+Variable
+Default Value: #<DENSE-ARRAYS:STANDARD-DENSE-ARRAY-CLASS DENSE-ARRAYS:STANDARD-DENSE-ARRAY>
+```
+
+Specifies the default value of CLASS in [dense-arrays:make-array](#make-array)
+and other functions. (TODO: Specify these other functions.)
+
+### aref
+
+```lisp
+Polymorphic Function: (aref array &rest subscripts)
+```
+
+This is SETF-able.
+
+#### Polymorph: `((common-lisp:array common-lisp:array) &rest abstract-arrays::subscripts)`
+
+A wrapper around CL:AREF.
+
+Return the element of the `array` specified by the `subscripts`.
+
+#### Polymorph: `((array dense-array) &rest subscripts)`
+
+Accessor function for DENSE-ARRAYS::DENSE-ARRAY.
+The semantics are intended to be similar to numpy's indexing semantics.
+See https://numpy.org/doc/stable/user/basics.indexing.html
+
+Each element of `subscripts` can be
+- either an integer denoting the position within the axis which is to be indexed
+- or a list of the form (&OPTIONAL START &KEY END STEP) with each of START END
+  STEP being integers if supplied. START denotes the start position within the
+  axis, END denotes the ending position within the axis, STEP denotes at what
+  distance within the axis the next element should come after the previous,
+  starting from START
+
+Each of the `subscripts`, START, END, STEP can also be negative integers, in which
+case the last element along the axis is given the index -1, the second last is
+given the index -2 and so on. Thus, `(aref ... '(-1 :step -1))` can reverse a one
+dimensional array.
+
+Like, CL:AREF, returns the element corresponding to `subscripts`
+if all the subscripts are integers and there as many subscripts
+as the rank of the array.
+
+If the number (aka length) of `subscripts` were less than the array's rank, or
+if some of the `subscripts` were lists described above, then returns a VIEW
+of the arrays. A VIEW is a window into the original array and thus
+avoids copying the elements of the original array.
+
+Examples illustrating the numpy-equivalent indexes:
+
+    a[::]       (aref a nil)
+    a[::2]      (aref a '(0 :step 2))
+    a[3, ::-1]  (aref a 3 '(-1 :step -1))
+    a[3::, -1]  (aref a '(3) -1)
+
+The `subscripts` can also be integer or boolean arrays, denoting which elements
+to select from each of the axes. But in this case the corresponding elements
+of the array are copied over into a new array.
+
+### array
+
+```lisp
+Type: (ARRAY &OPTIONAL (ELEMENT-TYPE '*) (ABSTRACT-ARRAYS::DIM/RANK '*))
+```
+
+A wrapper around STANDARD-DENSE-ARRAY with support for specifying ELEMENT-TYPE and DIMENSIONS or RANK.
+These specializers are the same like the CL:ARRAY compound type.
+
+
+### array-dimension
+
+```lisp
+Function: (array-dimension array axis-number)
+```
+
+Return the length of dimension `axis-number` of `array`.
+
+### array-dimensions
+
+```lisp
+Polymorphic Function: (array-dimensions array)
+```
+
+#### Polymorph: `((common-lisp:array common-lisp:array))`
+
+No documentation found.
+
+#### Polymorph: `((common-lisp:array abstract-array))`
+
+Returns a COPY of the dimensions of `array`. The copy may then be modified.
+
+See [narray-dimensions](#narray-dimensions) or equivalent of a copy is to be avoided, and destructive
+use is not intended.
+
+### array-displaced-to
+
+```lisp
+Function: (array-displaced-to array)
+```
+
+### array-displacement
+
+```lisp
+Function: (array-displacement array)
+```
+
+Returns two values:
+- [array-storage](#array-storage)
+- and OFFSET along first axis
+Consequences are undefined if `array` is displaced along multiple axis.
+
+### array-element-type
+
+```lisp
+Polymorphic Function: (array-element-type array)
+```
+
+#### Polymorph: `((common-lisp:array common-lisp:array))`
+
+No documentation found.
+
+#### Polymorph: `((abstract-array abstract-array))`
+
+No documentation found.
+
+### array-layout
+
+```lisp
+Function: (array-layout array)
+```
+
+### array-offset
+
+```lisp
+Function: (array-offset array axis-number)
+```
+
+Return the length of offset corresponding to `axis-number` of `array`.
+
+### array-offsets
+
+```lisp
+Function: (array-offsets array)
+```
+
+### array-rank
+
+```lisp
+Polymorphic Function: (array-rank array)
+```
+
+#### Polymorph: `((common-lisp:array common-lisp:array))`
+
+No documentation found.
+
+#### Polymorph: `((abstract-array abstract-array))`
+
+No documentation found.
+
+### array-storage
+
+```lisp
+Polymorphic Function: (array-storage array)
+```
+
+#### Polymorph: `((abstract-array abstract-array))`
+
+No documentation found.
+
+#### Polymorph: `((common-lisp:array common-lisp:array))`
+
+No documentation found.
+
+### array-storage-allocator
+
+No documentation found for `array-storage-allocator`
+
+### array-storage-deallocator
+
+No documentation found for `array-storage-deallocator`
+
+### array-stride
+
+```lisp
+Function: (array-stride array axis-number)
+```
+
+Return the length of stride corresponding to `axis-number` of `array`.
+
+### array-strides
+
+```lisp
+Function: (array-strides array)
+```
+
+### array-total-size
+
+```lisp
+Polymorphic Function: (array-total-size array)
+```
+
+#### Polymorph: `((common-lisp:array common-lisp:array))`
+
+No documentation found.
+
+#### Polymorph: `((abstract-array abstract-array))`
+
+No documentation found.
+
+### array=
+
+```lisp
+Function: (array= array1 array2 &key (test (function equalp)))
+```
+
+Returns non-NIL if each element of `array1` is equal to each corresponding
+element of `array2` using `test`, which should be a two-argument function that takes
+the one element of the first array and the corresponding element of the second
+and tests for their equality.
+
+### arrayp
+
+```lisp
+Function: (arrayp object)
+```
+
+### broadcast-array
+
+```lisp
+Function: (broadcast-array array broadcast-dimensions)
+```
+
+### broadcast-arrays
+
+```lisp
+Function: (broadcast-arrays &rest arrays)
+```
+
+Returns two values. The first value is the list of broadcasted arrays
+  if the second value is non-NIL.
+
+### broadcast-compatible-p
+
+```lisp
+Function: (broadcast-compatible-p &rest arrays)
+```
+
+Returns two values:
+- The first value is a generalized boolean indicating whether the arrays can be broadcasted.
+- The second value is the dimension of the array resulting from the broadcast.
+
+The broadcasting semantics are equivalent to numpy semantics. Two arrays are broadcast
+compatible, if
+- they have the same dimensions, or
+- if, for the dimensions they differ, one of the dimension is of length 1, or
+- the dimensions of the lower-ranked array matches the rightmost dimensions
+  of the higher-ranked array
+
+Thus, arrays with the following dimensions are broadcast-compatible:
+- (3) (3)
+- (3 1) (3 3)
+- (3 3) (1 3)
+- (3 3) (3)
+
+Arrays with the following dimensions are not compatible:
+- (3 1) (3)
+
+See https://numpy.org/doc/stable/user/basics.broadcasting.html for an elaborate discussion.
+
+### copy-array
+
+```lisp
+Function: (copy-array array &key (layout (array-layout array)))
+```
+
+Returns a copy of `array`. Creates a completely new array even if `array`
+is a VIEW (see ARRAY-VIEW-P).
+
+### copy-dense-array
+
+No documentation found for `copy-dense-array`
+
+### define-array-class
+
+```lisp
+Macro: (define-array-class name &body (direct-slots &rest slot-options))
+```
+
+Defines `name` as a CLASS with DIRECT-SUPERCLASS ABSTRACT-ARRAY and metaclass
+as ABSTRACT-ARRAY-CLASS. Also defines the appropriate order using `direct-slots`.
+
+### dense-array-type-class
+
+```lisp
+Function: (dense-array-type-class array-type &optional env)
+```
+
+### do-arrays
+
+```lisp
+Macro: (do-arrays rank/bindings &body body)
+```
+
+  Traverses the arrays in row-major order.
+
+  If the first argument `rank/bindings` is of type SIZE, it'd be treated as the rank
+  of the arrays. Then, the BINDINGS are assumed to be the first element of the `body`.
+
+  Otherwise, the first argument is treated as if they are BINDINGS.
+  Each BINDING is of the form
+    (ELT-VAR [array](#array) &OPTIONAL (ELEMENT-TYPE *) &KEY (CLASS-NAME [\*dense-array-class\*](#dense-array-class)))
+  Here, only [array](#array) is evaluated.
+
+Examples
+
+    (let ((a (make-array '(2 3)))
+          (b (make-array '(2 3))))
+      (do-arrays ((c a t)
+                  (d b t))
+        (print (list c d))))
+
+    (let ((a (make-array '(2 3)))
+          (b (make-array '(2 3))))
+      (do-arrays 2 ((c a t) ; The 2 indicates the rank of the arrays
+                    (d b t))
+        (print (list c d))))
+
+Either of the two cases might be faster depending on the number of dimensions.
+
+### make-array
+
+```lisp
+Function: (make-array dimensions &rest args &key
+           (element-type default-element-type)
+           (initial-element NIL initial-element-p)
+           (initial-contents NIL initial-contents-p)
+           (constructor NIL constructor-p) (strides NIL strides-p)
+           (adjustable NIL adjustable-p) (fill-pointer NIL fill-pointer-p)
+           (class *dense-array-class*) (layout *array-layout*)
+           (displaced-to NIL displaced-to-p) (offsets NIL offsets-p)
+           (displaced-index-offset 0 displaced-index-offset-p))
+```
+
+Like CL:MAKE-ARRAY but returns a DENSE-ARRAYS::DENSE-ARRAY instead of [cl:array](#array).
+Additionally takes
+
+- `layout` argument which can be one of (:ROW-MAJOR :COLUMN-MAJOR NIL)
+- `class` argument which should be a class designator denoting the class to which the
+  constructed dense array will belong to
+
+- `constructor` if supplied should be a function that takes as many arguments
+  as the number of dimensions aka rank of the array, and return the element that
+  should correspond to the position indicated by the arguments of the function.
+  For example:
+
+    (make-array '(2 3) :constructor (lambda (&rest indexes) (cons 'indexes indexes)))
+    ;=> #<[standard-dense-array](#standard-dense-array) :ROW-MAJOR 2x3 T
+          ((INDEXES 0 0) (INDEXES 0 1) (INDEXES 0 2))
+          ((INDEXES 1 0) (INDEXES 1 1) (INDEXES 1 2))
+         {10194A2FE3}>
+    
+
+### narray-dimensions
+
+```lisp
+Polymorphic Function: (narray-dimensions array)
+```
+
+#### Polymorph: `((common-lisp:array abstract-array))`
+
+Returns the dimensions of the `array`. The consequences are undefined if the
+returned dimensions are modified. Use [array-dimensions](#array-dimensions) if destructive usage is
+intended.
+
+### print-array
+
+```lisp
+Function: (print-array array &optional array-element-print-format &key level
+           length (stream NIL streamp))
+```
+
+Prints `array` as if by CL:PRINT.
+Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html.
+
+### row-major-aref
+
+```lisp
+Polymorphic Function: (row-major-aref array index)
+```
+
+Return the element of `array` corresponding to the row-major `index`.
+This is SETFable
+
+#### Polymorph: `((common-lisp:array common-lisp:array) (abstract-arrays::index t))`
+
+No documentation found.
+
+#### Polymorph: `((array dense-array) (index t))`
+
+No documentation found.
+
+### simple-array
+
+```lisp
+Type: (SIMPLE-ARRAY &OPTIONAL (ELEMENT-TYPE '*) (ABSTRACT-ARRAYS::DIM/RANK '*))
+```
+
+A wrapper around (AND STANDARD-DENSE-ARRAY SIMPLE-DENSE-ARRAY) with support for specifying ELEMENT-TYPE and DIMENSIONS or RANK.
+These specializers are the same like the CL:ARRAY compound type.
+
+
+### simple-unupgraded-array
+
+```lisp
+Type: (SIMPLE-UNUPGRADED-ARRAY &OPTIONAL (ELEMENT-TYPE '*)
+       (ABSTRACT-ARRAYS::DIM/RANK '*))
+```
+
+A wrapper around (AND UNUPGRADED-DENSE-ARRAY SIMPLE-DENSE-ARRAY) with support for specifying ELEMENT-TYPE and DIMENSIONS or RANK.
+These specializers are the same like the CL:ARRAY compound type.
+
+
+### standard-dense-array
+
+```lisp
+Type: STANDARD-DENSE-ARRAY
+```
+
+
+### standard-dense-array-class
+
+```lisp
+Type: STANDARD-DENSE-ARRAY-CLASS
+```
+
+
+### storage-accessor
+
+```lisp
+Generic Function: (storage-accessor class)
+```
+
+Returns a SYMBOL that is fbound to an accessor function that takes
+ (STORAGE INDEX) as arguments and returns the element at INDEX in STORAGE.
+The function is an accessor function in the sense that SYMBOL should also be
+associated with (SETF SYMBOL) function that takes (NEW-VALUE STORAGE INDEX) as
+arguments and sets the STORAGE element at INDEX to NEW-VALUE.
+  This function is primarily used inside [aref](#aref), [row-major-aref](#row-major-aref) and [do-arrays](#do-arrays),
+and their SETF counterparts.
+  See src/protocol.lisp and plus/cl-cuda.lisp for reference.
+
+### storage-allocator
+
+```lisp
+Generic Function: (storage-allocator class)
+```
+
+Returns a symbol fbound to a function with signature
+  (SIZE &KEY ELEMENT-TYPE INITIAL-ELEMENT)
+that allocates a VECTOR of length SIZE of ELEMENT-TYPE with each element as
+INITIAL-ELEMENT for use as a STORAGE-VECTOR for the ABSTRACT-ARRAY.
+
+### storage-deallocator
+
+```lisp
+Generic Function: (storage-deallocator class)
+```
+
+Returns either NIL or a symbol fbound to a function to be called
+to delete the STORAGE when the ABSTRACT-ARRAY goes out of scope. This function should
+take only the STORAGE object as its argument.
+  Internally, this function plays a role in the finalizer of the garbage collection
+using TRIVIAL-GARBAGE.
+  See plus/static-vectors.lisp and the [dense-arrays:make-array](#make-array) function for reference.
+
+### storage-element-type-upgrader
+
+```lisp
+Generic Function: (storage-element-type-upgrader class)
+```
+
+Equivalent to the CL:UPGRADED-ARRAY-ELEMENT-TYPE, this returns a function
+that takes a single argument element-type as input and returns the upgraded
+array element type for the array class given by `class` used for STORAGE.
+The upgraded array element type is then stored in the dense-array object and
+used for other tasks downstream.
+  See plus/cl-cuda.lisp and the [dense-arrays:make-array](#make-array) function for reference.
+
+### storage-type-inferrer-from-array-type
+
+```lisp
+Generic Function: (storage-type-inferrer-from-array-type class)
+```
+
+This should return a function that takes as input the ARRAY-TYPE and returns
+the possibly specialized type of storage that the corresponding array object
+will have. This is primarily used for optimization purposes inside [dense-arrays:do-arrays](#do-arrays)
+and the compiler macros of [dense-arrays:aref](#aref) [dense-arrays:row-major-aref](#row-major-aref) and SETF
+counterparts.
+  See src/protocol.lisp, plus/cl-cuda.lisp, src/do-arrays.lisp and optim/aref.lisp
+for reference.
+
+### unupgraded-array
+
+```lisp
+Type: (UNUPGRADED-ARRAY &OPTIONAL (ELEMENT-TYPE '*)
+       (ABSTRACT-ARRAYS::DIM/RANK '*))
+```
+
+A wrapper around UNUPGRADED-DENSE-ARRAY with support for specifying ELEMENT-TYPE and DIMENSIONS or RANK.
+These specializers are the same like the CL:ARRAY compound type.
+
+
+### unupgraded-dense-array
+
+```lisp
+Type: UNUPGRADED-DENSE-ARRAY
+```

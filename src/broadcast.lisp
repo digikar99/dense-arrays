@@ -71,26 +71,46 @@
 
 (defun broadcast-compatible-p (&rest arrays)
   "Returns two values:
-  The first value is a generalized boolean indicating whether the arrays can be broadcasted.
-  The second value is the dimension of the array resulting from the broadcast."
+- The first value is a generalized boolean indicating whether the arrays can be broadcasted.
+- The second value is the dimension of the array resulting from the broadcast.
+
+The broadcasting semantics are equivalent to numpy semantics. Two arrays are broadcast
+compatible, if
+- they have the same dimensions, or
+- if, for the dimensions they differ, one of the dimension is of length 1, or
+- the dimensions of the lower-ranked array matches the rightmost dimensions
+  of the higher-ranked array
+
+Thus, arrays with the following dimensions are broadcast-compatible:
+- (3) (3)
+- (3 1) (3 3)
+- (3 3) (1 3)
+- (3 3) (3)
+
+Arrays with the following dimensions are not compatible:
+- (3 1) (3)
+
+See https://numpy.org/doc/stable/user/basics.broadcasting.html for an elaborate discussion."
   (declare (dynamic-extent arrays)
            (optimize speed))
-  (case (length arrays)
-    (0 t)
-    (1 (values t (narray-dimensions (first arrays))))
-    (2 (%broadcast-compatible-p (narray-dimensions (first arrays))
-                                (narray-dimensions (second arrays))))
-    (t (multiple-value-bind (compatible-p broadcast-dimensions)
-           (%broadcast-compatible-p
-            (narray-dimensions (first arrays))
-            (narray-dimensions (second arrays)))
-         ;; Can this be simplified?
-         (when compatible-p
-           (multiple-value-bind (compatible-p-rest broadcast-dimensions-rest)
-               (apply 'broadcast-compatible-p (cddr arrays))
-             (when compatible-p-rest
-               (%broadcast-compatible-p broadcast-dimensions
-                                        broadcast-dimensions-rest))))))))
+  (let ((first-array  (first arrays))
+        (second-array (second arrays)))
+    (declare (type dense-array first-array second-array))
+    (case (length arrays)
+      (0 t)
+      (1 (values t (narray-dimensions first-array)))
+      (2 (%broadcast-compatible-p first-array second-array))
+      (t (multiple-value-bind (compatible-p broadcast-dimensions)
+             (%broadcast-compatible-p
+              (narray-dimensions first-array)
+              (narray-dimensions second-array))
+           ;; Can this be simplified?
+           (when compatible-p
+             (multiple-value-bind (compatible-p-rest broadcast-dimensions-rest)
+                 (apply 'broadcast-compatible-p (cddr arrays))
+               (when compatible-p-rest
+                 (%broadcast-compatible-p broadcast-dimensions
+                                          broadcast-dimensions-rest)))))))))
 
 (defun broadcast-arrays (&rest arrays)
   "Returns two values. The first value is the list of broadcasted arrays

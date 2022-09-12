@@ -2,6 +2,10 @@
 (in-package :dense-arrays)
 
 (defun array= (array1 array2 &key (test #'equalp))
+  "Returns non-NIL if each element of ARRAY1 is equal to each corresponding
+element of ARRAY2 using TEST, which should be a two-argument function that takes
+the one element of the first array and the corresponding element of the second
+and tests for their equality."
   (and (equalp (narray-dimensions array1)
                (narray-dimensions array2))
        (loop :for i :below (array-total-size array1)
@@ -18,7 +22,7 @@
                 index)))
 
 (defun %aref-view (array &rest subscripts)
-  "Returns a VIEW of the subscripted ARRAY (no copy)"
+  "Returns a VIEW of the subscripted ARRAY (without copying the contents)"
   (declare (optimize speed)
            (dynamic-extent subscripts)
            (type dense-array array))
@@ -127,6 +131,42 @@
      (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
 
 (defpolymorph (aref :inline t) ((array dense-array) &rest subscripts) t
+  "Accessor function for DENSE-ARRAYS::DENSE-ARRAY.
+The semantics are intended to be similar to numpy's indexing semantics.
+See https://numpy.org/doc/stable/user/basics.indexing.html
+
+Each element of SUBSCRIPTS can be
+- either an integer denoting the position within the axis which is to be indexed
+- or a list of the form (&OPTIONAL START &KEY END STEP) with each of START END
+  STEP being integers if supplied. START denotes the start position within the
+  axis, END denotes the ending position within the axis, STEP denotes at what
+  distance within the axis the next element should come after the previous,
+  starting from START
+
+Each of the SUBSCRIPTS, START, END, STEP can also be negative integers, in which
+case the last element along the axis is given the index -1, the second last is
+given the index -2 and so on. Thus, `(aref ... '(-1 :step -1))` can reverse a one
+dimensional array.
+
+Like, CL:AREF, returns the element corresponding to SUBSCRIPTS
+if all the subscripts are integers and there as many subscripts
+as the rank of the array.
+
+If the number (aka length) of SUBSCRIPTS were less than the array's rank, or
+if some of the SUBSCRIPTS were lists described above, then returns a VIEW
+of the arrays. A VIEW is a window into the original array and thus
+avoids copying the elements of the original array.
+
+Examples illustrating the numpy-equivalent indexes:
+
+    a[::]       (aref a nil)
+    a[::2]      (aref a '(0 :step 2))
+    a[3, ::-1]  (aref a 3 '(-1 :step -1))
+    a[3::, -1]  (aref a '(3) -1)
+
+The SUBSCRIPTS can also be integer or boolean arrays, denoting which elements
+to select from each of the axes. But in this case the corresponding elements
+of the array are copied over into a new array."
   (declare ;; (optimize speed)
            (type dense-array array)
            (dynamic-extent subscripts))
@@ -182,7 +222,7 @@
              (iter (for subscript in subscripts)
                (if (typep subscript (typexpand '(%dense-array bit)))
                    (appending (nonzero subscript))
-                   (collect   subscript))))    
+                   (collect   subscript))))
     (cond
       ((= (length subscripts) (array-rank array))
        (let ((rank   (array-rank        new-array))

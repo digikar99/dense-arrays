@@ -1,5 +1,6 @@
 #.(cl:let ((abstract-array-symbols '("ARRAYP"
                                      "ARRAY-DIMENSIONS"
+                                     "NARRAY-DIMENSIONS"
                                      "ARRAY-DIMENSION"
                                      "ARRAY-ELEMENT-TYPE"
                                      "ARRAY-TOTAL-SIZE"
@@ -25,7 +26,6 @@
                              "ARRAY-OFFSETS"
                              "ARRAY-STRIDE"
                              "ARRAY-STRIDES"
-                             "NARRAY-DIMENSIONS"
                              "ARRAY="
                              "MAKE-ARRAY"
                              "*ARRAY-ELEMENT-TYPE*"
@@ -76,7 +76,10 @@
 (in-package :dense-arrays)
 
 (defvar *array-element-type*)
-(defvar *array-layout* :row-major)
+(defvar *array-layout* :row-major
+  "Specifies the default layout constructed by DENSE-ARRAYS:MAKE-ARRAY and
+constructor functions like ASARRAY, ZEROS, ONES, etc in the
+DENSE-ARRAYS-PLUS-LITE package.")
 
 (setf (documentation '*array-element-type* 'variable)
       "If BOUND, this is the default value of the ELEMENT-TYPE or TYPE argument.

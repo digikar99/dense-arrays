@@ -60,6 +60,24 @@
                      (displaced-to nil displaced-to-p)
                      (offsets nil offsets-p)
                      (displaced-index-offset 0 displaced-index-offset-p))
+  "Like CL:MAKE-ARRAY but returns a DENSE-ARRAYS::DENSE-ARRAY instead of CL:ARRAY.
+Additionally takes
+
+- LAYOUT argument which can be one of (:ROW-MAJOR :COLUMN-MAJOR NIL)
+- CLASS argument which should be a class designator denoting the class to which the
+  constructed dense array will belong to
+
+- CONSTRUCTOR if supplied should be a function that takes as many arguments
+  as the number of dimensions aka rank of the array, and return the element that
+  should correspond to the position indicated by the arguments of the function.
+  For example:
+
+    (make-array '(2 3) :constructor (lambda (&rest indexes) (cons 'indexes indexes)))
+    ;=> #<STANDARD-DENSE-ARRAY :ROW-MAJOR 2x3 T
+          ((INDEXES 0 0) (INDEXES 0 1) (INDEXES 0 2))
+          ((INDEXES 1 0) (INDEXES 1 1) (INDEXES 1 2))
+         {10194A2FE3}>
+    "
   ;; TODO: Handle adjustable
   ;; TODO: Handle fill-pointer
   ;; TODO: Sanitize displaced-to and perhaps, displaced-index-offset
@@ -235,12 +253,6 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
   (declare (type dense-array array))
   (values (array-storage array)
           (first (array-offsets array))))
-
-(declaim (inline narray-dimensions))
-(defun narray-dimensions (array)
-  "Returns the dimensions-list of the ARRAY. The list is not expected to be modified."
-  (declare (type dense-array array))
-  (abstract-array-dimensions array))
 
 (declaim (inline array-dimension))
 (defun array-dimension (array axis-number)
