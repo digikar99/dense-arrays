@@ -20,6 +20,12 @@
                              "STANDARD-DENSE-ARRAY-CLASS"
                              "*DENSE-ARRAY-CLASS*"
 
+                             "STORAGE-ACCESSOR"
+                             "STORAGE-ALLOCATOR"
+                             "STORAGE-DEALLOCATOR"
+                             "STORAGE-ELEMENT-TYPE-UPGRADER"
+                             "STORAGE-TYPE-INFERRER-FROM-ARRAY-TYPE"
+
                              "ARRAY-DISPLACEMENT"
                              "ARRAY-DISPLACED-TO"
                              "ARRAY-OFFSET"
