@@ -149,19 +149,22 @@ Additionally takes
       (trivial-garbage:finalize dense-array
                                 (lambda () (funcall storage-deallocator storage))))
     (cond (constructor-p
-           (let ((row-major-index 0))
-             (declare (type size row-major-index))
+           (let ((row-major-index 0)
+                 (storage-accessor-function (fdefinition `(setf ,storage-accessor)))
+                 (constructor (ensure-function constructor)))
+             (declare (type size row-major-index)
+                      (type cl:function storage-accessor-function constructor))
              ;; To avoid repeated de-allocation of subscripts, we do this convoluted work
              ;; Uncomment the 'print' to see what is happening
              (labels ((construct (r &optional (stride (first strides))
                                   &rest subscripts)
-                        (declare (optimize debug)
+                        (declare (optimize speed)
                                  (type int-index r stride)
                                  (ignorable stride))
                         ;; (print r)
                         ;; (princ (list row-major-index :stride stride subscripts))
                         (if (< r 0)
-                            (funcall (fdefinition `(setf ,storage-accessor))
+                            (funcall storage-accessor-function
                                      (assert-type (apply constructor subscripts)
                                                   element-type)
                                      storage row-major-index)
@@ -179,7 +182,8 @@ Additionally takes
                                                               (the size (nth r strides)))))))))
                (construct (1- rank)))))
           (initial-contents-p
-           (let ((row-major-index 0))
+           (let ((row-major-index 0)
+                 (storage-accessor-function (fdefinition `(setf ,storage-accessor))))
              (declare (type (signed-byte 31) row-major-index)
                       (optimize (speed 1)))
              (labels ((set-displaced-to (elt axis)
@@ -191,7 +195,7 @@ Additionally takes
                                  :finally (decf row-major-index (* (nth axis dimensions)
                                                                    (nth axis strides)))))
                           (string
-                           (funcall (fdefinition `(setf ,storage-accessor))
+                           (funcall storage-accessor-function
                                     (assert-type elt element-type)
                                     storage row-major-index))
                           (cl:vector
@@ -201,7 +205,7 @@ Additionally takes
                                  :finally (decf row-major-index (* (nth axis dimensions)
                                                                    (nth axis strides)))))
                           (t
-                           (funcall (fdefinition `(setf ,storage-accessor))
+                           (funcall storage-accessor-function
                                     (assert-type elt element-type)
                                     storage row-major-index)))))
                (set-displaced-to initial-contents 0)))))
