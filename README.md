@@ -13,7 +13,7 @@
     - [Usage](#usage)
         - [Using Ultralisp](#using-ultralisp)
         - [Without using Ultralisp](#without-using-ultralisp)
-    - [API Reference](#api-reference)
+    - [API Reference: dense-arrays-plus-lite](#api-reference-dense-arrays-plus-lite)
         - [\*array-element-print-format\*](#array-element-print-format)
         - [\*array-element-type\*](#array-element-type)
         - [\*array-element-type-alist\*](#array-element-type-alist)
@@ -21,25 +21,25 @@
         - [\*dense-array-class\*](#dense-array-class)
         - [aref](#aref)
             - [Polymorph: `((common-lisp:array common-lisp:array) &rest abstract-arrays::subscripts)`](#polymorph-common-lisparray-common-lisparray-rest-abstract-arrayssubscripts)
-            - [Polymorph: `((array dense-array) &rest subscripts)`](#polymorph-array-dense-array-rest-subscripts)
+            - [Polymorph: `((array dense-array) &rest dense-arrays::subscripts)`](#polymorph-array-dense-array-rest-dense-arrayssubscripts)
         - [array](#array)
         - [array-dimension](#array-dimension)
         - [array-dimensions](#array-dimensions)
             - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray)
-            - [Polymorph: `((common-lisp:array abstract-array))`](#polymorph-common-lisparray-abstract-array)
+            - [Polymorph: `((common-lisp:array abstract-arrays:abstract-array))`](#polymorph-common-lisparray-abstract-arraysabstract-array)
         - [array-displaced-to](#array-displaced-to)
         - [array-displacement](#array-displacement)
         - [array-element-type](#array-element-type)
             - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-1)
-            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array)
+            - [Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`](#polymorph-abstract-arraysabstract-array-abstract-arraysabstract-array)
         - [array-layout](#array-layout)
         - [array-offset](#array-offset)
         - [array-offsets](#array-offsets)
         - [array-rank](#array-rank)
             - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-2)
-            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array-1)
+            - [Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`](#polymorph-abstract-arraysabstract-array-abstract-arraysabstract-array-1)
         - [array-storage](#array-storage)
-            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array-2)
+            - [Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`](#polymorph-abstract-arraysabstract-array-abstract-arraysabstract-array-2)
             - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-3)
         - [array-storage-allocator](#array-storage-allocator)
         - [array-storage-deallocator](#array-storage-deallocator)
@@ -47,9 +47,11 @@
         - [array-strides](#array-strides)
         - [array-total-size](#array-total-size)
             - [Polymorph: `((common-lisp:array common-lisp:array))`](#polymorph-common-lisparray-common-lisparray-4)
-            - [Polymorph: `((abstract-array abstract-array))`](#polymorph-abstract-array-abstract-array-3)
+            - [Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`](#polymorph-abstract-arraysabstract-array-abstract-arraysabstract-array-3)
         - [array=](#array)
         - [arrayp](#arrayp)
+        - [as-cl-array](#as-cl-array)
+        - [asarray](#asarray)
         - [broadcast-array](#broadcast-array)
         - [broadcast-arrays](#broadcast-arrays)
         - [broadcast-compatible-p](#broadcast-compatible-p)
@@ -58,13 +60,22 @@
         - [define-array-class](#define-array-class)
         - [dense-array-type-class](#dense-array-type-class)
         - [do-arrays](#do-arrays)
+        - [eye](#eye)
+        - [full](#full)
+        - [full-like](#full-like)
+        - [macro-map-array](#macro-map-array)
         - [make-array](#make-array)
         - [narray-dimensions](#narray-dimensions)
-            - [Polymorph: `((common-lisp:array abstract-array))`](#polymorph-common-lisparray-abstract-array-1)
+            - [Polymorph: `((common-lisp:array abstract-arrays:abstract-array))`](#polymorph-common-lisparray-abstract-arraysabstract-array-1)
+        - [ones](#ones)
+        - [ones-like](#ones-like)
         - [print-array](#print-array)
+        - [rand](#rand)
+        - [rand-like](#rand-like)
+        - [reshape](#reshape)
         - [row-major-aref](#row-major-aref)
             - [Polymorph: `((common-lisp:array common-lisp:array) (abstract-arrays::index t))`](#polymorph-common-lisparray-common-lisparray-abstract-arraysindex-t)
-            - [Polymorph: `((array dense-array) (index t))`](#polymorph-array-dense-array-index-t)
+            - [Polymorph: `((array dense-array) (dense-arrays::index t))`](#polymorph-array-dense-array-dense-arraysindex-t)
         - [simple-array](#simple-array)
         - [simple-unupgraded-array](#simple-unupgraded-array)
         - [standard-dense-array](#standard-dense-array)
@@ -74,8 +85,11 @@
         - [storage-deallocator](#storage-deallocator)
         - [storage-element-type-upgrader](#storage-element-type-upgrader)
         - [storage-type-inferrer-from-array-type](#storage-type-inferrer-from-array-type)
+        - [transpose](#transpose)
         - [unupgraded-array](#unupgraded-array)
         - [unupgraded-dense-array](#unupgraded-dense-array)
+        - [zeros](#zeros)
+        - [zeros-like](#zeros-like)
 
 <!-- markdown-toc end -->
 
@@ -480,7 +494,7 @@ and two, the version of trivial-types in quicklisp needs an update
 
 Feel free to raise an issue!
 
-## API Reference
+## API Reference: dense-arrays-plus-lite
 
 ### \*array-element-print-format\*
 
@@ -513,7 +527,7 @@ Is overriden by explicitly passing an ELEMENT-TYPE or TYPE argument.
 
 ```lisp
 Variable
-Default Value: NIL
+Default Value: ((#<PACKAGE "DENSE-NUMERICALS.IMPL"> . SINGLE-FLOAT))
 ```
 
 An ALIST mapping package to the default element-type used in that package.
@@ -530,7 +544,7 @@ Default Value: :ROW-MAJOR
 ```
 
 Specifies the default layout constructed by [dense-arrays:make-array](#make-array) and
-constructor functions like ASARRAY, ZEROS, ONES, etc in the
+constructor functions like [asarray](#asarray), [zeros](#zeros), [ones](#ones), etc in the
 DENSE-ARRAYS-PLUS-LITE package.
 
 ### \*dense-array-class\*
@@ -557,7 +571,7 @@ A wrapper around CL:AREF.
 
 Return the element of the `array` specified by the `subscripts`.
 
-#### Polymorph: `((array dense-array) &rest subscripts)`
+#### Polymorph: `((array dense-array) &rest dense-arrays::subscripts)`
 
 Accessor function for DENSE-ARRAYS::DENSE-ARRAY.
 The semantics are intended to be similar to numpy's indexing semantics.
@@ -599,7 +613,8 @@ of the array are copied over into a new array.
 ### array
 
 ```lisp
-Type: (ARRAY &OPTIONAL (ELEMENT-TYPE '*) (ABSTRACT-ARRAYS::DIM/RANK '*))
+Type: (ARRAY &OPTIONAL (ABSTRACT-ARRAYS::ELEMENT-TYPE '*)
+       (ABSTRACT-ARRAYS::DIM/RANK '*))
 ```
 
 A wrapper around STANDARD-DENSE-ARRAY with support for specifying ELEMENT-TYPE and DIMENSIONS or RANK.
@@ -624,7 +639,7 @@ Polymorphic Function: (array-dimensions array)
 
 No documentation found.
 
-#### Polymorph: `((common-lisp:array abstract-array))`
+#### Polymorph: `((common-lisp:array abstract-arrays:abstract-array))`
 
 Returns a COPY of the dimensions of `array`. The copy may then be modified.
 
@@ -658,7 +673,7 @@ Polymorphic Function: (array-element-type array)
 
 No documentation found.
 
-#### Polymorph: `((abstract-array abstract-array))`
+#### Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`
 
 No documentation found.
 
@@ -692,7 +707,7 @@ Polymorphic Function: (array-rank array)
 
 No documentation found.
 
-#### Polymorph: `((abstract-array abstract-array))`
+#### Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`
 
 No documentation found.
 
@@ -702,7 +717,7 @@ No documentation found.
 Polymorphic Function: (array-storage array)
 ```
 
-#### Polymorph: `((abstract-array abstract-array))`
+#### Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`
 
 No documentation found.
 
@@ -742,7 +757,7 @@ Polymorphic Function: (array-total-size array)
 
 No documentation found.
 
-#### Polymorph: `((abstract-array abstract-array))`
+#### Polymorph: `((abstract-arrays:abstract-array abstract-arrays:abstract-array))`
 
 No documentation found.
 
@@ -762,6 +777,21 @@ and tests for their equality.
 ```lisp
 Function: (arrayp object)
 ```
+
+### as-cl-array
+
+```lisp
+Function: (as-cl-array array)
+```
+
+### asarray
+
+```lisp
+Function: (asarray array-like &key (out NIL outp) (type default-element-type)
+           (layout *array-layout*))
+```
+
+`type` can also be :AUTO
 
 ### broadcast-array
 
@@ -866,6 +896,33 @@ Examples
 
 Either of the two cases might be faster depending on the number of dimensions.
 
+### eye
+
+```lisp
+Function: (eye per-axis-size &key (rank 2) (type default-element-type))
+```
+
+### full
+
+```lisp
+Function: (full &rest args)
+```
+
+LAMBDA-LIST: (SHAPE &KEY (TYPE DEFAULT-ELEMENT-TYPE) (LAYOUT [\*array-layout\*](#array-layout))
+              VALUE)
+
+### full-like
+
+```lisp
+Function: (full-like array-like value)
+```
+
+### macro-map-array
+
+```lisp
+Macro: (macro-map-array result-array function &rest arrays)
+```
+
 ### make-array
 
 ```lisp
@@ -905,11 +962,25 @@ Additionally takes
 Polymorphic Function: (narray-dimensions array)
 ```
 
-#### Polymorph: `((common-lisp:array abstract-array))`
+#### Polymorph: `((common-lisp:array abstract-arrays:abstract-array))`
 
 Returns the dimensions of the `array`. The consequences are undefined if the
-returned dimensions are modified. Use [array-dimensions](#array-dimensions) if destructive usage is
-intended.
+returned dimensions are modified. Use [array-dimensions](#array-dimensions) if destructive usage of
+the returned list is intended.
+
+### ones
+
+```lisp
+Function: (ones &rest args)
+```
+
+LAMBDA-LIST: (SHAPE &KEY (TYPE DEFAULT-ELEMENT-TYPE) (LAYOUT [\*array-layout\*](#array-layout)))
+
+### ones-like
+
+```lisp
+Function: (ones-like array-like)
+```
 
 ### print-array
 
@@ -920,6 +991,36 @@ Function: (print-array array &optional array-element-print-format &key level
 
 Prints `array` as if by CL:PRINT.
 Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html.
+
+### rand
+
+```lisp
+Function: (rand &rest args)
+```
+
+LAMBDA-LIST: (SHAPE &KEY (TYPE DEFAULT-ELEMENT-TYPE) (LAYOUT [\*array-layout\*](#array-layout))
+              (MIN (COERCE 0 TYPE)) (MAX (COERCE 1 TYPE)))
+
+### rand-like
+
+```lisp
+Function: (rand-like array-like)
+```
+
+### reshape
+
+```lisp
+Function: (reshape array-like new-shape &key (view NIL viewp)
+           (layout NIL layoutp))
+```
+
+`view` argument is considered only if `array-like` is a SIMPLE-DENSE-ARRAY.
+If `array-like` is a SIMPLE-DENSE-ARRAY, it is guaranteed that when `view` is supplied,
+- :VIEW non-NIL means that no copy of `array-like` is created
+- :VIEW NIL a copy of the array *will be* created
+What is not guaranteed: if `array-like` is not a SIMPLE-DENSE-ARRAY,
+then a new array is created. In the future, an attempt may be made to avoid
+creating the new array and instead return a view instead. 
 
 ### row-major-aref
 
@@ -934,14 +1035,15 @@ This is SETFable
 
 No documentation found.
 
-#### Polymorph: `((array dense-array) (index t))`
+#### Polymorph: `((array dense-array) (dense-arrays::index t))`
 
 No documentation found.
 
 ### simple-array
 
 ```lisp
-Type: (SIMPLE-ARRAY &OPTIONAL (ELEMENT-TYPE '*) (ABSTRACT-ARRAYS::DIM/RANK '*))
+Type: (SIMPLE-ARRAY &OPTIONAL (ABSTRACT-ARRAYS::ELEMENT-TYPE '*)
+       (ABSTRACT-ARRAYS::DIM/RANK '*))
 ```
 
 A wrapper around (AND STANDARD-DENSE-ARRAY SIMPLE-DENSE-ARRAY) with support for specifying ELEMENT-TYPE and DIMENSIONS or RANK.
@@ -951,7 +1053,7 @@ These specializers are the same like the CL:ARRAY compound type.
 ### simple-unupgraded-array
 
 ```lisp
-Type: (SIMPLE-UNUPGRADED-ARRAY &OPTIONAL (ELEMENT-TYPE '*)
+Type: (SIMPLE-UNUPGRADED-ARRAY &OPTIONAL (ABSTRACT-ARRAYS::ELEMENT-TYPE '*)
        (ABSTRACT-ARRAYS::DIM/RANK '*))
 ```
 
@@ -1039,10 +1141,16 @@ counterparts.
   See src/protocol.lisp, plus/cl-cuda.lisp, src/do-arrays.lisp and optim/aref.lisp
 for reference.
 
+### transpose
+
+```lisp
+Function: (transpose array-like &key axes)
+```
+
 ### unupgraded-array
 
 ```lisp
-Type: (UNUPGRADED-ARRAY &OPTIONAL (ELEMENT-TYPE '*)
+Type: (UNUPGRADED-ARRAY &OPTIONAL (ABSTRACT-ARRAYS::ELEMENT-TYPE '*)
        (ABSTRACT-ARRAYS::DIM/RANK '*))
 ```
 
@@ -1054,4 +1162,19 @@ These specializers are the same like the CL:ARRAY compound type.
 
 ```lisp
 Type: UNUPGRADED-DENSE-ARRAY
+```
+
+
+### zeros
+
+```lisp
+Function: (zeros &rest args)
+```
+
+LAMBDA-LIST: (SHAPE &KEY (TYPE DEFAULT-ELEMENT-TYPE) (LAYOUT [\*array-layout\*](#array-layout)))
+
+### zeros-like
+
+```lisp
+Function: (zeros-like array-like)
 ```
