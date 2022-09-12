@@ -272,7 +272,7 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
 
 (declaim (inline array-stride))
 (defun array-stride (array axis-number)
-  "Return the length of stride AXIS-NUMBER of ARRAY."
+  "Return the length of stride corresponding to AXIS-NUMBER of ARRAY."
   (declare (type dense-array array)
            (type fixnum axis-number))
   (elt (array-strides array) axis-number))
@@ -284,7 +284,7 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
 
 (declaim (inline array-offset))
 (defun array-offset (array axis-number)
-  "Return the length of offset AXIS-NUMBER of ARRAY."
+  "Return the length of offset corresponding to AXIS-NUMBER of ARRAY."
   (declare (type dense-array array)
            ;; (optimize speed)
            (type size axis-number))
@@ -296,7 +296,10 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
   (array-displaced-to array))
 
 (defun array-view-p (array)
-  "Returns T if the ARRAY is a VIEW, otherwise returns NIL"
+  "Returns T if the ARRAY is a VIEW, otherwise returns NIL. A VIEW does not
+have a known layout, and is useful as a window into certain elements of the larger array.
+A VIEW provides a way to obtain sub-arrays or reshapes or transposes out of ARRAY
+without copying."
   (declare (type dense-array array))
   (if (dense-array-root-array array) t nil))
 
@@ -358,7 +361,6 @@ Also see:
 (defmethod print-object ((array dense-array) stream)
   ;; (print (type-of array))
   (let* ((*print-right-margin* (or *print-right-margin* 80))
-         (*print-level* (if *print-level* (+ 1 *print-level*)))
          (sv      (array-storage array))
          (layout  (array-layout array))
          (rank    (array-rank array))
@@ -400,7 +402,9 @@ Also see:
                             "#")
                            (t
                             (loop :with dim := (array-dimension array depth)
-                                  :with print-length := (min dim *print-length*)
+                                  :with print-length := (if *print-length*
+                                                            (min dim *print-length*)
+                                                            dim)
                                   :with offset := (array-offset array depth)
                                   :with stride := (array-stride array depth)
                                     :initially (incf index offset)
@@ -413,10 +417,12 @@ Also see:
                    (format stream " ~A" (aref sv 0)))
                   (t
                    (dolist (item (data-as-lol))
-                     (pprint-newline :mandatory stream)
+                     #-ccl (pprint-newline :mandatory stream)
+                     #+ccl (format stream "~%  ")
                      (format stream "~A" item))
                    (pprint-indent :block -2 stream)
-                   (pprint-newline :mandatory stream)))))))))
+                   #+ccl (terpri stream)
+                   #-ccl (pprint-newline :mandatory stream)))))))))
 
 (defun print-array (array &optional array-element-print-format &key level length
                                                                  (stream nil streamp))
