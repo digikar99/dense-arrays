@@ -17,6 +17,13 @@
 (define-array-specialization-type simple-array
     (and standard-dense-array simple-dense-array))
 
+(pushnew (cons 'standard-dense-array (lambda (array)
+                                       (if (simple-dense-array-p array)
+                                           'simple-array
+                                           'array)))
+         *array-class-type-alist*
+         :test #'equal :key #'car)
+
 ;; For internal usage
 (define-array-specialization-type %dense-array dense-array)
 
