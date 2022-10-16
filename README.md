@@ -527,7 +527,7 @@ Is overriden by explicitly passing an ELEMENT-TYPE or TYPE argument.
 
 ```lisp
 Variable
-Default Value: ((#<PACKAGE "DENSE-NUMERICALS.IMPL"> . SINGLE-FLOAT))
+Default Value: NIL
 ```
 
 An ALIST mapping package to the default element-type used in that package.
@@ -573,8 +573,16 @@ Return the element of the `array` specified by the `subscripts`.
 
 #### Polymorph: `((array dense-array) &rest dense-arrays::subscripts)`
 
-Accessor function for DENSE-ARRAYS::DENSE-ARRAY.
-The semantics are intended to be similar to numpy's indexing semantics.
+No documentation found.
+
+### aref\*
+
+```lisp
+Function: (aref* dense-array &rest subscripts)
+```
+
+Accessor function for DENSE-ARRAYS::DENSE-ARRAY with semantics
+intended to be similar to numpy's indexing semantics.
 See https://numpy.org/doc/stable/user/basics.indexing.html
 
 Each element of `subscripts` can be
@@ -590,7 +598,7 @@ case the last element along the axis is given the index -1, the second last is
 given the index -2 and so on. Thus, `(aref ... '(-1 :step -1))` can reverse a one
 dimensional array.
 
-Like, CL:AREF, returns the element corresponding to `subscripts`
+Like, [cl:aref](#aref) or [abstract-arrays:aref](#aref), returns the element corresponding to `subscripts`
 if all the subscripts are integers and there as many subscripts
 as the rank of the array.
 
@@ -613,8 +621,7 @@ of the array are copied over into a new array.
 ### array
 
 ```lisp
-Type: (ARRAY &OPTIONAL (ABSTRACT-ARRAYS::ELEMENT-TYPE '*)
-       (ABSTRACT-ARRAYS::DIM/RANK '*))
+Type
 ```
 
 A wrapper around STANDARD-DENSE-ARRAY with support for specifying ELEMENT-TYPE and DIMENSIONS or RANK.
@@ -954,7 +961,7 @@ Additionally takes
           ((INDEXES 0 0) (INDEXES 0 1) (INDEXES 0 2))
           ((INDEXES 1 0) (INDEXES 1 1) (INDEXES 1 2))
          {10194A2FE3}>
-    
+
 
 ### narray-dimensions
 
@@ -1020,7 +1027,7 @@ If `array-like` is a SIMPLE-DENSE-ARRAY, it is guaranteed that when `view` is su
 - :VIEW NIL a copy of the array *will be* created
 What is not guaranteed: if `array-like` is not a SIMPLE-DENSE-ARRAY,
 then a new array is created. In the future, an attempt may be made to avoid
-creating the new array and instead return a view instead. 
+creating the new array and instead return a view instead.
 
 ### row-major-aref
 
@@ -1029,7 +1036,7 @@ Polymorphic Function: (row-major-aref array index)
 ```
 
 Return the element of `array` corresponding to the row-major `index`.
-This is SETFable
+This is SETFable.
 
 #### Polymorph: `((common-lisp:array common-lisp:array) (abstract-arrays::index t))`
 
@@ -1064,14 +1071,14 @@ These specializers are the same like the CL:ARRAY compound type.
 ### standard-dense-array
 
 ```lisp
-Type: STANDARD-DENSE-ARRAY
+Class
 ```
 
 
 ### standard-dense-array-class
 
 ```lisp
-Type: STANDARD-DENSE-ARRAY-CLASS
+Class
 ```
 
 
@@ -1161,7 +1168,7 @@ These specializers are the same like the CL:ARRAY compound type.
 ### unupgraded-dense-array
 
 ```lisp
-Type: UNUPGRADED-DENSE-ARRAY
+Class
 ```
 
 

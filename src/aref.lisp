@@ -131,8 +131,29 @@ and tests for their equality."
      (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
 
 (defpolymorph (aref :inline t) ((array dense-array) &rest subscripts) t
-  "Accessor function for DENSE-ARRAYS::DENSE-ARRAY.
-The semantics are intended to be similar to numpy's indexing semantics.
+  (assert (and (= (array-rank array)
+                  (length subscripts))
+               (every #'integerp subscripts))
+          (array subscripts))
+  (let* ((dense-array-class (class-of array)))
+    (assert-type
+     (funcall (storage-accessor dense-array-class)
+              (array-storage array)
+              (the int-index
+                   (let ((index 0))
+                     (declare (type size index))
+                     ;; TODO: Better error reporting for negative indices
+                     (loop :for stride :of-type int-index :in (array-strides array)
+                           :for subscript :of-type int-index :in subscripts
+                           :for offset :of-type size :in (array-offsets array)
+                           :do (incf index (+ offset
+                                              (the-size (* stride subscript)))))
+                     index)))
+     (array-element-type array))))
+
+(defun aref* (dense-array &rest subscripts)
+  "Accessor function for DENSE-ARRAYS::DENSE-ARRAY with semantics
+intended to be similar to numpy's indexing semantics.
 See https://numpy.org/doc/stable/user/basics.indexing.html
 
 Each element of SUBSCRIPTS can be
@@ -148,7 +169,7 @@ case the last element along the axis is given the index -1, the second last is
 given the index -2 and so on. Thus, `(aref ... '(-1 :step -1))` can reverse a one
 dimensional array.
 
-Like, CL:AREF, returns the element corresponding to SUBSCRIPTS
+Like, CL:AREF or ABSTRACT-ARRAYS:AREF, returns the element corresponding to SUBSCRIPTS
 if all the subscripts are integers and there as many subscripts
 as the rank of the array.
 
@@ -168,33 +189,33 @@ The SUBSCRIPTS can also be integer or boolean arrays, denoting which elements
 to select from each of the axes. But in this case the corresponding elements
 of the array are copied over into a new array."
   (declare ;; (optimize speed)
-           (type dense-array array)
-           (dynamic-extent subscripts))
-  (cond ((and (= (array-rank array) (length subscripts))
+   (type dense-array dense-array)
+   (dynamic-extent subscripts))
+  (cond ((and (= (array-rank dense-array) (length subscripts))
               (every #'integerp subscripts))
-         (let* ((dense-array-class (class-of array)))
+         (let* ((dense-array-class (class-of dense-array)))
            (assert-type
             (funcall (storage-accessor dense-array-class)
-                     (array-storage array)
+                     (array-storage dense-array)
                      (the int-index
                           (let ((index 0))
                             (declare (type size index))
                             ;; TODO: Better error reporting for negative indices
-                            (loop :for stride :of-type int-index :in (array-strides array)
+                            (loop :for stride :of-type int-index :in (array-strides dense-array)
                                   :for subscript :of-type int-index :in subscripts
-                                  :for offset :of-type size :in (array-offsets array)
-                                  :for dimension :of-type size :in (narray-dimensions array)
+                                  :for offset :of-type size :in (array-offsets dense-array)
+                                  :for dimension :of-type size :in (narray-dimensions dense-array)
                                   :do (incf index (+ offset
                                                      (the-size
                                                       (* stride
                                                          (normalize-index subscript dimension))))))
                             index)))
-            (array-element-type array))))
+            (array-element-type dense-array))))
         ((or (some #'cl:arrayp subscripts)
              (some #'arrayp subscripts))
-         (apply #'%aref array subscripts))
+         (apply #'%aref dense-array subscripts))
         (t
-         (apply #'%aref-view array subscripts))))
+         (apply #'%aref-view dense-array subscripts))))
 
 (define-condition invalid-index (error)
   ((index :accessor index :initarg :index))
@@ -204,7 +225,7 @@ of the array are copied over into a new array."
 (defun (setf %aref-view) (new-array array &rest subscripts)
   ;; TODO: Optimize
   (declare (dynamic-extent subscripts))
-  (let* ((sub-array         (apply #'aref array subscripts))
+  (let* ((sub-array         (apply #'aref* array subscripts))
          (broadcasted-array (broadcast-array new-array (array-dimensions sub-array))))
     (loop for i below (array-total-size sub-array)
           do (setf (row-major-aref sub-array i)
@@ -233,10 +254,10 @@ of the array are copied over into a new array."
                     (declare (type size depth))
                     (if (= depth rank)
                         (let ((ss-elt (mapcar (lambda (array)
-                                                (apply #'aref array ss-idx))
+                                                (apply #'aref* array ss-idx))
                                               subscripts)))
-                          (setf (apply #'aref array ss-elt)
-                                (assert-type (apply #'aref new-array ss-idx)
+                          (setf (apply #'aref* array ss-elt)
+                                (assert-type (apply #'aref* new-array ss-idx)
                                              elt-type)))
                         (loop :for i :from 0 :below (the size (nth depth dims))
                               :do (setf (nth depth ss-idx) i)
@@ -253,10 +274,36 @@ of the array are copied over into a new array."
            ;; (optimize speed)
            (dynamic-extent subscripts))
   (with-slots (storage element-type strides offsets dimensions rank) array
+    (assert (and (= rank (length subscripts))
+                 (every #'integerp subscripts))
+            (array subscripts))
+    (assert-type new-element/s (array-element-type array))
+    (let* ((dense-array-class (class-of array)))
+      (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
+               new-element/s
+               storage
+               (let ((index 0))
+                 (declare (type size index))
+                 ;; TODO: Better error reporting for negative indices
+                 (loop :for stride :of-type int-index :in strides
+                       :for subscript :of-type int-index :in subscripts
+                       :for offset :of-type size :in offsets
+                       :do (incf index
+                                 (the-size
+                                  (+ offset
+                                     (the-int-index (* stride subscript))))))
+                 index))))
+  new-element/s)
+
+(defun (setf aref*) (new-element/s dense-array &rest subscripts)
+  (declare (type dense-array dense-array)
+           ;; (optimize speed)
+           (dynamic-extent subscripts))
+  (with-slots (storage element-type strides offsets dimensions rank) dense-array
     (cond ((and (= rank (length subscripts))
                 (every #'integerp subscripts))
-           (assert-type new-element/s (array-element-type array))
-           (let* ((dense-array-class (class-of array)))
+           (assert-type new-element/s (array-element-type dense-array))
+           (let* ((dense-array-class (class-of dense-array)))
              (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
                       new-element/s
                       storage
@@ -266,91 +313,91 @@ of the array are copied over into a new array."
                         (loop :for stride :of-type int-index :in strides
                               :for subscript :of-type int-index :in subscripts
                               :for offset :of-type size :in offsets
-                              :for dimension :of-type size :in (narray-dimensions array)
+                              :for dimension :of-type size :in (narray-dimensions dense-array)
                               :do (incf index
-                                      (the-size
-                                       (+ offset
-                                          (the-int-index
-                                           (* stride
-                                              (normalize-index subscript dimension)))))))
+                                        (the-size
+                                         (+ offset
+                                            (the-int-index
+                                             (* stride
+                                                (normalize-index subscript dimension)))))))
                         index))))
           ((or (some #'cl:arrayp subscripts)
                (some #'arrayp subscripts))
-           (apply #'(setf %aref) new-element/s array subscripts))
+           (apply #'(setf %aref) new-element/s dense-array subscripts))
           (t
-           (apply #'(setf %aref-view) new-element/s array subscripts))))
+           (apply #'(setf %aref-view) new-element/s dense-array subscripts))))
   new-element/s)
 
-(def-test aref (:suite backend-independent)
+(def-test aref* (:suite backend-independent)
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))
-    (is (= 9 (aref array 9 0)))
-    (is (= 9 (aref array 8 1)))
-    (is (= 9 (aref array -2 -1)))
-    (is (array= array (aref array)))
-    (is (array= array (aref array nil)))
-    (is (array= array (aref array nil nil)))
-    (is (array= (aref array 0)
+    (is (= 9 (aref* array 9 0)))
+    (is (= 9 (aref* array 8 1)))
+    (is (= 9 (aref* array -2 -1)))
+    (is (array= array (aref* array)))
+    (is (array= array (aref* array nil)))
+    (is (array= array (aref* array nil nil)))
+    (is (array= (aref* array 0)
                 (make-array 2 :constructor #'+ :element-type 'int32)))
-    (is (array= (aref array 0 nil)
+    (is (array= (aref* array 0 nil)
                 (make-array 2 :constructor #'+ :element-type 'int32)))
-    (is (array= (aref array nil 0)
+    (is (array= (aref* array nil 0)
                 (make-array 10 :constructor #'+ :element-type 'int32)))
     (is (array= (make-array 5 :initial-contents '(5 4 3 2 1) :element-type 'int32)
-                (aref (make-array 5 :initial-contents '(1 2 3 4 5) :element-type 'int32)
-                      '(-1 :step -1))))
-    (is (array= (aref (aref array '(2 :end 4)) () 0)
+                (aref* (make-array 5 :initial-contents '(1 2 3 4 5) :element-type 'int32)
+                       '(-1 :step -1))))
+    (is (array= (aref* (aref* array '(2 :end 4)) () 0)
                 (make-array '(2) :initial-contents '(2 3)
                                  :element-type 'int32))))
   (symbol-macrolet ((array (make-array '(2 3) :constructor #'+ :element-type 'int32)))
-    (is (equalp '(2 2) (array-dimensions (aref array nil '(0 :step 2)))))
-    (is (equalp '(1 3) (array-dimensions (aref array '(0 :step 2)))))
-    (is (= 0 (aref (aref array '(0 :step 2)) 0 0))))
-  (is (array= (aref (make-array '(5 5) :constructor #'+ :element-type 'int32)
-                    '(1) '(1))
+    (is (equalp '(2 2) (array-dimensions (aref* array nil '(0 :step 2)))))
+    (is (equalp '(1 3) (array-dimensions (aref* array '(0 :step 2)))))
+    (is (= 0 (aref* (aref* array '(0 :step 2)) 0 0))))
+  (is (array= (aref* (make-array '(5 5) :constructor #'+ :element-type 'int32)
+                     '(1) '(1))
               (make-array '(4 4) :constructor (lambda (x y) (+ 2 x y))
                                  :element-type 'int32))))
 
 (def-test advanced-aref (:suite backend-dependent)
   (is (array= (make-array '(2 2) :initial-contents '((2 6) (1 4)) :element-type 'int32)
-              (aref (make-array '(2 3)
-                                :element-type 'int32
-                                :initial-contents '((1 2 3) (4 5 6)))
-                    (make-array '(2 2)
-                                :element-type 'int32
-                                :initial-contents '((0 1) (0 1)))
-                    (make-array '(2 2)
-                                :element-type 'int32
-                                :initial-contents '((1 2) (0 0))))))
+              (aref* (make-array '(2 3)
+                                 :element-type 'int32
+                                 :initial-contents '((1 2 3) (4 5 6)))
+                     (make-array '(2 2)
+                                 :element-type 'int32
+                                 :initial-contents '((0 1) (0 1)))
+                     (make-array '(2 2)
+                                 :element-type 'int32
+                                 :initial-contents '((1 2) (0 0))))))
   (is (array= (make-array '(3) :initial-contents '(1 3 6) :element-type 'int32)
-              (aref (make-array '(2 3)
-                                :element-type 'int32
-                                :initial-contents '((1 2 3) (4 5 6)))
-                    (make-array '(2 3)
-                                :element-type 'bit
-                                :initial-contents '((1 0 1) (0 0 1)))))))
+              (aref* (make-array '(2 3)
+                                 :element-type 'int32
+                                 :initial-contents '((1 2 3) (4 5 6)))
+                     (make-array '(2 3)
+                                 :element-type 'bit
+                                 :initial-contents '((1 0 1) (0 0 1)))))))
 
-(def-test setf-aref (:suite backend-independent)
+(def-test setf-aref* (:suite backend-independent)
   ;; The array constructed in BROADCAST-ARRAY has an implicit assumption
   (is (array= (make-array '(2 3) :initial-contents '((0 1 2) (1 2 -1)) :element-type 'int32)
               (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32)))
-                (setf (aref a 1 2) -1)
+                (setf (aref* a 1 2) -1)
                 a)))
   (is (array= (make-array '(2 3) :initial-contents '((0 1 2) (1 2 -1)) :element-type 'int32)
               (let ((a (make-array '(2 3) :constructor #'+ :element-type 'int32)))
-                (setf (aref a -1 -1) -1)
+                (setf (aref* a -1 -1) -1)
                 a)))
   (is (array= (make-array '(2 3 4) :initial-element 1 :element-type 'int32)
               (let ((a (make-array '(2 3 4) :initial-element 0 :element-type 'int32)))
-                (setf (aref a) 1)
+                (setf (aref* a) 1)
                 a)))
   (is (array= (make-array '(2 3) :initial-contents '((2 0 0) (3 0 0)) :element-type 'int32)
               (let ((a (make-array '(2 3) :initial-element 0 :element-type 'int32)))
-                (setf (aref a nil 0)
+                (setf (aref* a nil 0)
                       (make-array 2 :initial-contents '(2 3) :element-type 'int32))
                 a)))
   (is (array= (make-array '(2 3) :initial-contents '((2 0 0) (3 0 0)) :element-type 'int32)
               (let ((a (make-array '(2 3) :initial-element 0 :element-type 'int32)))
-                (setf (aref a nil -3)
+                (setf (aref* a nil -3)
                       (make-array 2 :initial-contents '(2 3) :element-type 'int32))
                 a))))
 
@@ -358,10 +405,10 @@ of the array are copied over into a new array."
   (is (array= (make-array '(2 3) :initial-contents '((2 2 2) (4 5 2)) :element-type 'int32)
               (let ((a (make-array '(2 3)
                                    :initial-contents '((1 2 3) (4 5 6)) :element-type 'int32)))
-                (setf (aref a (make-array '(2 3)
-                                          :element-type 'bit
-                                          :initial-contents '((1 0 1) (0 0 1))
-                                          :class 'standard-dense-array))
+                (setf (aref* a (make-array '(2 3)
+                                           :element-type 'bit
+                                           :initial-contents '((1 0 1) (0 0 1))
+                                           :class 'standard-dense-array))
                       2)
                 a))))
 
@@ -408,9 +455,9 @@ of the array are copied over into a new array."
   (symbol-macrolet ((array (make-array '(10 2) :constructor #'+ :element-type 'int32)))
     (is (= 5 (row-major-aref array 9)))
     (is (= 9 (row-major-aref array 18)))
-    (is (= 10 (row-major-aref (aref array nil 1) 9)))
-    (is (= 1 (row-major-aref (aref (aref array '(-1 :step -1))
-                                   '(9))
+    (is (= 10 (row-major-aref (aref* array nil 1) 9)))
+    (is (= 1 (row-major-aref (aref* (aref* array '(-1 :step -1))
+                                    '(9))
                              1)))))
 
 (def-test setf-row-major-aref (:suite backend-independent)
@@ -420,5 +467,5 @@ of the array are copied over into a new array."
                 array)))
   (is (array= (make-array '(2 3) :initial-contents '((0 1 2) (1 0 3)) :element-type 'int32)
               (let ((array (make-array '(2 3) :constructor #'+ :element-type 'int32)))
-                (setf (row-major-aref (aref array nil 1) 1) 0)
+                (setf (row-major-aref (aref* array nil 1) 1) 0)
                 array))))

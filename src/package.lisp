@@ -12,6 +12,7 @@
                                      "ARRAY-LAYOUT"))
            (shadow-symbols '("ARRAY"
                              "SIMPLE-ARRAY"
+                             "AREF*"
 
                              "ARRAY-STORAGE-ALLOCATOR"
                              "ARRAY-STORAGE-DEALLOCATOR"

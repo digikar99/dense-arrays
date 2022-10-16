@@ -256,10 +256,10 @@ Either of the two cases might be faster depending on the number of dimensions."
                     (elt))
                 (do-arrays 1 ((c (progn
                                    (push 1 elt)
-                                   (aref a 0)))
+                                   (aref* a 0)))
                               (d (progn
                                    (push 2 elt)
-                                   (aref a 1))))
+                                   (aref* a 1))))
                   (push (list c d) elt))
                 elt)))
   (is (equalp '((1 2) (0 1) 2 1)
@@ -267,10 +267,10 @@ Either of the two cases might be faster depending on the number of dimensions."
                     (elt))
                 (do-arrays 1 ((c (progn
                                    (push 1 elt)
-                                   (aref a nil 0)))
+                                   (aref* a nil 0)))
                               (d (progn
                                    (push 2 elt)
-                                   (aref a nil 1))))
+                                   (aref* a nil 1))))
                   (push (list c d) elt))
                 elt)))
   (is (array= (make-array '(2 3) :initial-element 1 :element-type 'int32)

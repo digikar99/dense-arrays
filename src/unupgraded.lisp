@@ -45,11 +45,11 @@
   (let ((*dense-array-class* 'unupgraded-dense-array))
     (let ((array (make-array 2 :element-type 'string :initial-element "")))
       (signals warning
-        (setf (aref array 0) 0))
+        (setf (aref* array 0) 0))
       (signals warning
-        (setf (aref array) 0))
+        (setf (aref* array) 0))
       (signals warning
         (setf (row-major-aref array 0) 0))
       (signals warning
-        (setf (row-major-aref (aref array) 0) 0)))))
+        (setf (row-major-aref (aref* array) 0) 0)))))
 
