@@ -29,8 +29,8 @@
            (class        (dense-array-type-class array-type env))
            (elt-type     (array-type-element-type array-type env))
            (rank         (array-type-rank array-type env))
-           (simple-p     (subtypep array-type 'simple-dense-array)))
-      (declare (ignore simple-p))
+           ;; FIXME on extensible-compound-types: This should work with simple-dense-array
+           (simple-p     (subtypep array-type 'simple-array)))
       (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
@@ -43,72 +43,49 @@
            (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
            (os              (make-gensym-list (length subscripts) "OFFSET"))
            (ss              (make-gensym-list (length subscripts) "STRIDE"))
-           (ds              (make-gensym-list (length subscripts) "DIMENSION"))
-           (full-expansion
-             (once-only (array)
-               `(locally (declare (type dense-array ,array))
-                  (cond ((and (= (array-rank ,array) ,(length subscripts))
-                              ,@(mapcar (lm ss `(integerp ,ss)) subscripts))
-                         (destructuring-lists ((size      ,os (array-offsets ,array)
-                                                          :dynamic-extent nil)
-                                               (int-index ,ss (array-strides ,array)
-                                                          :dynamic-extent nil)
-                                               (size      ,ds (narray-dimensions ,array)
-                                                          :dynamic-extent nil))
-                           (,storage-accessor
-                            (the ,storage-type (array-storage ,array))
-                            (the size (+ ,@os
-                                         ,@(mapcar (lm ss ds sub
-                                                       `(the size
-                                                             (* ,ss
-                                                                (normalize-index
-                                                                 ,sub
-                                                                 ,ds))))
-                                                   ss ds subscripts))))))
-                        ((or ,@(mapcar (lm ss `(cl:arrayp ,ss)) subscripts)
-                             ,@(mapcar (lm ss `(arrayp ,ss)) subscripts))
-                         (%aref ,array ,@subscripts))
-                        (t
-                         (%aref-view ,array ,@subscripts))))))
            (optim-expansion
-             `(the ,elt-type
-                   ,(once-only (array)
-                      `(locally (declare (type dense-array ,array))
-                         (destructuring-lists ((size      ,os (array-offsets ,array)
-                                                          :dynamic-extent nil)
-                                               (int-index ,ss (array-strides ,array)
-                                                          :dynamic-extent nil)
-                                               (size      ,ds (narray-dimensions ,array)
-                                                          :dynamic-extent nil))
-                           (,storage-accessor
-                            (the ,storage-type (array-storage ,array))
-                            (the-size (+ ,@os
-                                         ,@(mapcar (lm ss ds sub
-                                                       `(the-size
-                                                         (* ,ss
-                                                            (normalize-index
-                                                             ,sub
-                                                             ,ds))))
-                                                   ss ds subscripts))))))))))
+             (once-only (array)
+               (if simple-p
+                   `(locally (declare (type dense-array ,array))
+                      (destructuring-lists ((int-index ,ss (array-strides ,array)
+                                                       :dynamic-extent nil))
+                        (,storage-accessor
+                         (the ,storage-type (array-storage ,array))
+                         (the-size (+ ,@(mapcar (lm ss sub
+                                                    `(the-size
+                                                      (* ,ss ,sub)))
+                                                ss subscripts))))))
+                   `(locally (declare (type dense-array ,array))
+                      (destructuring-lists ((size      ,os (array-offsets ,array)
+                                                       :dynamic-extent nil)
+                                            (int-index ,ss (array-strides ,array)
+                                                       :dynamic-extent nil))
+                        (,storage-accessor
+                         (the ,storage-type (array-storage ,array))
+                         (the-size (+ ,@os
+                                      ,@(mapcar (lm ss sub
+                                                    `(the-size
+                                                      (* ,ss ,sub)))
+                                                ss subscripts))))))))))
         (return-from aref
           (cond ((eq '* elt-type)
                  (signal 'element-type-failure :form array :form-type array-type)
-                 form)
+                 optim-expansion)
                 ((not (integerp rank))
                  (signal 'rank-failure :form array :form-type array-type)
-                 full-expansion)
+                 form)
                 ((not (= rank (length subscripts)))
                  (signal 'compiler-macro-notes:optimization-failure-note
                          :datum "Number of subscripts does not match array rank ~D"
                          :args (list rank))
-                 full-expansion)
-                ((not (every (lm type (subtypep type 'integer)) subscript-types))
+                 form)
+                ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
                  (signal 'compiler-macro-notes:optimization-failure-note
                          :datum "Type of subscripts ~S were derived to be non-integers ~S"
                          :args (list subscripts subscript-types))
-                 full-expansion)
+                 form)
                 (t
-                 optim-expansion)))))))
+                 `(the ,elt-type ,optim-expansion))))))))
 
 
 
@@ -124,8 +101,7 @@
            (class      (dense-array-type-class array-type env))
            (elt-type   (array-type-element-type array-type env))
            (rank       (array-type-rank array-type env))
-           (simple-p   (subtypep array-type 'simple-dense-array)))
-      (declare (ignore simple-p))
+           (simple-p   (subtypep array-type 'simple-array)))
       (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
@@ -139,77 +115,54 @@
            (new-value-type  (primary-form-type new-value env))
            (os              (make-gensym-list (length subscripts) "OFFSET"))
            (ss              (make-gensym-list (length subscripts) "STRIDE"))
-           (ds              (make-gensym-list (length subscripts) "DIMENSION"))
-           (full-expansion
-             (once-only (array new-value)
-               `(locally (declare (type dense-array ,array))
-                  (cond ((and (= (array-rank ,array) ,(length subscripts))
-                              ,@(mapcar (lm ss `(integerp ,ss)) subscripts))
-                         (destructuring-lists ((size      ,os (array-offsets ,array)
-                                                          :dynamic-extent nil)
-                                               (int-index ,ss (array-strides ,array)
-                                                          :dynamic-extent nil)
-                                               (size      ,ds (narray-dimensions ,array)
-                                                          :dynamic-extent nil))
-                           (setf (,storage-accessor
-                                  (the ,storage-type (array-storage ,array))
-                                  (the size (+ ,@os
-                                               ,@(mapcar (lm ss ds sub
-                                                             `(the size
-                                                                   (* ,ss
-                                                                      (normalize-index
-                                                                       ,sub
-                                                                       ,ds))))
-                                                         ss ds subscripts))))
-                                 ,new-value)))
-                        ((or ,@(mapcar (lm ss `(cl:arrayp ,ss)) subscripts)
-                             ,@(mapcar (lm ss `(arrayp ,ss)) subscripts))
-                         (%aref ,array ,@subscripts))
-                        (t
-                         (%aref-view ,array ,@subscripts))))))
            (optim-expansion
-             `(the ,elt-type
-                   ,(once-only (array)
-                      `(locally (declare (type dense-array ,array))
-                         (destructuring-lists ((size      ,os (array-offsets ,array)
-                                                          :dynamic-extent nil)
-                                               (int-index ,ss (array-strides ,array)
-                                                          :dynamic-extent nil)
-                                               (size      ,ds (narray-dimensions ,array)
-                                                          :dynamic-extent nil))
-                           (setf (,storage-accessor
-                                  (the ,storage-type (array-storage ,array))
-                                  (the-size (+ ,@os
-                                               ,@(mapcar (lm ss ds sub
-                                                             `(the-size
-                                                               (* ,ss
-                                                                  (normalize-index
-                                                                   ,sub
-                                                                   ,ds))))
-                                                         ss ds subscripts))))
-                                 ,new-value)))))))
+             (once-only (array)
+               (if simple-p
+                   `(locally (declare (type dense-array ,array))
+                      (destructuring-lists ((int-index ,ss (array-strides ,array)
+                                                       :dynamic-extent nil))
+                        (setf (,storage-accessor
+                               (the ,storage-type (array-storage ,array))
+                               (the-size (+ ,@(mapcar (lm ss sub
+                                                          `(the-size
+                                                            (* ,ss ,sub)))
+                                                      ss subscripts))))
+                              ,new-value)))
+                   `(locally (declare (type dense-array ,array))
+                      (destructuring-lists ((size      ,os (array-offsets ,array)
+                                                       :dynamic-extent nil)
+                                            (int-index ,ss (array-strides ,array)
+                                                       :dynamic-extent nil))
+                        (setf (,storage-accessor
+                               (the ,storage-type (array-storage ,array))
+                               (the-size (+ ,@os
+                                            ,@(mapcar (lm ss sub
+                                                          `(the-size
+                                                            (* ,ss ,sub)))
+                                                      ss subscripts))))
+                              ,new-value)))))))
 
         (return-from aref
           (cond ((eq '* elt-type)
                  (signal 'element-type-failure :form array :form-type array-type)
-                 form)
+                 optim-expansion)
                 ((not (integerp rank))
                  (signal 'rank-failure :form array :form-type array-type)
-                 full-expansion)
+                 form)
                 ((not (= rank (length subscripts)))
                  (signal 'compiler-macro-notes:optimization-failure-note
                          :datum "Number of subscripts does not match array rank ~D"
                          :args (list rank))
-                 full-expansion)
-                ((not (every (lm type (subtypep type 'integer)) subscript-types))
+                 form)
+                ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
                  (signal 'compiler-macro-notes:optimization-failure-note
                          :datum "Type of subscripts ~S were derived to be non-integers ~S"
                          :args (list subscripts subscript-types))
-                 full-expansion)
+                 form)
                 ((not (subtypep new-value-type elt-type env))
                  (signal 'compiler-macro-notes:note
                          :datum "Type of the new-value form~%  ~S~%was derived to be ~S not of type ~S"
                          :args (list new-value new-value-type elt-type))
-                 full-expansion)
+                 form)
                 (t
-                 optim-expansion)))))))
+                 `(the ,elt-type ,optim-expansion))))))))
