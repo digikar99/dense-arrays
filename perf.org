@@ -2,7 +2,7 @@
 
   I keep wishing julia - or python - had CL features: SLIME-esque super-interactive development (including =C-c C-o= and =C-c M-o=), dynamic variables, (easy) stack inspection, AOT compile-time warnings, semantics of =print=, structural editing, the =iterate= library (or at least the =loop= macro). Once one knows these things, it tends to be a PITA to live without them. Some of these - like =print=, =loop= and =iterate= - do not totally depend on the language, the others /do/.
 
-  OTOH, making something as exhaustive as numpy or tensorflow in common lisp would be discarding all the human resources that went into these projects over the last decade. There also have been effortts to access python libraries from common lisp; while it works out for most things, some things remain. And one is still left wanting for more things /on top of the things in the first paragraph/:
+  OTOH, making something as exhaustive as numpy or tensorflow in common lisp would be discarding all the human resources that went into these projects over the last decade. There also have been efforts to access python libraries from common lisp; while it works out for most things, some things remain. And one is still left wanting for more things /on top of the things in the first paragraph/:
 
   - numpy does not show dimensions, and elements and element-types at the same time; julia does
   - neither show an id
@@ -38,7 +38,7 @@ All lisp performances are in the absence of SIMD.
 *** Native CL
 
 #+BEGIN_SRC lisp
-;;; 0.12 seconds of real time
+;;; 0.14 seconds of real time
 (let ((a (cl:make-array '(100 100) :element-type 'double-float
                                    :initial-element 0.0d0))
       (b 0.0d0))
@@ -52,9 +52,10 @@ All lisp performances are in the absence of SIMD.
 *** Python (unidiomatic)
 
 #+BEGIN_SRC python
-# 8.34 - yes this is unsuited for performance
+# 8.3 - yes this is unsuited for performance
 import numpy as np
 import time
+a = np.random.random((100, 100))
 def timeit(T):
     total = 0.0
     start = time.time()
@@ -72,6 +73,7 @@ timeit(1000)[1]
 # 0.03 - this is suited for performance!
 import numpy as np
 import time
+a = np.random.random((100, 100))
 def timeit(T):
     total = 0.0
     start = time.time()
@@ -83,7 +85,7 @@ timeit(1000)[1]
 *** aref (unoptimized)
 
 #+BEGIN_SRC lisp
-;;; 3.97 seconds of real time
+;;; 8.2 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
@@ -96,13 +98,12 @@ timeit(1000)[1]
 *** aref (optimized)
 
 #+BEGIN_SRC lisp
-;;; 0.59 seconds of real time
-;;; (after repeated evaluations, after generic-function cache is warmed up (?))
+;;; 0.24 seconds of real time; lesser if (safety 0)
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
   (declare (optimize speed)
-           (type (array double-float 2) a)
+           (type (simple-array double-float 2) a)
            (type double-float b))
   (timeit (incf b (aref a i j)))
   b)
@@ -111,7 +112,7 @@ timeit(1000)[1]
 *** do-arrays
 
 #+BEGIN_SRC lisp
-;;; do-arrays - 0.15 seconds of real time:
+;;; do-arrays - 0.16 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
