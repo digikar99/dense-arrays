@@ -30,7 +30,9 @@
            (elt-type     (array-type-element-type array-type env))
            (rank         (array-type-rank array-type env))
            ;; FIXME on extensible-compound-types: This should work with simple-dense-array
-           (simple-p     (subtypep array-type 'simple-array)))
+           (simple-p     (if (member :extensible-compound-types cl:*features*)
+                             (subtypep array-type 'simple-array)
+                             (subtypep array-type 'simple-dense-array))))
       (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
@@ -85,6 +87,9 @@
                          :args (list subscripts subscript-types))
                  form)
                 (t
+                 ;; ELT-TYPE is supplied
+                 ;; rank matches the number of subscripts
+                 ;; subscripts are declared/derived to be positive integers
                  `(the ,elt-type ,optim-expansion))))))))
 
 
@@ -101,7 +106,9 @@
            (class      (dense-array-type-class array-type env))
            (elt-type   (array-type-element-type array-type env))
            (rank       (array-type-rank array-type env))
-           (simple-p   (subtypep array-type 'simple-array)))
+           (simple-p   (if (member :extensible-compound-types cl:*features*)
+                           (subtypep array-type 'simple-array)
+                           (subtypep array-type 'simple-dense-array))))
       (when (eq 'cl:* class)
         ;; Don't have much hope of optimization
         (signal 'backend-failure :form array :form-type array-type)
