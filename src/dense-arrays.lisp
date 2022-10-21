@@ -40,8 +40,8 @@
   (if (typep value type)
       value
       (if datum
-          (apply #'warn datum datum-args)
-          (warn "Expectation unmet for ~S to be of type ~S" value type))))
+          (apply #'error datum datum-args)
+          (error "Expectation unmet for ~S to be of type ~S" value type))))
 
 (declaim (ftype (function * dense-array) make-array))
 (defun make-array (dimensions &rest args

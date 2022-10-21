@@ -32,11 +32,11 @@
                                           (declare (ignore args))
                                           "")))
 
-    (signals warning
+    (signals error
       (make-array 2 :element-type 'string :initial-element 0))
-    (signals warning
+    (signals error
       (make-array 2 :element-type 'string :initial-contents '(0 0)))
-    (signals warning
+    (signals error
       (make-array 2 :element-type 'string :constructor (lambda (&rest args)
                                                          (declare (ignore args))
                                                          0)))))
@@ -44,12 +44,12 @@
 (def-test unupgraded-array/aref ()
   (let ((*dense-array-class* 'unupgraded-dense-array))
     (let ((array (make-array 2 :element-type 'string :initial-element "")))
-      (signals warning
+      (signals error
         (setf (aref* array 0) 0))
-      (signals warning
+      (signals error
         (setf (aref* array) 0))
-      (signals warning
+      (signals error
         (setf (row-major-aref array 0) 0))
-      (signals warning
+      (signals error
         (setf (row-major-aref (aref* array) 0) 0)))))
 

@@ -134,7 +134,7 @@
                                                           `(the-size
                                                             (* ,ss ,sub)))
                                                       ss subscripts))))
-                              ,new-value)))
+                              (the ,elt-type ,new-value))))
                    `(locally (declare (type dense-array ,array))
                       (destructuring-lists ((size      ,os (array-offsets ,array)
                                                        :dynamic-extent nil)
@@ -147,7 +147,7 @@
                                                           `(the-size
                                                             (* ,ss ,sub)))
                                                       ss subscripts))))
-                              ,new-value)))))))
+                              (the ,elt-type ,new-value))))))))
 
         (return-from aref
           (cond ((eq '* elt-type)
