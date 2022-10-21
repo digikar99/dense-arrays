@@ -236,14 +236,17 @@ Either of the two cases might be faster depending on the number of dimensions."
                 (nreverse storage-accessors)))
       (let ((array-vars (make-gensym-list (length arrays) "ARRAY")))
         `(let (,@(mapcar (lm var arr `(,var ,arr)) array-vars arrays))
-           ,(unless (zerop (policy-quality 'safety env))
-              `(assert (every (lm a (equalp (narray-dimensions ,(first array-vars))
-                                            (narray-dimensions a)))
-                              (list ,@(rest array-vars)))
-                       ()
-                       "~&Expected arrays to have the same dimensions but they are:~%  ~{~S~^~%  ~}"
-                       (mapcar (lm array-var (narray-dimensions array-var))
-                               (list ,@array-vars))))
+           (declare ,@(mapcar (lm var arr `(type ,(nth-form-type arr env 0) ,var))
+                              array-vars arrays))
+           ,@(unless (zerop (policy-quality 'safety env))
+               (loop :for var :in (rest array-vars)
+                     :collect
+                     `(assert (equalp (narray-dimensions ,var)
+                                      (narray-dimensions ,(first array-vars)))
+                              (,var ,(first array-vars))
+                              "~&Expected arrays to have the same dimensions but~%  ~S~%has a dimension of ~S~%while~%  ~S~%has a dimension of ~S"
+                              ,var (narray-dimensions ,var)
+                              ,(first array-vars) (narray-dimensions ,(first array-vars)))))
            ,(if rankp
                 (expand-do-arrays-with-rank elt-vars array-vars storage-types
                                             storage-accessors rank body)
