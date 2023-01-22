@@ -12,9 +12,8 @@
 (defmethod storage-deallocator ((class static-dense-array-class))
   'static-vectors:free-static-vector)
 
-(define-array-specialization-type static-array static-dense-array)
-(define-array-specialization-type simple-static-array (and static-dense-array
-                                                           simple-dense-array))
+(define-dense-array-types static-dense-array static-dense-array
+  static-array simple-static-array)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (export '(static-array simple-static-array static-dense-array)

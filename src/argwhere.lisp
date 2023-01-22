@@ -64,7 +64,8 @@
                              :for idx :in indices
                              :do (funcall #'(setf aref)
                                           idx
-                                          idx-array elt-idx))
+                                          (the dense-array idx-array)
+                                          elt-idx))
                        (incf elt-idx))
                      (loop :for i :from 0 :below (the size (nth depth dims))
                            :do (setf (nth depth indices) i)

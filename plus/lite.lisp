@@ -1,5 +1,6 @@
 (uiop:define-package :dense-arrays-plus-lite
-  (:mix :dense-arrays #+extensible-compound-types :extensible-compound-types-cl :cl :5am)
+  (:mix :dense-arrays #+extensible-compound-types :extensible-compound-types-cl
+        :cl :5am :alexandria)
   (:import-from
    #:dense-arrays
    #:lm

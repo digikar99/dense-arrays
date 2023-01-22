@@ -84,6 +84,9 @@ subclass of DENSE-ARRAY." ',name))))))
   (def storage-element-type-upgrader)
   (def storage-type-inferrer-from-array-type))
 
+(defmethod storage-element-type-upgrader (class)
+  'cl:upgraded-array-element-type)
+
 
 ;;; STANDARD-DENSE-ARRAY
 
@@ -113,4 +116,4 @@ and other functions. (TODO: Specify these other functions.)")
   'cl:upgraded-array-element-type)
 (defmethod storage-type-inferrer-from-array-type ((class standard-dense-array-class))
   (lambda (array-type)
-    `(cl:simple-array ,(array-type-element-type array-type) 1)))
+    `(cl:simple-array ,(dense-array-type-element-type array-type) 1)))

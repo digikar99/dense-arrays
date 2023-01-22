@@ -10,9 +10,8 @@
   'identity)
 
 ;; TODO: Prepare a SIMPLE-UNUPGRADED-ARRAY type
-(define-array-specialization-type unupgraded-array unupgraded-dense-array)
-(define-array-specialization-type simple-unupgraded-array (and unupgraded-dense-array
-                                                               simple-dense-array))
+(define-dense-array-types unupgraded-dense-array unupgraded-dense-array
+  unupgraded-array simple-unupgraded-array)
 
 (define-array-specializations (string) ())
 

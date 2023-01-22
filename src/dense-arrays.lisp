@@ -263,7 +263,8 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
   "Return the length of dimension AXIS-NUMBER of ARRAY."
   (declare (type dense-array array)
            (type fixnum axis-number))
-  (elt (narray-dimensions array) axis-number))
+  (the (mod #.array-dimension-limit)
+       (elt (narray-dimensions array) axis-number)))
 
 (declaim (inline array-strides))
 (defun array-strides (array)

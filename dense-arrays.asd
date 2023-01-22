@@ -9,6 +9,7 @@
                "alexandria"
                "compiler-macro-notes"
                "closer-mop"
+               "extensible-compound-types"
                (:feature :extensible-compound-types "extensible-compound-types-cl")
                "fiveam"
                "iterate"

@@ -73,9 +73,15 @@
                      #:nth-form-type)
        (:import-from :trivial-types
                      #:function-designator)
+       #-extensible-compound-types
+       (:import-from :extensible-compound-types
+                     #:define-orthogonally-specializing-type
+                     #:define-type)
+       #-extensible-compound-types
        (:import-from :polymorphic-functions
-                     #-extensible-compound-types
-                     #:typexpand
+                     #:typexpand)
+       (:import-from :polymorphic-functions
+                     #:cl-type-specifier-p
                      #:policy-quality
                      #:optim-speed
                      #:env)))

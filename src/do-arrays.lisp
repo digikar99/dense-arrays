@@ -211,7 +211,7 @@ Either of the two cases might be faster depending on the number of dimensions."
                                                array env 0)))
                                         (if (subtypep array-type
                                                       'dense-array)
-                                            (array-type-element-type array-type)
+                                            (dense-array-type-element-type array-type)
                                             'cl:*)))
                            ;; Could there be a case where a user wants to specify
                            ;; the class but not the element-type?
