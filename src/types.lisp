@@ -90,12 +90,12 @@
 (define-dense-array-types standard-dense-array
   standard-dense-array array simple-array)
 
-(pushnew (cons 'standard-dense-array (lambda (array)
-                                       (if (dense-array-root-array array)
-                                           'simple-array
-                                           'array)))
-         *array-class-type-alist*
-         :test #'equal :key #'car)
+(setf (assoc-value *array-class-type-alist* 'standard-dense-array
+                   :test #'equal)
+      (lambda (array)
+        (if (null (dense-array-root-array array))
+            'simple-array
+            'array)))
 
 ;; For internal usage
 
