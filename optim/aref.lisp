@@ -19,157 +19,161 @@
 
 (defpolymorph-compiler-macro aref (dense-array &rest)
     (&whole form array &rest subscripts &environment env)
-  (compiler-macro-notes:with-notes (form env
-                                    :name (find-polymorph 'aref '(dense-array &rest))
-                                    :unwind-on-signal nil
-                                    :optimization-note-condition optim-speed)
-    ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
-    ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
-    (let* ((array-type   (primary-form-type array env))
-           (class        (dense-array-type-class array-type env))
-           (elt-type     (array-type-element-type array-type env))
-           (rank         (array-type-rank array-type env))
-           ;; FIXME on extensible-compound-types: This should work with simple-dense-array
-           (simple-p     (if (member :extensible-compound-types cl:*features*)
-                             (subtypep array-type 'simple-array)
-                             (subtypep array-type 'simple-dense-array))))
-      (when (eq 'cl:* class)
-        ;; Don't have much hope of optimization
-        (signal 'backend-failure :form array :form-type array-type)
-        (return-from aref form))
-      (let*
-          ((storage-accessor (storage-accessor class))
-           (storage-type     (funcall (storage-type-inferrer-from-array-type
-                                       class)
-                                      `(%dense-array ,elt-type ,rank)))
-           (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
-           (os              (make-gensym-list (length subscripts) "OFFSET"))
-           (ss              (make-gensym-list (length subscripts) "STRIDE"))
-           (optim-expansion
-             (once-only (array)
-               (if simple-p
-                   `(locally (declare (type dense-array ,array))
-                      (destructuring-lists ((int-index ,ss (array-strides ,array)
-                                                       :dynamic-extent nil))
-                        (,storage-accessor
-                         (the ,storage-type (array-storage ,array))
-                         (the-size (+ ,@(mapcar (lm ss sub
-                                                    `(the-size
-                                                      (* ,ss ,sub)))
-                                                ss subscripts))))))
-                   `(locally (declare (type dense-array ,array))
-                      (destructuring-lists ((size      ,os (array-offsets ,array)
-                                                       :dynamic-extent nil)
-                                            (int-index ,ss (array-strides ,array)
-                                                       :dynamic-extent nil))
-                        (,storage-accessor
-                         (the ,storage-type (array-storage ,array))
-                         (the-size (+ ,@os
-                                      ,@(mapcar (lm ss sub
-                                                    `(the-size
-                                                      (* ,ss ,sub)))
-                                                ss subscripts))))))))))
-        (return-from aref
-          (cond ((eq '* elt-type)
-                 (signal 'element-type-failure :form array :form-type array-type)
-                 optim-expansion)
-                ((not (integerp rank))
-                 (signal 'rank-failure :form array :form-type array-type)
-                 form)
-                ((not (= rank (length subscripts)))
-                 (signal 'compiler-macro-notes:optimization-failure-note
-                         :datum "Number of subscripts does not match array rank ~D"
-                         :args (list rank))
-                 form)
-                ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
-                 (signal 'compiler-macro-notes:optimization-failure-note
-                         :datum "Type of subscripts ~S were derived to be non-integers ~S"
-                         :args (list subscripts subscript-types))
-                 form)
-                (t
-                 ;; ELT-TYPE is supplied
-                 ;; rank matches the number of subscripts
-                 ;; subscripts are declared/derived to be positive integers
-                 `(the ,elt-type ,optim-expansion))))))))
+  (let ((original-form `(aref ,@(rest form))))
+    (compiler-macro-notes:with-notes (original-form
+                                      env
+                                      :name (find-polymorph 'aref '(dense-array &rest))
+                                      :unwind-on-signal nil
+                                      :optimization-note-condition optim-speed)
+      ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
+      ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
+      (let* ((array-type   (primary-form-type array env))
+             (class        (dense-array-type-class array-type env))
+             (elt-type     (array-type-element-type array-type env))
+             (rank         (array-type-rank array-type env))
+             ;; FIXME on extensible-compound-types: This should work with simple-dense-array
+             (simple-p     (if (member :extensible-compound-types cl:*features*)
+                               (subtypep array-type 'simple-array)
+                               (subtypep array-type 'simple-dense-array))))
+        (when (eq 'cl:* class)
+          ;; Don't have much hope of optimization
+          (signal 'backend-failure :form array :form-type array-type)
+          (return-from aref form))
+        (let*
+            ((storage-accessor (storage-accessor class))
+             (storage-type     (funcall (storage-type-inferrer-from-array-type
+                                         class)
+                                        `(%dense-array ,elt-type ,rank)))
+             (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
+             (os              (make-gensym-list (length subscripts) "OFFSET"))
+             (ss              (make-gensym-list (length subscripts) "STRIDE"))
+             (optim-expansion
+               (once-only (array)
+                 (if simple-p
+                     `(locally (declare (type dense-array ,array))
+                        (destructuring-lists ((int-index ,ss (array-strides ,array)
+                                                         :dynamic-extent nil))
+                          (,storage-accessor
+                           (the ,storage-type (array-storage ,array))
+                           (the-size (+ ,@(mapcar (lm ss sub
+                                                      `(the-size
+                                                        (* ,ss ,sub)))
+                                                  ss subscripts))))))
+                     `(locally (declare (type dense-array ,array))
+                        (destructuring-lists ((size      ,os (array-offsets ,array)
+                                                         :dynamic-extent nil)
+                                              (int-index ,ss (array-strides ,array)
+                                                         :dynamic-extent nil))
+                          (,storage-accessor
+                           (the ,storage-type (array-storage ,array))
+                           (the-size (+ ,@os
+                                        ,@(mapcar (lm ss sub
+                                                      `(the-size
+                                                        (* ,ss ,sub)))
+                                                  ss subscripts))))))))))
+          (return-from aref
+            (cond ((eq '* elt-type)
+                   (signal 'element-type-failure :form array :form-type array-type)
+                   optim-expansion)
+                  ((not (integerp rank))
+                   (signal 'rank-failure :form array :form-type array-type)
+                   form)
+                  ((not (= rank (length subscripts)))
+                   (signal 'compiler-macro-notes:optimization-failure-note
+                           :datum "Number of subscripts does not match array rank ~D"
+                           :args (list rank))
+                   form)
+                  ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
+                   (signal 'compiler-macro-notes:optimization-failure-note
+                           :datum "Type of subscripts~%  ~S~%could not be derived to be non-negative-integers~%  ~S"
+                           :args (list subscripts subscript-types))
+                   form)
+                  (t
+                   ;; ELT-TYPE is supplied
+                   ;; rank matches the number of subscripts
+                   ;; subscripts are declared/derived to be positive integers
+                   `(the ,elt-type ,optim-expansion)))))))))
 
 
 
 (defpolymorph-compiler-macro (setf aref) (t dense-array &rest)
     (&whole form new-value array &rest subscripts &environment env)
-  (compiler-macro-notes:with-notes (form env
-                                    :name (find-polymorph 'aref '(dense-array &rest))
-                                    :unwind-on-signal nil
-                                    :optimization-note-condition optim-speed)
-    ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
-    ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
-    (let* ((array-type (primary-form-type array env))
-           (class      (dense-array-type-class array-type env))
-           (elt-type   (array-type-element-type array-type env))
-           (rank       (array-type-rank array-type env))
-           (simple-p   (if (member :extensible-compound-types cl:*features*)
-                           (subtypep array-type 'simple-array)
-                           (subtypep array-type 'simple-dense-array))))
-      (when (eq 'cl:* class)
-        ;; Don't have much hope of optimization
-        (signal 'backend-failure :form array :form-type array-type)
-        (return-from aref form))
-      (let*
-          ((storage-accessor (storage-accessor class))
-           (storage-type    (funcall (storage-type-inferrer-from-array-type
-                                      class)
-                                     `(%dense-array ,elt-type ,rank)))
-           (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
-           (new-value-type  (primary-form-type new-value env))
-           (os              (make-gensym-list (length subscripts) "OFFSET"))
-           (ss              (make-gensym-list (length subscripts) "STRIDE"))
-           (optim-expansion
-             (once-only (array)
-               (if simple-p
-                   `(locally (declare (type dense-array ,array))
-                      (destructuring-lists ((int-index ,ss (array-strides ,array)
-                                                       :dynamic-extent nil))
-                        (setf (,storage-accessor
-                               (the ,storage-type (array-storage ,array))
-                               (the-size (+ ,@(mapcar (lm ss sub
-                                                          `(the-size
-                                                            (* ,ss ,sub)))
-                                                      ss subscripts))))
-                              (the ,elt-type ,new-value))))
-                   `(locally (declare (type dense-array ,array))
-                      (destructuring-lists ((size      ,os (array-offsets ,array)
-                                                       :dynamic-extent nil)
-                                            (int-index ,ss (array-strides ,array)
-                                                       :dynamic-extent nil))
-                        (setf (,storage-accessor
-                               (the ,storage-type (array-storage ,array))
-                               (the-size (+ ,@os
-                                            ,@(mapcar (lm ss sub
-                                                          `(the-size
-                                                            (* ,ss ,sub)))
-                                                      ss subscripts))))
-                              (the ,elt-type ,new-value))))))))
+  (let ((original-form `(funcall #'(setf aref) ,@(rest form))))
+    (compiler-macro-notes:with-notes (original-form
+                                      env
+                                      :name (find-polymorph 'aref '(dense-array &rest))
+                                      :unwind-on-signal nil
+                                      :optimization-note-condition optim-speed)
+      ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
+      ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
+      (let* ((array-type (primary-form-type array env))
+             (class      (dense-array-type-class array-type env))
+             (elt-type   (array-type-element-type array-type env))
+             (rank       (array-type-rank array-type env))
+             (simple-p   (if (member :extensible-compound-types cl:*features*)
+                             (subtypep array-type 'simple-array)
+                             (subtypep array-type 'simple-dense-array))))
+        (when (eq 'cl:* class)
+          ;; Don't have much hope of optimization
+          (signal 'backend-failure :form array :form-type array-type)
+          (return-from aref form))
+        (let*
+            ((storage-accessor (storage-accessor class))
+             (storage-type    (funcall (storage-type-inferrer-from-array-type
+                                        class)
+                                       `(%dense-array ,elt-type ,rank)))
+             (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
+             (new-value-type  (primary-form-type new-value env))
+             (os              (make-gensym-list (length subscripts) "OFFSET"))
+             (ss              (make-gensym-list (length subscripts) "STRIDE"))
+             (optim-expansion
+               (once-only (array)
+                 (if simple-p
+                     `(locally (declare (type dense-array ,array))
+                        (destructuring-lists ((int-index ,ss (array-strides ,array)
+                                                         :dynamic-extent nil))
+                          (setf (,storage-accessor
+                                 (the ,storage-type (array-storage ,array))
+                                 (the-size (+ ,@(mapcar (lm ss sub
+                                                            `(the-size
+                                                              (* ,ss ,sub)))
+                                                        ss subscripts))))
+                                (the ,elt-type ,new-value))))
+                     `(locally (declare (type dense-array ,array))
+                        (destructuring-lists ((size      ,os (array-offsets ,array)
+                                                         :dynamic-extent nil)
+                                              (int-index ,ss (array-strides ,array)
+                                                         :dynamic-extent nil))
+                          (setf (,storage-accessor
+                                 (the ,storage-type (array-storage ,array))
+                                 (the-size (+ ,@os
+                                              ,@(mapcar (lm ss sub
+                                                            `(the-size
+                                                              (* ,ss ,sub)))
+                                                        ss subscripts))))
+                                (the ,elt-type ,new-value))))))))
 
-        (return-from aref
-          (cond ((eq '* elt-type)
-                 (signal 'element-type-failure :form array :form-type array-type)
-                 optim-expansion)
-                ((not (integerp rank))
-                 (signal 'rank-failure :form array :form-type array-type)
-                 form)
-                ((not (= rank (length subscripts)))
-                 (signal 'compiler-macro-notes:optimization-failure-note
-                         :datum "Number of subscripts does not match array rank ~D"
-                         :args (list rank))
-                 form)
-                ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
-                 (signal 'compiler-macro-notes:optimization-failure-note
-                         :datum "Type of subscripts ~S were derived to be non-integers ~S"
-                         :args (list subscripts subscript-types))
-                 form)
-                ((not (subtypep new-value-type elt-type env))
-                 (signal 'compiler-macro-notes:note
-                         :datum "Type of the new-value form~%  ~S~%was derived to be ~S not of type ~S"
-                         :args (list new-value new-value-type elt-type))
-                 form)
-                (t
-                 `(the ,elt-type ,optim-expansion))))))))
+          (return-from aref
+            (cond ((eq '* elt-type)
+                   (signal 'element-type-failure :form array :form-type array-type)
+                   optim-expansion)
+                  ((not (integerp rank))
+                   (signal 'rank-failure :form array :form-type array-type)
+                   form)
+                  ((not (= rank (length subscripts)))
+                   (signal 'compiler-macro-notes:optimization-failure-note
+                           :datum "Number of subscripts does not match array rank ~D"
+                           :args (list rank))
+                   form)
+                  ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
+                   (signal 'compiler-macro-notes:optimization-failure-note
+                           :datum "Type of subscripts~%  ~S~%could not be derived to be non-negative-integers~%  ~S"
+                           :args (list subscripts subscript-types))
+                   form)
+                  ((not (subtypep new-value-type elt-type env))
+                   (signal 'compiler-macro-notes:note
+                           :datum "Type of the new-value form~%  ~S~%was derived to be ~S not of type ~S"
+                           :args (list new-value new-value-type elt-type))
+                   form)
+                  (t
+                   `(the ,elt-type ,optim-expansion)))))))))
