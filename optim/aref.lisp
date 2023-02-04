@@ -17,6 +17,8 @@
                                    (row-major-aref ,array1-sym i)
                                    (row-major-aref ,array2-sym i)))))))
 
+;; TODO: These can be optimized slightly, given that AREF and AREF* are now separate.
+
 (defpolymorph-compiler-macro aref (dense-array &rest)
     (&whole form array &rest subscripts &environment env)
   (let ((original-form `(aref ,@(rest form))))

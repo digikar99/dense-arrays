@@ -292,7 +292,7 @@ Evaluation took:
 
 NIL
 CL-USER> (let ((a (dense-arrays:make-array '(1000 1000))))
-           (time (loop for i below 1000 do (dense-arrays:aref a nil i))))
+           (time (loop for i below 1000 do (dense-arrays:aref* a nil i))))
 Evaluation took:
   0.000 seconds of real time
   0.000910 seconds of total run time (0.000878 user, 0.000032 system)
@@ -353,12 +353,12 @@ DENSE-ARRAYS-DEMO> (make-array '(2 3 4) :constructor #'+)
     (2 3 4 5)
     (3 4 5 6))
  {100980B593}>
-DENSE-ARRAYS-DEMO> (aref * 1 '(0 :step 2))
+DENSE-ARRAYS-DEMO> (aref* * 1 '(0 :step 2))
 #<STANDARD-DENSE-ARRAY NIL 2x4 T
    (1 2 3 4)
    (3 4 5 6)
  {1009810073}>
-DENSE-ARRAYS-DEMO> (aref ** 1 '(-1 :step -2))
+DENSE-ARRAYS-DEMO> (aref* ** 1 '(-1 :step -2))
 #<STANDARD-DENSE-ARRAY NIL 2x4 T
    (3 4 5 6)
    (1 2 3 4)
@@ -404,21 +404,21 @@ NIL
 **Slicing facilities**
 
 ```lisp
-DENSE-ARRAYS-DEMO> (aref a nil 1)
+DENSE-ARRAYS-DEMO> (aref* a nil 1)
 #<STANDARD-DENSE-ARRAY NIL 4 T
    1
    2
    3
    4
  {100984D933}>
-DENSE-ARRAYS-DEMO> (aref a nil -1)
+DENSE-ARRAYS-DEMO> (aref* a nil -1)
 #<STANDARD-DENSE-ARRAY NIL 4 T
    9
    10
    11
    12
  {100984ECC3}>
-DENSE-ARRAYS-DEMO> (aref a 1)
+DENSE-ARRAYS-DEMO> (aref* a 1)
 #<STANDARD-DENSE-ARRAY NIL 10 T
    1
    2
@@ -431,26 +431,26 @@ DENSE-ARRAYS-DEMO> (aref a 1)
    9
    10
  {100984FFA3}>
-DENSE-ARRAYS-DEMO> (aref a '(1 :end 3) '(1 :end 3))
+DENSE-ARRAYS-DEMO> (aref* a '(1 :end 3) '(1 :end 3))
 #<STANDARD-DENSE-ARRAY NIL 2x2 T
    (2 3)
    (3 4)
  {10098622A3}>
-DENSE-ARRAYS-DEMO> (defparameter b (aref a '(1 :end 3) '(1 :end 8 :step 2)))
+DENSE-ARRAYS-DEMO> (defparameter b (aref* a '(1 :end 3) '(1 :end 8 :step 2)))
 B
 DENSE-ARRAYS-DEMO> b
 #<STANDARD-DENSE-ARRAY NIL 2x4 T
    (2 4 6 8)
    (3 5 7 9)
  {1009863FF3}>
-DENSE-ARRAYS-DEMO> (aref b (make-array '(2 4) :initial-contents '((0 1 0 0) (1 1 0 0))
+DENSE-ARRAYS-DEMO> (aref* b (make-array '(2 4) :initial-contents '((0 1 0 0) (1 1 0 0))
                                        :element-type 'bit))
 #<STANDARD-DENSE-ARRAY :ROW-MAJOR 3 T
    4
    3
    5
  {1009867F13}>
-DENSE-ARRAYS-DEMO> (setf (aref b (make-array '(2 4)
+DENSE-ARRAYS-DEMO> (setf (aref* b (make-array '(2 4)
                                              :initial-contents '((0 1 0 0) (1 1 0 0))
                                              :element-type 'bit))
                          0)
