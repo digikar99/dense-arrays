@@ -346,12 +346,8 @@ CL-USER> (setq *print-length* 10) ; also intends to respect (*print-level* *prin
 ```lisp
 DENSE-ARRAYS-DEMO> (make-array '(2 3 4) :constructor #'+)
 #<STANDARD-DENSE-ARRAY :ROW-MAJOR 2x3x4 T
-   ((0 1 2 3)
-    (1 2 3 4)
-    (2 3 4 5))
-   ((1 2 3 4)
-    (2 3 4 5)
-    (3 4 5 6))
+  ((0 1 2 3) (1 2 3 4) (2 3 4 5))
+  ((1 2 3 4) (2 3 4 5) (3 4 5 6))
  {100980B593}>
 DENSE-ARRAYS-DEMO> (aref* * 1 '(0 :step 2))
 #<STANDARD-DENSE-ARRAY NIL 2x4 T
@@ -373,21 +369,6 @@ DENSE-ARRAYS-DEMO> (make-array '(2 100))
    (0 0 0 0 0 0 0 0 0 0 ...)
    (0 0 0 0 0 0 0 0 0 0 ...)
  {10098286B3}>
-DENSE-ARRAYS-DEMO> (describe (make-array '(2 10)))
-#<STANDARD-DENSE-ARRAY :ROW-MAJOR 2x10 T {100982C243}>
-  [standard-object]
-
-Slots with :INSTANCE allocation:
-  STORAGE                        = #(0 0 0 0 0 0 0 0 0 0 ...)
-  DIMENSIONS                     = (2 10)
-  ELEMENT-TYPE                   = T
-  RANK                           = 2
-  TOTAL-SIZE                     = 20
-  STRIDES                        = (10 1)
-  OFFSETS                        = (0 0)
-  LAYOUT                         = :ROW-MAJOR
-  ROOT-ARRAY                     = NIL
-; No value
 DENSE-ARRAYS-DEMO> (defparameter a (make-array '(4 10) :constructor #'+))
 A
 DENSE-ARRAYS-DEMO> (print-array a "~2d")
@@ -444,7 +425,7 @@ DENSE-ARRAYS-DEMO> b
    (3 5 7 9)
  {1009863FF3}>
 DENSE-ARRAYS-DEMO> (aref* b (make-array '(2 4) :initial-contents '((0 1 0 0) (1 1 0 0))
-                                       :element-type 'bit))
+                                               :element-type 'bit))
 #<STANDARD-DENSE-ARRAY :ROW-MAJOR 3 T
    4
    3

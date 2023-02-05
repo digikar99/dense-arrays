@@ -370,60 +370,90 @@ Also see:
                           (switch ((array-element-type array) :test #'type=)
                             ('double-float "~,15,3@e")
                             ('single-float "~,7,2@e")
-                            (t             "~s")))))
+                            (t             "~s"))))
+         (*print-level* (if *print-level*
+                            (1+ *print-level*)
+                            *print-level*)))
     ;; Do variable declarations before just to save some horizontal space
-    (pprint-logical-block (stream nil)
-      (print-unreadable-object (array stream :identity t :type t)
-        ;; header
-        (format stream "~S " layout)
-        (if (zerop rank)
-            (format stream "NIL ~S"
-                    (array-element-type array))
-            (format stream "~{~S~^x~} ~S"
-                    (narray-dimensions array)
-                    (array-element-type array)))
-        ;; DONE: *print-level*
-        ;; DONE: *print-lines*
-        ;; DONE: *print-length*
-        (when (and *print-array*
-                   (not (or (zerop (array-total-size array))
-                            (and *print-lines* (< *print-lines* 3))
-                            (and *print-level*
-                                 (< *print-level* 1)
-                                 (progn
-                                   (write-string " #" stream)
-                                   t)))))
-          ;; print the array elements
-          (labels ((data-as-lol (&optional (depth 0))
-                     ;; Get the relevant data from storage vector as a
-                     ;; potentially nested list (list of lists)
-                     (cond ((= depth rank)
-                            (format nil fmt-control (aref sv index)))
-                           ((and *print-level* (= depth *print-level*))
-                            "#")
-                           (t
-                            (loop :with dim := (array-dimension array depth)
-                                  :with print-length := (if *print-length*
-                                                            (min dim *print-length*)
-                                                            dim)
-                                  :with offset := (array-offset array depth)
-                                  :with stride := (array-stride array depth)
-                                    :initially (incf index offset)
-                                  :repeat print-length
-                                  :collect (data-as-lol (1+ depth)) :into data
-                                  :do (incf index stride)
-                                  :finally (decf index (+ offset (* stride print-length)))
-                                           (return (nconc data (if (< print-length dim) '("...")))))))))
-            (cond ((zerop rank)
-                   (format stream " ~A" (aref sv 0)))
-                  (t
-                   (dolist (item (data-as-lol))
-                     #-ccl (pprint-newline :mandatory stream)
-                     #+ccl (format stream "~%  ")
-                     (format stream "~A" item))
-                   (pprint-indent :block -2 stream)
-                   #+ccl (terpri stream)
-                   #-ccl (pprint-newline :mandatory stream)))))))))
+    (labels ((data-as-lol (&optional (depth 0))
+               ;; Get the relevant data from storage vector as a
+               ;; potentially nested list (list of lists)
+               (cond ((= depth rank)
+                      (format nil fmt-control (aref sv index)))
+                     ((and *print-level* (= depth *print-level*))
+                      "#")
+                     (t
+                      (loop :with dim := (array-dimension array depth)
+                            :with print-length
+                              := (if *print-length*
+                                     (min dim *print-length*)
+                                     dim)
+                            :with offset := (array-offset array depth)
+                            :with stride := (array-stride array depth)
+                              :initially (incf index offset)
+                            :repeat print-length
+                            :collect (data-as-lol (1+ depth)) :into data
+                            :do (incf index stride)
+                            :finally
+                               (decf index
+                                     (+ offset (* stride print-length)))
+                               (return (nconc data
+                                              (when (< print-length dim)
+                                                '("..."))))))))
+             (pretty-print-new-line (stream)
+               #-ccl (pprint-newline :mandatory stream)
+               #+ccl (format stream "~%  ")))
+      (let* ((items (data-as-lol))
+             (len   (length items))
+             (num-lines 3))
+        (pprint-logical-block (stream items)
+          (print-unreadable-object (array stream :identity t :type t)
+            (format stream "~S " layout)
+            ;; header
+            (if (zerop rank)
+                (format stream "NIL ~S"
+                        (array-element-type array))
+                (format stream "~{~S~^x~} ~S"
+                        (narray-dimensions array)
+                        (array-element-type array)))
+            (when (and *print-array*
+                       (not (or (zerop (array-total-size array))
+                                (and *print-lines* (< *print-lines* 3))
+                                (and *print-level*
+                                     (< *print-level* 1)
+                                     (progn
+                                       (write-string " #" stream)
+                                       t)))))
+              (pretty-print-new-line stream)
+              ;; DONE: *print-level*
+              ;; DONE: *print-lines*
+              ;; DONE: *print-length*
+              ;; print the array elements
+              (cond ((zerop rank)
+                     (format stream " ~A" (aref sv 0)))
+                    (t
+                     (loop :for item :in items
+                           :for i :below len
+                           :do (let* ((printed-item (format nil "~A" item))
+                                      (newline-count (1+ (count #\newline printed-item))))
+                                 (when (or (null *print-lines*)
+                                           (and *print-lines*
+                                                (<= (+ num-lines newline-count)
+                                                    *print-lines*)))
+                                   (write-string printed-item stream)
+                                   (when (= i (1- len))
+                                     (pprint-indent :block -2 stream))
+                                   (pretty-print-new-line stream)
+                                   (incf num-lines newline-count))
+                                 (when (and *print-lines*
+                                            (not (<= (+ num-lines newline-count)
+                                                     *print-lines*))
+                                            (< i (1- len)))
+                                   ;; We have more items to print, but no more lines
+                                   (format stream "..")
+                                   (pprint-indent :block -2 stream)
+                                   (pretty-print-new-line stream)
+                                   (return)))))))))))))
 
 (defun print-array (array &optional array-element-print-format &key level length
                                                                  (stream nil streamp))
@@ -439,26 +469,29 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
   nil)
 
 (def-test print-array ()
-  (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello
-                                       :class 'standard-dense-array)))
-    (macrolet ((lines (n)
-                 `(with-output-to-string (*standard-output*)
-                    (let ((*print-lines* ,n))
-                      (print-array array "~D"))))
-               (len (n)
-                 `(with-output-to-string (*standard-output*)
-                    (let ((*print-length* ,n))
-                      (print-array array "~D"))))
-               (level (n)
-                 `(with-output-to-string (*standard-output*)
-                    (let ((*print-level* ,n))
-                      (print-array array "~D")))))
-      (is (<= (count #\newline (lines 3))
-              3))
-      (is (<= (count #\newline (lines 2))
-              2))
-      (is (>= 3 (count #\newline (len 0))))
-      (is (>= 4 (count #\newline (len 1))))
-      (is (= 5 (count #\newline (len 2))))
-      (is (= 1 (count #\newline (level 0))))
-      (is (= 7 (count #\newline (level 1)))))))
+  (let ((*print-lines*  nil)
+        (*print-length* nil)
+        (*print-level*  nil))
+    (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello
+                                                :class 'standard-dense-array)))
+      (macrolet ((lines (n)
+                   `(with-output-to-string (*standard-output*)
+                      (let ((*print-lines* ,n))
+                        (print-array array "~D"))))
+                 (len (n)
+                   `(with-output-to-string (*standard-output*)
+                      (let ((*print-length* ,n))
+                        (print-array array "~D"))))
+                 (level (n)
+                   `(with-output-to-string (*standard-output*)
+                      (let ((*print-level* ,n))
+                        (print-array array "~D")))))
+        (is (<= (count #\newline (lines 3))
+                3))
+        (is (<= (count #\newline (lines 2))
+                2))
+        (is (>= 3 (count #\newline (len 0))))
+        (is (>= 4 (count #\newline (len 1))))
+        (is (= 5 (count #\newline (len 2))))
+        (is (= 1 (count #\newline (level 0))))
+        (is (= 7 (count #\newline (level 1))))))))
