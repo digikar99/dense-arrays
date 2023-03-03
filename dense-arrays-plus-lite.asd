@@ -1,6 +1,7 @@
 (defsystem "dense-arrays-plus-lite"
   :depends-on ("dense-arrays"
                "trivial-coerce"
+               "extensible-compound-types-interfaces"
                "uiop")
   :pathname #P"plus/"
   :components ((:file "lite"))

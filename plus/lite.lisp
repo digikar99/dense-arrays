@@ -2,6 +2,17 @@
   (:mix :dense-arrays #+extensible-compound-types :extensible-compound-types-cl
         :cl :5am :alexandria)
   (:import-from
+   :extensible-compound-types-interfaces
+   #:define-interface-instance
+   #:array-like
+   #:row-major-iterator
+   #:dimensions-and-strides
+   #:element-type
+   #:dimensions)
+  (:import-from
+   :extensible-compound-types-interfaces.impl
+   #:max-type)
+  (:import-from
    #:dense-arrays
    #:lm
    #:size
@@ -36,153 +47,58 @@
 (def-suite :dense-arrays-plus-lite)
 (in-suite :dense-arrays-plus-lite)
 
-;; ASARRAY ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun dimensions (array-like)
-  "Consequences of ARRAY-LIKE having elements of different dimensions is undefined."
-  (typecase array-like
-    (string      nil)
-    (sequence    (let ((len (length array-like)))
-                   (cons len
-                         (when (> len 0) (dimensions (elt array-like 0))))))
-    (cl:array    (cl:array-dimensions array-like))
-    (dense-array (array-dimensions array-like))
-    (t           ())))
-
-
-(defun max-type (type-1 type-2)
-  (cond ((subtypep type-1 type-2)
-         type-2)
-        ((subtypep type-2 type-1)
-         type-1)
-        ((or (alexandria:type= type-1 'double-float)
-             (alexandria:type= type-2 'double-float))
-         'double-float)
-        ((or (alexandria:type= type-1 'single-float)
-             (alexandria:type= type-2 'single-float))
-         'single-float)
-        ;; At this point, none of the types are floats
-        ;; FIXME: Operate better on impl with other float types
-        ((and (subtypep type-1 '(unsigned-byte *))
-              (subtypep type-2 '(signed-byte *)))
-         (loop :for num-bits :in '(8 16 32 64)
-               :if (subtypep type-1 `(signed-byte ,num-bits))
-                 :do (return-from max-type `(signed-byte ,num-bits))
-               :finally (return-from max-type 'single-float)))
-        ((and (subtypep type-1 '(signed-byte *))
-              (subtypep type-2 '(unsigned-byte *)))
-         (loop :for num-bits :in '(8 16 32 64)
-               :if (subtypep type-2 `(signed-byte ,num-bits))
-                 :do (return-from max-type `(signed-byte ,num-bits))
-               :finally (return-from max-type 'single-float)))
-        (t
-         (error "Don't know how to find MAX-TYPE of ~S and ~S" type-1 type-2))))
-
-(defun element-type (array-like)
-  "Consequences of ARRAY-LIKE having elements of different element-type is undefined."
-  (typecase array-like
-    (string      t)
-    (sequence    (if (< 0 (length array-like))
-                     (loop :for i :from 1 :below (length array-like)
-                           :with max-type := (element-type (elt array-like 0))
-                           :do (setq max-type
-                                     (max-type max-type
-                                               (element-type (elt array-like i))))
-                           :finally (return max-type))
-                     'null))
-    (cl:array    (cl:array-element-type array-like))
-    (dense-array (array-element-type (array-displaced-to array-like)))
-    (t           (type-of array-like))))
-
-(def-test dimensions ()
-  (is (equalp '(3)   (dimensions '(1 2 3))))
-  (is (equalp '(1 3) (dimensions '(#(1 2 3)))))
-  (is (equalp '(2 3 4)
-              (dimensions (list (make-array '(3 4) :element-type 'single-float)
-                                (make-array '(3 4) :element-type 'single-float)))))
-  (is (equalp '(2 3 4)
-              (dimensions (list (cl:make-array '(3 4))
-                                (cl:make-array '(3 4)))))))
-
-(defvar *index*)
-(defvar *storage*)
-(defvar *storage-accessor*)
-(defvar *remaining-strides*)
-(defvar *remaining-dimensions*)
-
-(defmethod traverse ((object t))
-  (funcall (fdefinition `(setf ,*storage-accessor*))
-           (trivial-coerce:coerce object (array-element-type *storage*))
-           *storage* *index*))
-
-(defmethod traverse ((object string))
-  (funcall (fdefinition `(setf ,*storage-accessor*))
-           object
-            *storage* *index*))
-
-(macrolet ((def-stub (type)
-             `(defmethod traverse ((object ,type))
-                (let ((*remaining-strides* (rest *remaining-strides*))
-                      (*remaining-dimensions* (rest *remaining-dimensions*))
-                      (*Index* *index*))
-                  (map nil (lambda (elt)
-                             (traverse elt)
-                             (incf *index* (first *remaining-strides*)))
-                       object)
-                  (decf *index* (* (first *remaining-strides*)
-                                   (first *remaining-dimensions*)))))))
-  (def-stub vector)
-  (def-stub list))
-
-(defmethod traverse ((object cl:array))
-  (error "Do not know how to TRAVERSE CL:ARRAY while maintaining stride information")
-  ;; (loop :for i :from 0 :below (cl:array-total-size object)
-  ;;       :do (traverse (cl:row-major-aref object i)))
-  )
-
-(defmethod traverse ((object dense-arrays::dense-array))
-  (error "Do not know how to TRAVERSE DENSE-ARRAYS::DENSE-ARRAY while maintaining stride information")
-  ;; (do-arrays ((a object))
-  ;;   (traverse a))
-  )
+(define-interface-instance array-like dense-array
+  (dimensions-and-strides (array)
+    (values (array-dimensions array)
+            (array-strides array)))
+  (element-type (array)
+    (array-element-type array))
+  (row-major-iterator (array)
+    (let ((total-size-1 (1- (array-total-size array)))
+          (row-major-index -1))
+      (lambda ()
+        (incf row-major-index)
+        (values (row-major-aref array row-major-index)
+                (not (cl:= total-size-1 row-major-index)))))))
 
 ;; - But should the result type be array or dense-arrays::dense-array,
 ;;   or something else?
-(defun asarray (array-like &key (out nil outp) (type default-element-type) (layout *array-layout*))
+(defun asarray (array-like &key (out nil outp)
+                             (type default-element-type typep)
+                             (layout *array-layout*))
   "TYPE can also be :AUTO"
-  (let* ((dimensions (dimensions array-like)))
+  (let* ((dimensions (dimensions-and-strides array-like)))
     (when outp
       (check-type out dense-array)
       (assert (equalp dimensions (narray-dimensions out)) (out))
-      (assert (type= type (array-element-type out)) (out)))
+      (if typep
+          (assert (type= type (array-element-type out)) (out))
+          (setq type (array-element-type out))))
     (let* ((array      (or out
                            (make-array dimensions
                                        :element-type (if (eq :auto type)
                                                          (element-type array-like)
                                                          type)
                                        :layout layout)))
-           (*storage*  (array-displaced-to array))
-           (*storage-accessor* (storage-accessor (class-of array)))
-           (*index*    0)
-           (*remaining-strides* (cons (array-total-size array)
-                                      (array-strides array)))
-           (*remaining-dimensions* (cons 1 (narray-dimensions array))))
-      (traverse array-like)
+           (type     (array-element-type array))
+           (iterator (row-major-iterator array-like)))
+      (if (functionp iterator)
+          (do-arrays ((x array))
+            (setf x (trivial-coerce:coerce (funcall iterator) type)))
+          (setf (aref array) (trivial-coerce:coerce iterator type)))
       array)))
 
 (def-test asarray ()
-  (5am:signals error (array= (make-array '(2 1 3) :initial-contents '(((1 2 3))
-                                                                      ((1 2 3)))
-                                                  :element-type '(unsigned-byte 2))
-                             (asarray '(#2a((1 2 3)) #2a((1 2 3))) :type '(integer 0 3))))
   (is (array= (make-array '(2 1 3) :initial-contents '(((1 2 3))
                                                        ((1 2 3)))
                                    :element-type '(unsigned-byte 2))
-              (asarray '(#((1 2 3)) #((1 2 3))) :type '(integer 0 3))))
+              (asarray '(#2a((1 2 3)) #2a((1 2 3))) :type '(integer 0 3))))
   (is (array= (make-array '(2 1 3) :initial-contents '(((1 2 3))
                                                        ((1 2 3)))
                                    :element-type '(unsigned-byte 2))
-              (asarray '(#((1 2 3)) #((1 2 3))) :type '(integer 0 3) :layout :column-major)))
+              (asarray '(#2a((1 2 3)) #2a((1 2 3))) :type '(integer 0 3)
+                                                    :layout :column-major)))
   (is (array= (make-array '(1 3) :initial-contents '((1 2 3))
                                  :element-type '(unsigned-byte 2))
               (asarray '(#(1 2 3)) :type '(integer 0 3))))
