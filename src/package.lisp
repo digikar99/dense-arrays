@@ -62,6 +62,8 @@
        (:export ,@shadow-symbols
                 ,@abstract-array-symbols)
        (:shadow ,@shadow-symbols)
+       (:import-from :extensible-compound-types.impl
+                     #:simplify-and-type)
        (:import-from :abstract-arrays
                      #:+abstract-array-slot-order+
                      #:define-ordered-class-with-required-slots

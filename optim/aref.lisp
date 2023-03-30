@@ -29,7 +29,8 @@
                                       :optimization-note-condition optim-speed)
       ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
       ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
-      (let* ((array-type   (primary-form-type array env))
+      (let* ((array-type   (simplify-and-type `(and ,(primary-form-type array env) t)
+                                              env))
              (class        (dense-array-type-class array-type env))
              (elt-type     (array-type-element-type array-type env))
              (rank         (array-type-rank array-type env))
@@ -108,7 +109,8 @@
                                       :optimization-note-condition optim-speed)
       ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
       ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
-      (let* ((array-type (primary-form-type array env))
+      (let* ((array-type (simplify-and-type `(and ,(primary-form-type array env) t)
+                                            env))
              (class      (dense-array-type-class array-type env))
              (elt-type   (array-type-element-type array-type env))
              (rank       (array-type-rank array-type env))
