@@ -435,15 +435,19 @@ Also see:
                      (loop :for item :in items
                            :for i :below len
                            :do (let* ((printed-item (format nil "~A" item))
-                                      (newline-count (1+ (count #\newline printed-item))))
+                                      (newline-count (1+ (count #\newline printed-item)))
+                                      (printed-lines
+                                        (uiop:split-string printed-item
+                                                           :separator '(#\newline))))
                                  (when (or (null *print-lines*)
                                            (and *print-lines*
                                                 (<= (+ num-lines newline-count)
                                                     *print-lines*)))
-                                   (write-string printed-item stream)
+                                   (dolist (line printed-lines)
+                                     (write-string line stream)
+                                     (pretty-print-new-line stream))
                                    (when (= i (1- len))
                                      (pprint-indent :block -2 stream))
-                                   (pretty-print-new-line stream)
                                    (incf num-lines newline-count))
                                  (when (and *print-lines*
                                             (not (<= (+ num-lines newline-count)
