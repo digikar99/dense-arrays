@@ -42,6 +42,23 @@
       (if datum
           (apply #'error datum datum-args)
           (error "Expectation unmet for ~S to be of type ~S" value type))))
+(define-compiler-macro assert-type (&whole whole value-form type-form
+                                    &optional datum
+                                    &rest datum-args
+                                    &environment env)
+  (declare (ignore datum datum-args))
+  (let* ((value-form-type (cl-form-types:nth-form-type value-form env 0 t t))
+         (type-form-type  (cl-form-types:nth-form-type type-form env 0 t t))
+         (type (optima:match type-form-type
+                 ((list 'eql type) type)
+                 ((list 'member type) type)
+                 (_ (return-from assert-type whole)))))
+    (multiple-value-bind (subtypep knownp)
+        (subtypep value-form-type type)
+      (cond ((and subtypep knownp)
+             value-form)
+            (t
+             whole)))))
 
 (declaim (ftype (function * dense-array) make-array))
 (defun make-array (dimensions &rest args
@@ -178,8 +195,9 @@ Additionally takes
                                              subscripts)
                                       (incf row-major-index s)
                                   :finally (decf row-major-index
-                                                 (the size (* (the size (nth r dimensions))
-                                                              (the size (nth r strides)))))))))
+                                                 (the size
+                                                      (* (the size (nth r dimensions))
+                                                         (the size (nth r strides)))))))))
                (construct (1- rank)))))
           (initial-contents-p
            (let ((row-major-index 0)
@@ -396,7 +414,7 @@ Also see:
                             :do (incf index stride)
                             :finally
                                (decf index
-                                     (+ offset (* stride print-length)))
+                                   (+ offset (* stride print-length)))
                                (return (nconc data
                                               (when (< print-length dim)
                                                 '("..."))))))))

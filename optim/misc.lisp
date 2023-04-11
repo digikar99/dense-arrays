@@ -23,7 +23,7 @@
    (form-type :initarg :form-type :reader form-type)
    (slot :initarg :slot :reader slot))
   (:report (lambda (c s)
-             (format s "Unable to identify the ~S of FORM~%  ~S~%derived to be of type ~S"
+             (format s "Unable to identify the DENSE-ARRAY ~S of FORM~%  ~S~%derived to be of type ~S"
                      (slot c) (form c) (form-type c)))))
 
 (define-condition backend-failure (slot-type-failure)

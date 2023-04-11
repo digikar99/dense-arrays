@@ -17,7 +17,7 @@
                                    (row-major-aref ,array1-sym i)
                                    (row-major-aref ,array2-sym i)))))))
 
-;; TODO: These can be optimized slightly, given that AREF and AREF* are now separate.
+;; TODO: Consider the per-axis information to further optimize without (SAFETY 0)
 
 (defpolymorph-compiler-macro aref (dense-array &rest)
     (&whole form array &rest subscripts &environment env)
@@ -37,7 +37,8 @@
              ;; FIXME on extensible-compound-types: This should work with simple-dense-array
              (simple-p     (if (member :extensible-compound-types cl:*features*)
                                (subtypep array-type 'simple-array)
-                               (subtypep array-type 'simple-dense-array))))
+                               (subtypep array-type 'simple-dense-array)))
+             (safety-zero-p (zerop (policy-quality 'safety env))))
         (when (eq 'cl:* class)
           ;; Don't have much hope of optimization
           (signal 'backend-failure :form array :form-type array-type)
@@ -48,6 +49,7 @@
                                          class)
                                         `(%dense-array ,elt-type ,rank)))
              (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
+             (ds              (make-gensym-list (length subscripts) "DIMENSION"))
              (os              (make-gensym-list (length subscripts) "OFFSET"))
              (ss              (make-gensym-list (length subscripts) "STRIDE"))
              (optim-expansion
@@ -55,25 +57,42 @@
                  (if simple-p
                      `(locally (declare (type dense-array ,array))
                         (destructuring-lists ((int-index ,ss (array-strides ,array)
+                                                         :dynamic-extent nil)
+                                              (size      ,ds (narray-dimensions ,array)
                                                          :dynamic-extent nil))
+                          ,(when (not safety-zero-p)
+                             `(when (not (and ,@(mapcar (lm d s `(<= 0 ,s (1- ,d)))
+                                                        ds subscripts)))
+                                (error 'invalid-array-index
+                                       :array ,array :index (list ,@subscripts)
+                                       :suggestion
+                                       "Did you mean to use DENSE-ARRAYS:AREF* ?")))
                           (,storage-accessor
                            (the ,storage-type (array-storage ,array))
-                           (the-size (+ ,@(mapcar (lm ss sub
-                                                      `(the-size
-                                                        (* ,ss ,sub)))
-                                                  ss subscripts))))))
+                           (the-int-index (+ ,@(mapcar (lm ss sub
+                                                           `(the-size
+                                                             (* ,ss ,sub)))
+                                                       ss subscripts))))))
                      `(locally (declare (type dense-array ,array))
                         (destructuring-lists ((size      ,os (array-offsets ,array)
                                                          :dynamic-extent nil)
+                                              (size      ,ds (narray-dimensions ,array)
+                                                         :dynamic-extent nil)
                                               (int-index ,ss (array-strides ,array)
                                                          :dynamic-extent nil))
+                          ,(when (not safety-zero-p)
+                             `(when (not (and ,@(mapcar (lm d s `(<= 0 ,s (1- ,d)))
+                                                        ds subscripts)))
+                                (error 'invalid-array-index-error
+                                       :array ,array :index (list ,@subscripts)
+                                       :suggestion
+                                       "Did you mean to use DENSE-ARRAYS:AREF* ?")))
                           (,storage-accessor
                            (the ,storage-type (array-storage ,array))
-                           (the-size (+ ,@os
-                                        ,@(mapcar (lm ss sub
-                                                      `(the-size
-                                                        (* ,ss ,sub)))
-                                                  ss subscripts))))))))))
+                           (the-size (+ ,@os ,@(mapcar (lm ss sub
+                                                           `(the-size
+                                                             (* ,ss ,sub)))
+                                                       ss subscripts))))))))))
           (return-from aref
             (cond ((eq '* elt-type)
                    (signal 'element-type-failure :form array :form-type array-type)
@@ -83,8 +102,8 @@
                    form)
                   ((not (= rank (length subscripts)))
                    (signal 'compiler-macro-notes:optimization-failure-note
-                           :datum "Number of subscripts does not match array rank ~D"
-                           :args (list rank))
+                           :datum "Number of subscripts (~D) does not match array rank ~D"
+                           :args (list (length subscripts) rank))
                    form)
                   ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
                    (signal 'compiler-macro-notes:optimization-failure-note
@@ -128,26 +147,46 @@
                                        `(%dense-array ,elt-type ,rank)))
              (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
              (new-value-type  (primary-form-type new-value env))
+             (ds              (make-gensym-list (length subscripts) "DIMENSION"))
              (os              (make-gensym-list (length subscripts) "OFFSET"))
              (ss              (make-gensym-list (length subscripts) "STRIDE"))
+             (safety-zero-p (zerop (policy-quality 'safety env)))
              (optim-expansion
                (once-only (array)
                  (if simple-p
                      `(locally (declare (type dense-array ,array))
                         (destructuring-lists ((int-index ,ss (array-strides ,array)
+                                                         :dynamic-extent nil)
+                                              (size      ,ds (narray-dimensions ,array)
                                                          :dynamic-extent nil))
+                          ,(when (not safety-zero-p)
+                             `(when (not (and ,@(mapcar (lm d s `(<= 0 ,s (1- ,d)))
+                                                        ds subscripts)))
+                                (error 'invalid-array-index
+                                       :array ,array :index (list ,@subscripts)
+                                       :suggestion
+                                       "Did you mean to use (SETF DENSE-ARRAYS:AREF*) ?")))
                           (setf (,storage-accessor
                                  (the ,storage-type (array-storage ,array))
-                                 (the-size (+ ,@(mapcar (lm ss sub
-                                                            `(the-size
-                                                              (* ,ss ,sub)))
-                                                        ss subscripts))))
+                                 (the-int-index (+ ,@(mapcar (lm ss sub
+                                                                 `(the-size
+                                                                   (* ,ss ,sub)))
+                                                             ss subscripts))))
                                 (the ,elt-type ,new-value))))
                      `(locally (declare (type dense-array ,array))
                         (destructuring-lists ((size      ,os (array-offsets ,array)
                                                          :dynamic-extent nil)
+                                              (size      ,ds (narray-dimensions ,array)
+                                                         :dynamic-extent nil)
                                               (int-index ,ss (array-strides ,array)
                                                          :dynamic-extent nil))
+                          ,(when (not safety-zero-p)
+                             `(when (not (and ,@(mapcar (lm d s `(<= 0 ,s (1- ,d)))
+                                                        ds subscripts)))
+                                (error 'invalid-array-index
+                                       :array ,array :index (list ,@subscripts)
+                                       :suggestion
+                                       "Did you mean to use (SETF DENSE-ARRAYS:AREF*) ?")))
                           (setf (,storage-accessor
                                  (the ,storage-type (array-storage ,array))
                                  (the-size (+ ,@os

@@ -1,5 +1,20 @@
-
 (in-package :dense-arrays)
+
+(define-condition invalid-array-index-for-axis (invalid-array-index)
+  ((axis  :initarg :axis)
+   (valid :initarg :valid :initform nil))
+  (:report (lambda (c s)
+             (with-slots (axis index valid) c
+               (format s "Invalid index ~A for array axis of length ~A."
+                       index axis)
+               (when valid
+                 (format s "~%Valid index range is from ~A to ~A (both inclusive)."
+                         (car valid) (cdr valid)))))))
+
+(define-condition invalid-index (error)
+  ((index :accessor index :initarg :index))
+  (:report (lambda (condition stream)
+             (format stream "Index ~S is invalid" (index condition)))))
 
 (defun array= (array1 array2 &key (test #'equalp))
   "Returns non-NIL if each element of ARRAY1 is equal to each corresponding
@@ -17,9 +32,14 @@ and tests for their equality."
 (defun normalize-index (index dimension)
   (declare (optimize speed)
            (type int-index index dimension))
-  (the size (if (< index 0)
-                (+ index dimension)
-                index)))
+  (let ((normalized-index (if (< index 0)
+                              (+ index dimension)
+                              index)))
+    (declare (type int-index normalized-index))
+    (if (and (<= 0 normalized-index) (< normalized-index dimension))
+        (the-size normalized-index)
+        (error 'invalid-axis-index-error :index index :axis dimension
+               :valid (cons (- dimension) (1- dimension))))))
 
 (defun %aref-view (array &rest subscripts)
   "Returns a VIEW of the subscripted ARRAY (without copying the contents)"
@@ -59,7 +79,7 @@ and tests for their equality."
                                 ss
                               (declare (type int-index start end step))
                               (psetq start (normalize-index start d)
-                                     end   (normalize-index end   d))
+                                     end   (1+ (normalize-index (1- end)   d)))
                               (when (and (< step 0) (not endp))
                                 (setq end -1))
                               (push (ceiling (- end start) step) new-dimensions)
@@ -130,26 +150,35 @@ and tests for their equality."
     (t
      (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
 
-(defpolymorph (aref :inline t) ((array dense-array) &rest subscripts) t
-  (assert (and (= (array-rank array)
+(defpolymorph (aref :inline t :static-dispatch-name da-ref)
+    ((array dense-array) &rest subscripts) t
+  (declare (optimize speed)
+           (type list subscripts))
+  (assert (and (= (the-size (array-rank array))
                   (length subscripts))
-               (every #'integerp subscripts))
-          (array subscripts))
+               (every (lambda (s d)
+                        (and (integerp s)
+                             (locally (declare (type int-index s d))
+                               (<= 0 s (1- d)))))
+                      subscripts
+                      (narray-dimensions array)))
+          (array subscripts)
+          'invalid-array-index
+          :index subscripts
+          :array array
+          :suggestion "Did you mean to use DENSE-ARRAYS:AREF* ?")
   (let* ((dense-array-class (class-of array)))
-    (assert-type
-     (funcall (storage-accessor dense-array-class)
-              (array-storage array)
-              (the int-index
-                   (let ((index 0))
-                     (declare (type size index))
-                     ;; TODO: Better error reporting for negative indices
-                     (loop :for stride :of-type int-index :in (array-strides array)
-                           :for subscript :of-type int-index :in subscripts
-                           :for offset :of-type size :in (array-offsets array)
-                           :do (incf index (+ offset
-                                              (the-size (* stride subscript)))))
-                     index)))
-     (array-element-type array))))
+    (funcall (fdefinition (storage-accessor dense-array-class))
+             (array-storage array)
+             (the size
+                  (let ((index 0))
+                    (declare (type size index))
+                    (loop :for stride :of-type size :in (array-strides array)
+                          :for subscript :of-type size :in subscripts
+                          :for offset :of-type size :in (array-offsets array)
+                          :do (incf index (+ offset
+                                             (the-size (* stride subscript)))))
+                    index)))))
 
 (defun aref* (dense-array &rest subscripts)
   "Accessor function for DENSE-ARRAYS::DENSE-ARRAY with semantics
@@ -194,33 +223,29 @@ of the array are copied over into a new array."
   (cond ((and (= (array-rank dense-array) (length subscripts))
               (every #'integerp subscripts))
          (let* ((dense-array-class (class-of dense-array)))
-           (assert-type
-            (funcall (storage-accessor dense-array-class)
-                     (array-storage dense-array)
-                     (the int-index
-                          (let ((index 0))
-                            (declare (type size index))
-                            ;; TODO: Better error reporting for negative indices
-                            (loop :for stride :of-type int-index :in (array-strides dense-array)
-                                  :for subscript :of-type int-index :in subscripts
-                                  :for offset :of-type size :in (array-offsets dense-array)
-                                  :for dimension :of-type size :in (narray-dimensions dense-array)
-                                  :do (incf index (+ offset
-                                                     (the-size
-                                                      (* stride
-                                                         (normalize-index subscript dimension))))))
-                            index)))
-            (array-element-type dense-array))))
+           (funcall (storage-accessor dense-array-class)
+                    (array-storage dense-array)
+                    (the int-index
+                         (let ((index 0))
+                           (declare (type int-index index))
+                           (loop :for stride :of-type int-index
+                                   :in (array-strides dense-array)
+                                 :for subscript :of-type int-index :in subscripts
+                                 :for offset :of-type int-index
+                                   :in (array-offsets dense-array)
+                                 :for dimension :of-type int-index
+                                   :in (narray-dimensions dense-array)
+                                 :do (incf index
+                                         (+ offset
+                                            (the-int-index
+                                             (* stride
+                                                (normalize-index subscript dimension))))))
+                           index)))))
         ((or (some #'cl:arrayp subscripts)
              (some #'arrayp subscripts))
          (apply #'%aref dense-array subscripts))
         (t
          (apply #'%aref-view dense-array subscripts))))
-
-(define-condition invalid-index (error)
-  ((index :accessor index :initarg :index))
-  (:report (lambda (condition stream)
-             (format stream "Index ~S is invalid" (index condition)))))
 
 (defun (setf %aref-view) (new-array array &rest subscripts)
   ;; TODO: Optimize
@@ -269,29 +294,41 @@ of the array are copied over into a new array."
        (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
   new-array)
 
-(defpolymorph ((setf aref) :inline t) (new-element/s (array dense-array) &rest subscripts) t
+(defpolymorph ((setf aref) :inline t)
+    (new-element/s (array dense-array) &rest subscripts)
+    t
   (declare (type dense-array array)
-           ;; (optimize speed)
+           (type list subscripts)
+           (optimize speed)
            (dynamic-extent subscripts))
+  (assert (and (= (array-rank array)
+                  (length subscripts))
+               (every (lambda (s d)
+                        (and (integerp s)
+                             (locally (declare (type int-index s d))
+                               (<= 0 s (1- d)))))
+                      subscripts
+                      (narray-dimensions array)))
+          (array subscripts)
+          'invalid-array-index-error
+          :index subscripts
+          :array array
+          :suggestion "Did you mean to use (SETF DENSE-ARRAYS:AREF*) ?")
   (with-slots (storage element-type strides offsets dimensions rank) array
-    (assert (and (= rank (length subscripts))
-                 (every #'integerp subscripts))
-            (array subscripts))
-    (assert-type new-element/s (array-element-type array))
+    (assert-type new-element/s element-type)
     (let* ((dense-array-class (class-of array)))
       (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
                new-element/s
                storage
                (let ((index 0))
                  (declare (type size index))
-                 ;; TODO: Better error reporting for negative indices
                  (loop :for stride :of-type int-index :in strides
                        :for subscript :of-type int-index :in subscripts
                        :for offset :of-type size :in offsets
                        :do (incf index
-                                 (the-size
-                                  (+ offset
-                                     (the-int-index (* stride subscript))))))
+                               (the-size
+                                (+ offset
+                                   (the-int-index (* stride subscript))))))
                  index))))
   new-element/s)
 
@@ -309,15 +346,15 @@ of the array are copied over into a new array."
                       storage
                       (let ((index 0))
                         (declare (type size index))
-                        ;; TODO: Better error reporting for negative indices
                         (loop :for stride :of-type int-index :in strides
                               :for subscript :of-type int-index :in subscripts
                               :for offset :of-type size :in offsets
-                              :for dimension :of-type size :in (narray-dimensions dense-array)
+                              :for dimension :of-type size
+                                :in (narray-dimensions dense-array)
                               :do (incf index
                                         (the-size
                                          (+ offset
-                                            (the-int-index
+                                            (the-size
                                              (* stride
                                                 (normalize-index subscript dimension)))))))
                         index))))

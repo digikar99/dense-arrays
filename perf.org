@@ -85,7 +85,7 @@ timeit(1000)[1]
 *** aref (unoptimized)
 
 #+BEGIN_SRC lisp
-;;; 8.2 seconds of real time
+;;; 3.7 seconds of real time
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))
@@ -98,7 +98,7 @@ timeit(1000)[1]
 *** aref (optimized)
 
 #+BEGIN_SRC lisp
-;;; 0.24 seconds of real time; lesser if (safety 0)
+;;; 0.36 seconds of real time; lesser if (safety 0)
 (let ((a (make-array '(100 100) :element-type 'double-float
                                 :initial-element 0.0d0))
       (b 0.0d0))

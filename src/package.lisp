@@ -9,7 +9,8 @@
                                      "ARRAY-RANK"
                                      "ARRAY-STORAGE"
                                      "DEFINE-ARRAY-CLASS"
-                                     "ARRAY-LAYOUT"))
+                                     "ARRAY-LAYOUT"
+                                     "INVALID-ARRAY-INDEX"))
            (shadow-symbols '("ARRAY"
                              "SIMPLE-ARRAY"
                              "AREF*"

@@ -122,6 +122,8 @@
                   ,@(mapcar (lm st sv `(type ,st ,sv))
                             storage-types svs))
          ;; TODO: A proper let form would aid debugging, but doesn't allow setf-ing
+         ;; FIXME: SETF should be checking for the appropriate type, especially to
+         ;; handle the UNUPGRADED-ARRAY correctly.
          (symbol-macrolet (,@(mapcar (lm elt-var sa sv i `(,elt-var (,sa ,sv ,i)))
                                      elt-vars storage-accessors svs is))
            (labels ((nest-loop (,dimensions ,@strides ,@offsets)
