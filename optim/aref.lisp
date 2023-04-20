@@ -105,9 +105,9 @@
                            :datum "Number of subscripts (~D) does not match array rank ~D"
                            :args (list (length subscripts) rank))
                    form)
-                  ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
+                  ((not (every (lm type (subtypep type 'integer)) subscript-types))
                    (signal 'compiler-macro-notes:optimization-failure-note
-                           :datum "Type of subscripts~%  ~S~%could not be derived to be non-negative-integers~%  ~S"
+                           :datum "Type of subscripts~%  ~S~%could not be derived to be integers~%  ~S"
                            :args (list subscripts subscript-types))
                    form)
                   (t
@@ -208,9 +208,9 @@
                            :datum "Number of subscripts does not match array rank ~D"
                            :args (list rank))
                    form)
-                  ((not (every (lm type (subtypep type '(integer 0))) subscript-types))
+                  ((not (every (lm type (subtypep type 'integer)) subscript-types))
                    (signal 'compiler-macro-notes:optimization-failure-note
-                           :datum "Type of subscripts~%  ~S~%could not be derived to be non-negative-integers~%  ~S"
+                           :datum "Type of subscripts~%  ~S~%could not be derived to be integers~%  ~S"
                            :args (list subscripts subscript-types))
                    form)
                   ((not (subtypep new-value-type elt-type env))
