@@ -65,6 +65,7 @@
        (:shadow ,@shadow-symbols)
        (:import-from :extensible-compound-types.impl
                      #:simplify-and-type)
+       (:shadowing-import-from :cl #:ftype)
        (:import-from :abstract-arrays
                      #:+abstract-array-slot-order+
                      #:define-ordered-class-with-required-slots
