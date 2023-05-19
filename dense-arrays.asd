@@ -3,7 +3,7 @@
   :author "Shubhamkar B. Ayare"
   :description "Numpy like array objects for Common Lisp"
   :license "MIT"
-  :version "0.2.0" ; beta
+  :version "0.2.2" ; beta
   :depends-on ("abstract-arrays"
                "polymorphic-functions"
                "alexandria"

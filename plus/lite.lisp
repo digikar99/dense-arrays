@@ -47,6 +47,9 @@
 (def-suite :dense-arrays-plus-lite)
 (in-suite :dense-arrays-plus-lite)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (trivial-package-local-nicknames:add-package-local-nickname
+   :coerce :extensible-optimizing-coerce))
 
 (define-interface-instance array-like dense-array
   (dimensions-and-strides (array)
@@ -85,8 +88,8 @@
            (iterator (row-major-iterator array-like)))
       (if (functionp iterator)
           (do-arrays ((x array))
-            (setf x (trivial-coerce:coerce (funcall iterator) type)))
-          (setf (aref array) (trivial-coerce:coerce iterator type)))
+            (setf x (coerce:coerce (funcall iterator) type)))
+          (setf (aref array) (coerce:coerce iterator type)))
       array)))
 
 (def-test asarray ()
@@ -438,7 +441,7 @@ creating the new array and instead return a view instead. "
                 (,result-type (array-element-type ,result)))
            (dotimes (,i (array-total-size ,(first array-syms)))
              (funcall #'(setf row-major-aref)
-                      (trivial-coerce:coerce
+                      (coerce:coerce
                        (,function ,@(mapcar (lm array-sym `(row-major-aref ,array-sym ,i))
                                             array-syms))
                        ,result-type)
