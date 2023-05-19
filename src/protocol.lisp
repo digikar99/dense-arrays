@@ -9,7 +9,7 @@
   ;; What can be instantiated is a CL:ARRAY with an ELEMENT-TYPE specified.
   ;; For DENSE-ARRAY, this ELEMENT-TYPE depends on the underlying storage itself.
 
-  ((strides      :required t)
+  ((strides      :required t :type list)
    (offsets      :required t)
    (layout       :required t
                  ;; LAYOUT can be NIL in the case of a non SIMPLE-ARRAY
