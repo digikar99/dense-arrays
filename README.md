@@ -1,18 +1,18 @@
 # dense-arrays
 
-[Last README update: 5th June 2022. To skip rant, click [here](#introduction).]
+[Last README update: 7th June 2023.]
 
 <!-- markdown-toc start - Don't edit this section. Run M-x markdown-toc-refresh-toc -->
 **Table of Contents**
 
 - [dense-arrays](#dense-arrays)
-    - [Rant](#rant)
     - [Introduction](#introduction)
         - [Included Systems](#included-systems)
     - [Basic Demonstration](#basic-demonstration)
     - [Usage](#usage)
         - [Using Ultralisp](#using-ultralisp)
         - [Without using Ultralisp](#without-using-ultralisp)
+    - [Interfacing with magicl](#interfacing-with-magicl)
     - [API Reference: dense-arrays-plus-lite](#api-reference-dense-arrays-plus-lite)
         - [\*array-element-print-format\*](#array-element-print-format)
         - [\*array-element-type\*](#array-element-type)
@@ -22,6 +22,7 @@
         - [aref](#aref)
             - [Polymorph: `((common-lisp:array common-lisp:array) &rest abstract-arrays::subscripts)`](#polymorph-common-lisparray-common-lisparray-rest-abstract-arrayssubscripts)
             - [Polymorph: `((array dense-array) &rest dense-arrays::subscripts)`](#polymorph-array-dense-array-rest-dense-arrayssubscripts)
+        - [aref\*](#aref)
         - [array](#array)
         - [array-dimension](#array-dimension)
         - [array-dimensions](#array-dimensions)
@@ -93,58 +94,23 @@
 
 <!-- markdown-toc end -->
 
+## Introduction
 
-## Rant
+In essence, `dense-arrays` provides a numpy like array object with multidimensional strides and offsets, alongwith some more essentials. These include:
 
-Quick! Tell me the dimensions of
+- a metaclass `dense-array-class`
+- a class `dense-array` with
+  - multidimensional strides and offsets: CL arrays can only have a single offset
+  - an option for layout: row-major or column-major to play nice with libraries like or [magicl](https://github.com/quil-lang/magicl). NIL layout implies either non-contiguous arrays or an unknown layout.
+  - customizable behavior, especially storage slot: depending on the exact class of `dense-array`, the storage object and associated meta-information could correspond to usual `(cl:simple-array element-type 1)` or [static-vectors](https://github.com/sionescu/static-vectors) or [cl-cuda](https://github.com/takagi/cl-cuda)[DOC.org](./DOC.org) for more details about customization.
+- [a rich aref](#basic-demonstration)
+- a nicer default print-object that respects `*print-array* *print-length* *print-level* *print-lines*` and is customizable via `*array-element-print-format*`; this could be improved and integrated further with builtins once someone wraps their head around [The Lisp Pretty Printer](http://www.lispworks.com/documentation/lw51/CLHS/Body/22_b.htm).
+- a `unupgraded-array` and `simple-unupgraded-array` types that use `(cl:simple-array * 1)` for storage but do not upgrade the types; this can be helpful for better type checking
+- dynamic variables: `*array-element-type* *array-element-type-alist* *dense-array-class* *array-layout*`
 
-```lisp
-#2A((0 4 2 1 9 1 5 9 8 8 6 8 2 0 4 0 2 3 6 8 2 6 7 2 6 7 2 7 8 9 6 8 5 6 3 1 5
-     5 3 5 0 4 1 4 5 4 3 2 6 1 0 5 2 5 1 6 2 2 3 3 7 9 5 8 2 5 0 5 5 3 8 6 3 7
-     9 4 7 3 3 1 3 0 0 0 8 8 4 8 2 5 7 2 5 6 6 1 5 1 5 4 3 1 3 9 7 0 9 8)
-    (2 0 0 7 0 5 8 7 2 0 3 1 9 3 3 2 8 5 0 3 1 3 5 6 9 2 9 8 5 2 0 6 4 7 7 2 5
-     6 7 8 3 3 6 3 1 7 3 2 8 0 6 5 9 8 7 7 4 5 8 5 4 8 8 1 6 8 0 7 8 7 4 6 3 9
-     3 3 0 9 4 9 7 1 0 0 9 6 3 7 4 4 7 7 5 9 5 0 9 2 2 5 1 6 6 6 5 9 8 2)
-    (6 5 0 3 7 2 4 0 3 4 9 3 1 9 8 2 4 4 7 2 3 8 3 9 4 4 8 8 7 0 6 2 0 1 9 9 2
-     4 7 4 1 4 2 1 4 1 9 7 7 2 9 0 0 6 0 5 1 5 5 2 8 5 8 9 0 1 7 0 8 9 5 0 2 3
-     8 5 8 5 2 4 0 9 3 9 4 8 4 8 7 1 8 5 5 4 3 4 0 3 5 7 9 4 2 5 4 7 0 0)
-    (8 8 9 6 9 3 6 4 4 2 3 9 4 8 4 1 2 1 0 5 3 0 5 9 4 3 9 7 9 8 8 4 5 3 6 9 9
-     0 9 1 8 1 7 5 7 1 8 1 7 2 4 2 4 9 0 9 9 3 8 5 8 8 1 4 9 0 5 8 9 7 5 4 3 4
-     1 4 2 9 1 9 8 2 4 5 6 2 0 2 0 0 5 8 5 9 9 4 2 7 7 1 7 5 7 6 2 9 6 2)
-    (2 4 9 8 2 7 1 6 0 8 4 2 9 4 6 9 9 4 1 5 1 4 0 1 9 9 0 1 3 8 0 9 7 9 2 3 9
-     5 8 0 8 8 1 2 4 9 1 0 5 4 5 4 8 5 7 2 8 1 6 5 5 3 0 9 0 8 8 8 5 0 7 6 7 1
-     6 3 8 8 6 9 7 9 9 5 2 1 6 7 5 3 3 9 7 2 4 0 3 8 4 9 7 8 1 5 1 9 1 6)
-    (7 7 0 7 9 6 1 5 8 4 2 9 4 9 9 6 6 9 3 3 7 6 1 6 6 6 3 5 5 1 6 7 3 7 6 2 8
-     7 3 4 2 4 8 1 3 0 8 3 5 4 7 6 5 6 0 9 5 0 0 7 6 0 9 1 0 0 5 3 1 2 1 0 5 5
-     6 2 4 7 5 5 7 7 6 5 1 6 6 1 4 0 9 9 0 2 9 5 4 0 7 1 2 1 3 9 9 7 7 9))
-```
+> If all you want are nice looking arrays, see the [prettier-builtins](https://github.com/digikar99/prettier-builtins) library that provides a nice pretty printer for builtin arrays.
 
-and also the element-type!
-
-```lisp
-CL-USER> (progn
-           (print (array-dimensions *))
-           (print (array-element-type *)))
-(6 108)
-T
-T
-```
-
-Why do I need to do this every f*cking time? This can't be so annoying. I mean, why do I need to do all that to get something as basic as dimensions and element-type? Like magicl you mean?
-
-```lisp
-#<MAGICL:MATRIX/SINGLE-FLOAT (6x108):
-  .
-  .
-  .
-  . >
-```
-
-See how pretty? Well not sarcastically. It is prettier than cl:array indeed, in that I can at least tell the element-type and dimensions at a glance, what more can you need?
-
-```lisp
-(setq *print-length* 10)
-```
+A `dense-array` looks something like this:
 
 ```lisp
 #<STANDARD-DENSE-ARRAY :ROW-MAJOR 6x108 T
@@ -157,7 +123,7 @@ See how pretty? Well not sarcastically. It is prettier than cl:array indeed, in 
  {103F4CE453}>
 ```
 
-Oh wait!
+Or also:
 
 ```lisp
 #<STANDARD-DENSE-ARRAY :ROW-MAJOR 6x108 SINGLE-FLOAT
@@ -174,13 +140,11 @@ Oh wait!
    (  6.553       4.481       0.159       5.915       4.391       5.940
       1.160       2.071       4.158       8.746     ...)
  {103F81F7B3}>
-```
+ ```
+ 
+It tells you at a glance that the first one is a 6x108 array with element-type T while the second has element-type single-float. And both have row-major layouts. Oh, and we even have their identity in case we want to check whether some two objects are the same or just their elements are same!
 
-No, wait!
-
-So that first one is a 6x108 array with element-type T while the second has element-type single-float. And both have row-major layouts. Oh, and we even have their identity in case we want to check whether two objects are the same or just their elements are same!
-
-We could have simply written a nice print-array function, couldn't we? Well, perhaps yes, but perhaps not! What do you mean?
+Besides looking pretty, there are a few more things under the hood.
 
 ```lisp
 (describe *)
@@ -199,85 +163,9 @@ Slots with :INSTANCE allocation:
   ROOT-ARRAY                     = NIL
 ```
 
-Storage, dimensions, element-type, rank, total-size, pretty obvious stuff.
+Storage, dimensions, element-type, rank, total-size, should be self-explanatory.
 
-Hmm, strides, offsets, layout, and root array: what... are these? Offsets, I think I know, it sounds like displaced-index-offset of cl:array, but wait, why is it a list and not a single number? Welcome to dense-arrays :)
-
-But does that mean all the effort spent on magicl *all these years* will go to waste? Thankfully not! Turns out both magicl and dense-arrays - specifically standard-dense-array - are using cl:vector under the hood for storage:
-
-```
-(describe (magicl:rand '(6 108) :type 'single-float))
-#<MAGICL:MATRIX/DOUBLE-FLOAT (6x108):..
-  [structure-object]
-
-Slots with :INSTANCE allocation:
-  NROWS                          = 6
-  NCOLS                          = 108
-  SIZE                           = 648
-  LAYOUT                         = :COLUMN-MAJOR
-  STORAGE                        = #(0.23684204 0.7401872 0.8467122 0.17149377 0.5106092 0.10455426..
-```
-
-What that means is:
-
-```lisp
-(ql:quickload "dense-arrays+magicl")
-```
-
-```lisp
-(rand 5 5 :type 'single-float)
-#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
-   (  0.058       0.553       0.918       0.653       0.080    )
-   (  0.283       0.289       0.843       0.236       0.333    )
-   (  0.434       0.701       0.826       0.339       0.306    )
-   (  0.275       0.021       0.774       0.248       0.841    )
-   (  0.426       0.913       0.662       0.058       0.395    )
- {10438D6D13}>
-```
-
-```lisp
-(magicl-funcall #'magicl:svd *)
-#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
-   ( -0.460      -0.292       0.740       0.354       0.174    )
-   ( -0.401       0.179       0.112      -0.801       0.391    )
-   ( -0.497      -0.221      -0.107      -0.209      -0.806    )
-   ( -0.401       0.842      -0.068       0.348      -0.065    )
-   ( -0.469      -0.352      -0.651       0.262       0.404    )
- {10476B6C93}>
-#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
-   (  2.486       0.000e+00   0.000e+00   0.000e+00   0.000e+00)
-   (  0.000e+00   0.793       0.000e+00   0.000e+00   0.000e+00)
-   (  0.000e+00   0.000e+00   0.635       0.000e+00   0.000e+00)
-   (  0.000e+00   0.000e+00   0.000e+00   0.181       0.000e+00)
-   (  0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.105    )
- {10476B87F3}>
-#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
-   ( -0.268      -0.465      -0.721      -0.278      -0.340    )
-   (  0.025      -0.717       0.150      -0.044       0.678    )
-   ( -0.421      -0.360       0.320       0.660      -0.393    )
-   ( -0.496       0.356      -0.444       0.402       0.519    )
-   ( -0.710       0.115       0.398      -0.569       0.023    )
- {10476B8D03}>
-```
-
-Welcome again to dense-arrays :D!
-
-## Introduction
-
-This system provides
-
-- a metaclass `dense-array-class`
-- a class `dense-array` with
-  - multidimensional strides and offsets: CL arrays can only have a single offset
-  - an option for layout: row-major or column-major to play nice with libraries like or [magicl](https://github.com/quil-lang/magicl). NIL layout implies either non-contiguous arrays or an unknown layout.
-  - customizable behavior, especially storage slot: depending on the exact class of `dense-array`, the storage object and associated meta-information could correspond to usual `(cl:simple-array element-type 1)` or [static-vectors](https://github.com/sionescu/static-vectors) or [cl-cuda](https://github.com/takagi/cl-cuda)[DOC.org](./DOC.org) for more details about customization.
-- [a rich aref](#basic-demonstration)
-- a nicer default print-object that respects `*print-array* *print-length* *print-level* *print-lines*` and is customizable via `*array-element-print-format*`; this could be improved and integrated further with builtins once someone wraps their head around [The Lisp Pretty Printer](http://www.lispworks.com/documentation/lw51/CLHS/Body/22_b.htm).
-- a `unupgraded-array` and `simple-unupgraded-array` types that use `(cl:simple-array * 1)` for storage but do not upgrade the types; this can be helpful for better type checking
-- dynamic variables: `*array-element-type* *array-element-type-alist* *dense-array-class* *array-layout*`
-
-The multidimensional strides and offsets enable copy-free slicing and broadcasting.
-
+As for strides, offsets, layout, and root array? Strides and offsets are the multidimensional equivalents of the ANSI arrays provided displaced-index-offset. Their multidimensional nature allows copy-free slicing, reshaping, transposing, or broadcasting.
 
 ```lisp
 CL-USER> (let ((a (make-array '(1000 1000))))
@@ -306,28 +194,26 @@ NIL
 **Limitations:**
 
 - adjustable-arrays are not handled yet
-- `aref` can be 5-6 times slower than `cl:aref` even after optimization; the work-around for this is `do-arrays` which can be up to 25% slower. See [perf.org](./perf.org) for example optimizations.
-- cannot be a drop-in replacement for built-in arrays because `cl:array` is both a class and a specializing type-specifier; IIUC, non-builtins can only either be one of class or specializing type-specifier. However, this can now be rectified using [extensible-compound-types](https://github.com/digikar99/extensible-compound-types), however one needs to also think about playing nice in the presence or absence of extensible-compound-types.
-- `(setf aref)` and `(setf row-major-aref)` may need to be used using `(funcall #'(setf aref) ...)` since some implementations like SBCL "lose" the type information from the environment in an attempt to use `once-only`
+- `aref` can be 2-3 times slower than `cl:aref` even after optimization; the work-around for this is `do-arrays` which can be almost at par with native arrays. See [perf.org](./perf.org) for example optimizations.
+- cannot be a drop-in replacement for built-in arrays because `cl:array` is both a class and a specializing type-specifier; in ANSI CL, non-builtins can only either be one of class or specializing type-specifier. Although, this limitation can now be overcome using [extensible-compound-types](https://github.com/digikar99/extensible-compound-types), however including this might require one to think about playing nice in the presence or absence of extensible-compound-types.
+- `(setf aref)` and `(setf row-major-aref)` may need to be used using `(funcall #'(setf aref) ...)` since some implementations like SBCL "lose" the type information from the environment.
 - Although `:layout` has been provided recently, support for it can be buggy. Bug reports will be appreciated!
-
 
 ### Included Systems
 
 - `dense-arrays`: the super bare essentials
 - `dense-arrays-plus-lite`: some utilities
-- `dense-arrays+static-vectors`: provides and exports a `static-array` type that is essentially a wrapper around [static-vectors](https://github.com/sionescu/static-vectors)
+- `dense-arrays/magicl`: provides helper functions `magicl-funcall from-magicl-tensor as-magicl-tensor` for interoperating between `standard-dense-array` and `magicl:vector magicl:matrix magicl:tensor`
+- `dense-arrays/static-vectors`: provides and exports a `static-array` type that is essentially a wrapper around [static-vectors](https://github.com/sionescu/static-vectors)
 - `dense-arrays+cuda`: provides and export an array using `cl-cuda`
-- `dense-arrays+magicl`: provides helper functions `magicl-funcall from-magicl-tensor as-magicl-tensor` for interoperating between `standard-dense-array` and `magicl:vector magicl:matrix magicl:tensor`
 - `dense-arrays-plus`: more utilities as well as static-vectors
 
-Minimalists would want to stick to the first four. The last one also introduces
+Minimalists would want to stick to the first few. The last one also introduces
 
 - `shape` as an alias for `array-dimensions`
 - `int32 uint32 uint8` types as aliases for their common lisp counterparts
 - integration with [py4cl2](#py4cl2): simply set `py4cl2:*array-type*` to `:dense-arrays` when you want to use py4cl2 with dense-arrays.
 - and perhaps more things!
-
 
 ## Basic Demonstration
 
@@ -474,6 +360,69 @@ and two, the version of trivial-types in quicklisp needs an update
 3. Optionally: `(asdf:test-system "dense-arrays")`- or dense-arrays-plus or dense-arrays-plus-lite
 
 Feel free to raise an issue!
+
+## Interfacing with magicl
+
+Both magicl and dense-arrays - specifically standard-dense-array - use cl:vector under the hood for storage:
+
+```
+(describe (magicl:rand '(6 108) :type 'single-float))
+#<MAGICL:MATRIX/DOUBLE-FLOAT (6x108):..
+  [structure-object]
+
+Slots with :INSTANCE allocation:
+  NROWS                          = 6
+  NCOLS                          = 108
+  SIZE                           = 648
+  LAYOUT                         = :COLUMN-MAJOR
+  STORAGE                        = #(0.23684204 0.7401872 0.8467122 0.17149377 0.5106092 0.10455426..
+```
+
+This allows one of them to be cast to the other. If you are using [asdf-system-connections](https://github.com/gwkkwg/asdf-system-connections), then the integration should be loaded as soon as you have loaded both dense-arrays and magic. Otherwise:
+
+```lisp
+(ql:quickload "dense-arrays/magicl")
+```
+
+Now we have a dense-array.
+
+```lisp
+(rand 5 5 :type 'single-float)
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
+   (  0.058       0.553       0.918       0.653       0.080    )
+   (  0.283       0.289       0.843       0.236       0.333    )
+   (  0.434       0.701       0.826       0.339       0.306    )
+   (  0.275       0.021       0.774       0.248       0.841    )
+   (  0.426       0.913       0.662       0.058       0.395    )
+ {10438D6D13}>
+```
+
+Upon which we can call magicl functions:
+
+```lisp
+(magicl-funcall #'magicl:svd *)
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
+   ( -0.460      -0.292       0.740       0.354       0.174    )
+   ( -0.401       0.179       0.112      -0.801       0.391    )
+   ( -0.497      -0.221      -0.107      -0.209      -0.806    )
+   ( -0.401       0.842      -0.068       0.348      -0.065    )
+   ( -0.469      -0.352      -0.651       0.262       0.404    )
+ {10476B6C93}>
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
+   (  2.486       0.000e+00   0.000e+00   0.000e+00   0.000e+00)
+   (  0.000e+00   0.793       0.000e+00   0.000e+00   0.000e+00)
+   (  0.000e+00   0.000e+00   0.635       0.000e+00   0.000e+00)
+   (  0.000e+00   0.000e+00   0.000e+00   0.181       0.000e+00)
+   (  0.000e+00   0.000e+00   0.000e+00   0.000e+00   0.105    )
+ {10476B87F3}>
+#<STANDARD-DENSE-ARRAY :ROW-MAJOR 5x5 SINGLE-FLOAT
+   ( -0.268      -0.465      -0.721      -0.278      -0.340    )
+   (  0.025      -0.717       0.150      -0.044       0.678    )
+   ( -0.421      -0.360       0.320       0.660      -0.393    )
+   ( -0.496       0.356      -0.444       0.402       0.519    )
+   ( -0.710       0.115       0.398      -0.569       0.023    )
+ {10476B8D03}>
+```
 
 ## API Reference: dense-arrays-plus-lite
 
