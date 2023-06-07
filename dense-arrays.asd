@@ -1,9 +1,9 @@
-
 (defsystem "dense-arrays"
   :author "Shubhamkar B. Ayare"
   :description "Numpy like array objects for Common Lisp"
   :license "MIT"
   :version "0.2.2" ; beta
+  :defsystem-depends-on ("asdf-system-connections")
   :depends-on ("abstract-arrays"
                "polymorphic-functions"
                "alexandria"
@@ -44,3 +44,17 @@
                                          (FORMAT T \"Running tests with *ARRAY-LAYOUT* bound to ~S\"
                                                  DENSE-ARRAYS:*ARRAY-LAYOUT*)
                                          (5AM:RUN! :DENSE-ARRAYS)))"))))
+
+(defsystem-connection "dense-arrays/magicl"
+  :requires ("dense-arrays" "magicl")
+  :description "Exports 4 additional symbols from DENSE-ARRAYS package:
+- MAGICL-FUNCALL
+- MAGICL-DENSE-ARRAY
+- MAGICL-ARRAY
+- SIMPLE-MAGICL-ARRAY"
+  :author "Shubhamkar B. Ayare"
+  :license "MIT"
+  :version "0.0.0" ; alpha - no versioning maintained at the moment
+  :serial t
+  :components ((:module "plus"
+                :components ((:file "magicl")))))
