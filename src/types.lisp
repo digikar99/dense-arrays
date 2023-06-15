@@ -38,7 +38,7 @@
                        (optima:ematch (append type-spec
                                               (make-list (- 6 (length type-spec))
                                                          :initial-element 'cl:*))
-                         ((list class-name element-type dimensions
+                         ((list ',class-name element-type dimensions
                                 _ _ simple-p)
                           ,(if simple-array-name
                                `(if (eq t simple-p)
