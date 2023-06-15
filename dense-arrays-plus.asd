@@ -1,5 +1,5 @@
 (defsystem "dense-arrays-plus"
-  :depends-on ("dense-arrays+static-vectors"
+  :depends-on ("static-vectors"
                "dense-arrays-plus-lite"
                "fiveam"
                "generic-cl"
