@@ -1,13 +1,15 @@
 (in-package :dense-arrays)
 
-(defclass unupgraded-dense-array-class (standard-dense-array-class) ())
+(eval-when (:compile-toplevel :load-toplevel :execute)
 
-(defclass unupgraded-dense-array (dense-array)
-  ()
-  (:metaclass unupgraded-dense-array-class))
+  (defclass unupgraded-dense-array-class (standard-dense-array-class) ())
 
-(defmethod storage-element-type-upgrader ((class unupgraded-dense-array-class))
-  'identity)
+  (defclass unupgraded-dense-array (dense-array)
+    ()
+    (:metaclass unupgraded-dense-array-class))
+
+  (defmethod storage-element-type-upgrader ((class unupgraded-dense-array-class))
+    'identity))
 
 ;; TODO: Prepare a SIMPLE-UNUPGRADED-ARRAY type
 (define-dense-array-types unupgraded-dense-array unupgraded-dense-array
