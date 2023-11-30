@@ -1,7 +1,6 @@
 (defsystem "dense-arrays-plus-lite"
   :depends-on ("dense-arrays"
-               "extensible-optimizing-coerce"
-               "extensible-compound-types-interfaces"
+               "peltadot"
                "trivial-package-local-nicknames"
                "uiop")
   :pathname #P"plus/"

@@ -1,17 +1,6 @@
 (uiop:define-package :dense-arrays-plus-lite
-  (:mix :dense-arrays #+extensible-compound-types :extensible-compound-types-cl
-        :cl :5am :alexandria)
-  (:import-from
-   :extensible-compound-types-interfaces
-   #:define-interface-instance
-   #:array-like
-   #:row-major-iterator
-   #:dimensions-and-strides
-   #:element-type
-   #:dimensions)
-  (:import-from
-   :extensible-compound-types-interfaces.impl
-   #:max-type)
+  (:mix :dense-arrays :peltadot :5am :alexandria)
+  (:use)
   (:import-from
    #:dense-arrays
    #:lm
@@ -49,9 +38,9 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (trivial-package-local-nicknames:add-package-local-nickname
-   :coerce :extensible-optimizing-coerce))
+   :coerce :peltadot/coerce))
 
-(define-interface-instance array-like dense-array
+(define-trait-implementation array-like dense-array ()
   (dimensions-and-strides (array)
     (values (array-dimensions array)
             (array-strides array)))

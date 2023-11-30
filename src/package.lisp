@@ -51,44 +51,32 @@
                              "UNUPGRADED-DENSE-ARRAY"
                              "UNUPGRADED-ARRAY"
                              "SIMPLE-UNUPGRADED-ARRAY")))
-    `(polymorphic-functions.defpackage:defpackage :dense-arrays
-       (:shadowing-import-exported-symbols :abstract-arrays
-                                           #+extensible-compound-types
-                                           :extensible-compound-types)
-       (:use
-        :polymorphic-functions
-        #-extensible-compound-types :cl
-        #+extensible-compound-types :extensible-compound-types-cl
-        :iterate :alexandria :5am)
+    `(peltadot/utils:defpackage :dense-arrays
+       (:shadowing-import-exported-symbols #:abstract-arrays
+                                           #:iterate)
+       (:use #:peltadot
+             #:iterate
+             #:alexandria
+             #:5am)
        (:export ,@shadow-symbols
                 ,@abstract-array-symbols)
        (:shadow ,@shadow-symbols)
-       (:import-from :extensible-compound-types.impl
-                     #:simplify-and-type)
-       (:shadowing-import-from :cl #:ftype)
-       (:import-from :abstract-arrays
-                     #:+abstract-array-slot-order+
-                     #:define-ordered-class-with-required-slots
-                     #:storage
-                     #:dimensions
-                     #:rank
-                     #:element-type)
-       (:import-from :cl-form-types
-                     #:nth-form-type)
-       (:import-from :trivial-types
+       (:shadowing-import-from #:cl #:ftype)
+       (:shadowing-import-from #:peltadot
+                               #:subtypep
+                               #:type=
+                               #:named-lambda)
+       (:shadowing-import-from #:abstract-arrays
+                               #:+abstract-array-slot-order+
+                               #:define-ordered-class-with-required-slots
+                               #:storage
+                               #:dimensions
+                               #:rank
+                               #:element-type)
+       (:import-from #:trivial-types
                      #:function-designator)
-       #-extensible-compound-types
-       (:import-from :extensible-compound-types
-                     #:define-orthogonally-specializing-type
-                     #:define-type)
-       #-extensible-compound-types
-       (:import-from :polymorphic-functions
-                     #:typexpand)
-       (:import-from :polymorphic-functions
-                     #:cl-type-specifier-p
-                     #:policy-quality
-                     #:optim-speed
-                     #:env)))
+       (:local-nicknames
+        (:cl-form-types #:peltadot/form-types))))
 
 (in-package :dense-arrays)
 
@@ -129,12 +117,12 @@ Is overriden by *ARRAY-ELEMENT-TYPE* when bound, or by explicitly passing an
 
 (defmacro the-size (form)
   `(#+sbcl sb-ext:truly-the
-    #-sbcl the
+    #-sbcl cl:the
     size ,form))
 
 (defmacro the-int-index (form)
   `(#+sbcl sb-ext:truly-the
-    #-sbcl the
+    #-sbcl cl:the
     int-index ,form))
 
 (deftype int32 () `(signed-byte 32))

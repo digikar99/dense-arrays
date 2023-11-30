@@ -1,2 +1,2 @@
 ("abstract-arrays" :git "https://github.com/digikar99/abstract-arrays")
-("extensible-optimizing-coerce" :git "https://github.com/digikar99/extensible-optimizing-coerce")
+("peltadot" :git "https://gitlab.com/digikar/peltadot")

@@ -2,19 +2,15 @@
   :author "Shubhamkar B. Ayare"
   :description "Numpy like array objects for Common Lisp"
   :license "MIT"
-  :version "0.3.0" ; beta
+  :version "0.4.0" ; beta
   :defsystem-depends-on ("asdf-system-connections")
   :depends-on ("abstract-arrays"
-               "polymorphic-functions"
                "alexandria"
-               "compiler-macro-notes"
                "closer-mop"
-               "extensible-compound-types"
-               (:feature :extensible-compound-types "extensible-compound-types-cl")
                "fiveam"
                "iterate"
+               "peltadot"
                "trivial-garbage"
-               "cl-form-types"
                "trivial-types"
                "uiop")
   :serial t
