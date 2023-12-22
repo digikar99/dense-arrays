@@ -137,6 +137,8 @@ Additionally takes
                                            (t (switch (element-type :test #'type=)
                                                 ('single-float 0.0f0)
                                                 ('double-float 0.0d0)
+                                                ('(complex single-float) #c(0.0f0 0.0f0))
+                                                ('(complex double-float) #c(0.0d0 0.0d0))
                                                 (t 0))))))
                             (unless (or initial-contents
                                         constructor)
