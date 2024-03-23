@@ -1,6 +1,6 @@
-(cl:in-package :dense-arrays-plus)
+(cl:in-package :dense-arrays-plus-lite)
 
-(5am:in-suite :dense-arrays-plus)
+(5am:in-suite :dense-arrays)
 
 (def-test py4cl2 ()
   (is (array= (make-array '(2 3)
