@@ -3,7 +3,7 @@
   :description "Numpy like array objects for Common Lisp"
   :license "MIT"
   :version "0.4.0" ; beta
-  :defsystem-depends-on ("asdf-system-connections")
+  :defsystem-depends-on ("alternate-asdf-system-connections")
   :depends-on ("abstract-arrays"
                "alexandria"
                "closer-mop"
@@ -41,7 +41,7 @@
                                                  DENSE-ARRAYS:*ARRAY-LAYOUT*)
                                          (5AM:RUN! :DENSE-ARRAYS)))"))))
 
-(defsystem-connection "dense-arrays/magicl"
+(define-system-connection "dense-arrays/magicl"
   :requires ("dense-arrays" "magicl")
   :description "Exports 4 additional symbols from DENSE-ARRAYS package:
 - MAGICL-FUNCALL
@@ -55,14 +55,14 @@
   :components ((:module "plus"
                 :components ((:file "magicl")))))
 
-(defsystem-connection "dense-arrays/static-vectors"
+(define-system-connection "dense-arrays/static-vectors"
   :author "Shubhamkar B. Ayare"
   :license "MIT"
   :version "0.0.0"
   :requires ("dense-arrays" "static-vectors")
   :serial t
-  :components ((:module "plus"
-                :components ((:file "static-vectors"))))
+  :pathname #P"plus/"
+  :components ((:file "static-vectors"))
   :perform (test-op (o c)
              (declare (ignore o c))
              (eval (read-from-string "(LET ((DENSE-ARRAYS:*DENSE-ARRAY-CLASS*
@@ -70,3 +70,16 @@
                                             (5AM:*ON-ERROR* :DEBUG)
                                             (5AM:*ON-FAILURE* :DEBUG))
                                         (5AM:RUN :DENSE-ARRAYS))"))))
+
+(define-system-connection "dense-arrays/cl-cuda"
+  :requires ("cl-cuda" "dense-arrays")
+  :pathname #P"plus/"
+  :components ((:file "cl-cuda"))
+  :perform (test-op (o c)
+             (declare (ignore o c))
+             ;; Other tests won't pass because do-arrays is a compile time thing.
+             ;; Or, they make certain assumptions about the backend.
+             (eval (read-from-string "(LET ((CL-CUDA:*SHOW-MESSAGES* NIL)
+                                            (DENSE-ARRAYS:*DENSE-ARRAY-CLASS*
+                                               'DENSE-ARRAYS:CUDA-DENSE-ARRAY))
+                                        (5AM:RUN 'DENSE-ARRAYS::BACKEND-INDEPENDENT)))"))))
