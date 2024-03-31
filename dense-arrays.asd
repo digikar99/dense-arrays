@@ -10,6 +10,7 @@
                "fiveam"
                "iterate"
                "peltadot"
+               "peltadot-traits-library"
                "trivial-garbage"
                "trivial-types"
                "uiop")

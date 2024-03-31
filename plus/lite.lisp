@@ -14,6 +14,13 @@
    #:array-offsets
    #:array-strides
    #:array-root-array)
+  (:import-from
+   #:peltadot-traits-library
+   #:array-like
+   #:dimensions-and-strides
+   #:dimensions
+   #:element-type
+   #:row-major-iterator)
   (:reexport :dense-arrays)
   (:export
    #:asarray
