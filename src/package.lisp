@@ -72,7 +72,8 @@
                                #:storage
                                #:dimensions
                                #:rank
-                               #:element-type)
+                               #:element-type
+                               #:index)
        (:import-from #:trivial-types
                      #:function-designator)
        (:local-nicknames
