@@ -4,17 +4,12 @@
   ((axis  :initarg :axis)
    (valid :initarg :valid :initform nil))
   (:report (lambda (c s)
-             (with-slots (axis abstract-arrays::index valid) c
+             (with-slots (axis index valid) c
                (format s "Invalid index ~A for array axis of length ~A."
-                       abstract-arrays::index axis)
+                       index axis)
                (when valid
                  (format s "~%Valid index range is from ~A to ~A (both inclusive)."
                          (car valid) (cdr valid)))))))
-
-(define-condition invalid-index (error)
-  ((index :accessor index :initarg :index))
-  (:report (lambda (condition stream)
-             (format stream "Index ~S is invalid" (index condition)))))
 
 (defun array= (array1 array2 &key (test #'equalp))
   "Returns non-NIL if each element of ARRAY1 is equal to each corresponding
@@ -87,7 +82,7 @@ and tests for their equality."
                               (push (the-size (+ o offset-carry (the-int-index (* start s))))
                                     new-offsets)
                               (setq offset-carry 0)))
-                           (t (error 'invalid-index :index ss))))
+                           (t (error 'invalid-array-index :array array :index ss))))
                    (setq dim        (cdr dim)
                          strides    (cdr strides)
                          subscripts (cdr subscripts)
