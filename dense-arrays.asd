@@ -13,7 +13,8 @@
                "peltadot-traits-library"
                "trivial-garbage"
                "trivial-types"
-               "uiop")
+               "uiop"
+               "float-features")
   :serial t
   :components ((:module "src"
                 :serial t

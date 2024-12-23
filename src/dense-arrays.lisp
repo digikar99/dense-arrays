@@ -351,21 +351,24 @@ without copying."
   (unless (typep arg 'number)
     (return-from pretty-print-number (print-object arg stream)))
   (let ((number arg))
-    (if (or (>= (abs number) 100) (< (abs number) 0.001))
-        (format stream
-                (typecase number
-                  (float (if (< number 0)
-                             " ~9,3,2e"
-                             " ~10,3,2e"))
-                  (t     "~s"))
-              arg)
-        (format stream
-                (typecase number
-                  (float (if (< number 0)
-                             "~7,3,,,f    "
-                             "~7,3,,,f    "))
-                  (t      "~s"))
-              arg))))
+    (typecase number
+      (float
+       (cond ((float-features:float-nan-p number)
+              (format stream "    NaN    "))
+             ((float-features:float-infinity-p number)
+              (format stream "   ~AInf    " (if (plusp number) #\+ #\-)))
+             ((or (>= (abs number) 100) (< (abs number) 0.001))
+              (format stream
+                      (if (< number 0)
+                          " ~9,3,2e"
+                          " ~10,3,2e")
+                      number))
+             (t (format stream
+                        (if (< number 0)
+                            "~7,3,,,f    "
+                            "~7,3,,,f    ")
+                        number))))
+      (t (format stream "~s" number)))))
 
 ;;; FIXME: Someone read up http://www.lispworks.com/documentation/lw51/CLHS/Body/22_b.htm
 ;;; to do things better
