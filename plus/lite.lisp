@@ -426,7 +426,7 @@ creating the new array and instead return a view instead. "
   (alexandria:with-gensyms (result i result-type)
     (let ((array-syms (alexandria:make-gensym-list (length arrays) "ARRAY"))
           (function   (cond ((eq 'quote (first function)) (second function))
-                            ((eq 'function (first function)) (second function))
+                            ((eq 'cl:function (first function)) (second function))
                             (t (error "Unexpected")))))
       `(let (,@(loop :for sym :in array-syms
                      :for array-expr :in arrays
