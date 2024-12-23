@@ -4,9 +4,9 @@
   ((axis  :initarg :axis)
    (valid :initarg :valid :initform nil))
   (:report (lambda (c s)
-             (with-slots (axis index valid) c
+             (with-slots (axis abstract-arrays::index valid) c
                (format s "Invalid index ~A for array axis of length ~A."
-                       index axis)
+                       abstract-arrays::index axis)
                (when valid
                  (format s "~%Valid index range is from ~A to ~A (both inclusive)."
                          (car valid) (cdr valid)))))))
@@ -38,7 +38,7 @@ and tests for their equality."
     (declare (type int-index normalized-index))
     (if (and (<= 0 normalized-index) (< normalized-index dimension))
         (the-size normalized-index)
-        (error 'invalid-axis-index-error :index index :axis dimension
+        (error 'invalid-array-index-for-axis :index index :axis dimension
                :valid (cons (- dimension) (1- dimension))))))
 
 (defun %aref-view (array &rest subscripts)
