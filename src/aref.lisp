@@ -305,7 +305,7 @@ of the array are copied over into a new array."
                       subscripts
                       (narray-dimensions array)))
           (array subscripts)
-          'invalid-array-index-error
+          'invalid-array-index
           :index subscripts
           :array array
           :suggestion "Did you mean to use (SETF DENSE-ARRAYS:AREF*) ?")
