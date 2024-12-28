@@ -426,7 +426,7 @@ Also see:
              (pretty-print-new-line (stream)
                #-ccl (pprint-newline :mandatory stream)
                #+ccl (format stream "~%  ")))
-      (let* ((items (data-as-lol))
+      (let* ((items (ensure-list (data-as-lol)))
              (len   (length items))
              (num-lines 3))
         (pprint-logical-block (stream items)
@@ -452,35 +452,32 @@ Also see:
               ;; DONE: *print-lines*
               ;; DONE: *print-length*
               ;; print the array elements
-              (cond ((zerop rank)
-                     (format stream " ~A" (aref sv 0)))
-                    (t
-                     (loop :for item :in items
-                           :for i :below len
-                           :do (let* ((printed-item (format nil "~A" item))
-                                      (newline-count (1+ (count #\newline printed-item)))
-                                      (printed-lines
-                                        (uiop:split-string printed-item
-                                                           :separator '(#\newline))))
-                                 (when (or (null *print-lines*)
-                                           (and *print-lines*
-                                                (<= (+ num-lines newline-count)
-                                                    *print-lines*)))
-                                   (dolist (line printed-lines)
-                                     (write-string line stream)
-                                     (pretty-print-new-line stream))
-                                   (when (= i (1- len))
-                                     (pprint-indent :block -2 stream))
-                                   (incf num-lines newline-count))
-                                 (when (and *print-lines*
-                                            (not (<= (+ num-lines newline-count)
-                                                     *print-lines*))
-                                            (< i (1- len)))
-                                   ;; We have more items to print, but no more lines
-                                   (format stream "..")
-                                   (pprint-indent :block -2 stream)
-                                   (pretty-print-new-line stream)
-                                   (return)))))))))))))
+              (loop :for item :in items
+                    :for i :below len
+                    :do (let* ((printed-item (format nil "~A" item))
+                               (newline-count (1+ (count #\newline printed-item)))
+                               (printed-lines
+                                 (uiop:split-string printed-item
+                                                    :separator '(#\newline))))
+                          (when (or (null *print-lines*)
+                                    (and *print-lines*
+                                         (<= (+ num-lines newline-count)
+                                             *print-lines*)))
+                            (dolist (line printed-lines)
+                              (write-string line stream)
+                              (pretty-print-new-line stream))
+                            (when (= i (1- len))
+                              (pprint-indent :block -2 stream))
+                            (incf num-lines newline-count))
+                          (when (and *print-lines*
+                                     (not (<= (+ num-lines newline-count)
+                                              *print-lines*))
+                                     (< i (1- len)))
+                            ;; We have more items to print, but no more lines
+                            (format stream "..")
+                            (pprint-indent :block -2 stream)
+                            (pretty-print-new-line stream)
+                            (return)))))))))))
 
 (defun print-array (array &optional array-element-print-format &key level length
                                                                  (stream nil streamp))
