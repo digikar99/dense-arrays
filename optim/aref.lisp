@@ -83,7 +83,7 @@
                           ,(when (not safety-zero-p)
                              `(when (not (and ,@(mapcar (lm d s `(<= 0 ,s (1- ,d)))
                                                         ds subscripts)))
-                                (error 'invalid-array-index-error
+                                (error 'invalid-array-index
                                        :array ,array :index (list ,@subscripts)
                                        :suggestion
                                        "Did you mean to use DENSE-ARRAYS:AREF* ?")))
