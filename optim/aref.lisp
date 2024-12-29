@@ -246,9 +246,9 @@
                            :datum "Type of subscripts~%  ~S~%could not be derived to be integers~%  ~S"
                            :args (list subscripts subscript-types))
                    form)
-                  ((not (subtypep new-value-type elt-type env))
+                  ((not (intersect-type-p new-value-type elt-type env))
                    (signal 'compiler-macro-notes:note
-                           :datum "Type of the new-value form~%  ~S~%was derived to be ~S not of type ~S"
+                           :datum "Type of the new-value form~%  ~S~%was derived to be ~S which does not intersect type ~S"
                            :args (list new-value new-value-type elt-type))
                    form)
                   (t
