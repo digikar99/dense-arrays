@@ -105,9 +105,15 @@
 (defun dense-array-type-element-type (type-spec)
   (assert (subtypep type-spec 'dense-array))
   (optima:match (typexpand type-spec)
-    ((list 'specializing _)
-     'cl:*)
     ((list* 'specializing _ element-type _)
      element-type)
     (_
      (array-type-element-type type-spec))))
+
+(defun dense-array-type-rank (type-spec)
+  (assert (subtypep type-spec 'dense-array))
+  (optima:match (typexpand type-spec)
+    ((list* 'specializing _ _ _ rank _)
+     rank)
+    (_
+     (array-type-rank type-spec))))
