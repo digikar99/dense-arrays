@@ -55,7 +55,7 @@
              (optim-expansion
                (once-only (array)
                  (cond
-                   ((zerop rank)
+                   ((eql rank 0)
                     `(locally (declare (type dense-array ,array))
                        ,(when (not safety-zero-p)
                           `(when (not (and ,@(mapcar (lm d s `(<= 0 ,s (1- ,d)))
@@ -168,7 +168,7 @@
              (optim-expansion
                (once-only (array)
                  (cond
-                   ((zerop rank)
+                   ((eql rank 0)
                     `(locally (declare (type dense-array ,array))
                        (destructuring-lists ((int-index ,ss (array-strides ,array)
                                                         :dynamic-extent nil)
