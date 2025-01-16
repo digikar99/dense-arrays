@@ -31,7 +31,6 @@
                              "ARRAY-DISPLACEMENT"
                              "ARRAY-DISPLACED-TO"
                              "ARRAY-OFFSET"
-                             "ARRAY-OFFSETS"
                              "ARRAY-STRIDE"
                              "ARRAY-STRIDES"
                              "ARRAY="

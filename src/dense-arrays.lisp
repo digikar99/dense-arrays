@@ -75,8 +75,7 @@
                      (layout *array-layout*)
 
                      (displaced-to nil displaced-to-p)
-                     (offsets nil offsets-p)
-                     (displaced-index-offset 0 displaced-index-offset-p))
+                     (offset 0))
   "Like CL:MAKE-ARRAY but returns a DENSE-ARRAYS::DENSE-ARRAY instead of CL:ARRAY.
 Additionally takes
 
@@ -97,8 +96,7 @@ Additionally takes
     "
   ;; TODO: Handle adjustable
   ;; TODO: Handle fill-pointer
-  ;; TODO: Sanitize displaced-to and perhaps, displaced-index-offset
-  ;; TODO: Take displaced-index-offset and strides into account while calculating dimensions
+  ;; TODO: Sanitize displaced-to
   (declare ;; (optimize speed)
    (ignore args adjustable fill-pointer displaced-to-p)
    (type function-designator constructor)
@@ -106,8 +104,6 @@ Additionally takes
   (ensure-single initial-element-p
                  initial-contents-p
                  constructor-p)
-  (ensure-single offsets-p
-                 displaced-index-offset-p)
   (when fill-pointer-p
     (error "FILL-POINTER has not been handled yet in DENSE-ARRAY"))
   (when adjustable-p
@@ -119,14 +115,6 @@ Additionally takes
          (strides         (if strides-p
                               strides
                               (dimensions->strides dimensions layout)))
-
-         ;; FIXME: Handle displaced-index-offset correctly
-         (offsets         (if displaced-index-offset
-                              (if (= rank 0)
-                                  ()
-                                  (nconc (list displaced-index-offset)
-                                         (make-list (1- rank) :initial-element 0)))
-                              offsets))
 
          (class           (typecase class
                             (class class)
@@ -157,7 +145,7 @@ Additionally takes
                                          :element-type element-type
                                          :dimensions dimensions
                                          :strides strides
-                                         :offsets offsets
+                                         :offset offset
                                          :total-size (apply #'* dimensions)
                                          :root-array nil
                                          :rank (length dimensions)
@@ -260,8 +248,15 @@ Additionally takes
 
 (declaim (ftype (function (dense-array) list)
                 narray-dimensions
-                array-strides
-                array-offsets))
+                array-strides))
+
+(declaim (ftype (function (dense-array) size)
+                array-offset))
+
+(declaim (inline array-offset))
+(defun array-offset (array)
+  (declare (type dense-array array))
+  (dense-array-offset array))
 
 (declaim (inline array-displaced-to))
 (defun array-displaced-to (array)
@@ -272,11 +267,11 @@ Additionally takes
 (defun array-displacement (array)
   "Returns two values:
 - ARRAY-STORAGE
-- and OFFSET along first axis
+- OFFSET
 Consequences are undefined if ARRAY is displaced along multiple axis."
   (declare (type dense-array array))
   (values (array-storage array)
-          (first (array-offsets array))))
+          (array-offset array)))
 
 (declaim (inline array-dimension))
 (defun array-dimension (array axis-number)
@@ -298,19 +293,6 @@ Consequences are undefined if ARRAY is displaced along multiple axis."
            (type fixnum axis-number))
   (elt (array-strides array) axis-number))
 
-(declaim (inline array-offsets))
-(defun array-offsets (array)
-  (declare (type dense-array array))
-  (dense-array-offsets array))
-
-(declaim (inline array-offset))
-(defun array-offset (array axis-number)
-  "Return the length of offset corresponding to AXIS-NUMBER of ARRAY."
-  (declare (type dense-array array)
-           ;; (optimize speed)
-           (type size axis-number))
-  (elt (array-offsets array) axis-number))
-
 (defun 1d-storage-array (array)
   "Returns the storage-vector underlying the ARRAY. This is equivalent to ARRAY-DISPLACED-TO."
   (declare (type dense-array array))
@@ -323,13 +305,6 @@ A VIEW provides a way to obtain sub-arrays or reshapes or transposes out of ARRA
 without copying."
   (declare (type dense-array array))
   (if (dense-array-root-array array) t nil))
-
-(defun array-displaced-index-offset (array)
-  (declare (type dense-array array))
-  (let ((offsets (array-offsets array)))
-    (if (every #'zerop (rest offsets))
-        (first offsets)
-        (error "Supplied array is displaced along multipe axes. Offsets: ~S" offsets))))
 
 (defun collect-reduce-from-end (function list initial-element)
   (declare (type list list)
@@ -388,7 +363,7 @@ Also see:
          (sv      (array-storage array))
          (layout  (array-layout array))
          (rank    (array-rank array))
-         (index   0)
+         (index   (array-offset array))
          (fmt-control (or *array-element-print-format*
                           (switch ((array-element-type array) :test #'type=)
                             ('double-float "~,15,3@e")
@@ -411,15 +386,13 @@ Also see:
                               := (if *print-length*
                                      (min dim *print-length*)
                                      dim)
-                            :with offset := (array-offset array depth)
                             :with stride := (array-stride array depth)
-                              :initially (incf index offset)
                             :repeat print-length
                             :collect (data-as-lol (1+ depth)) :into data
                             :do (incf index stride)
                             :finally
                                (decf index
-                                   (+ offset (* stride print-length)))
+                                   (* stride print-length))
                                (return (nconc data
                                               (when (< print-length dim)
                                                 '("..."))))))))

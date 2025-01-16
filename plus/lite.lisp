@@ -11,7 +11,7 @@
    #:storage-accessor
    #:dense-array
    #:simple-dense-array
-   #:array-offsets
+   #:array-offset
    #:array-strides
    #:array-root-array)
   (:import-from
@@ -122,24 +122,22 @@
                  (t (asarray array-like)))))
     (declare (type dense-array array)
              (optimize speed))
-    (multiple-value-bind (dimensions strides offsets)
+    (multiple-value-bind (dimensions strides)
         (if axes
             (loop :for i :of-type size :below (array-rank array)
                   :for axis :in axes
                   :collect (array-dimension array axis) :into dimensions
                   :collect (array-stride array axis) :into strides
-                  :collect (array-offset array axis) :into offsets
-                  :finally (return (values dimensions strides offsets)))
+                  :finally (return (values dimensions strides)))
             (values (reverse (narray-dimensions array))
-                    (reverse (array-strides    array))
-                    (reverse (array-offsets    array))))
+                    (reverse (array-strides    array))))
       (make-instance (class-of array)
                      :storage (array-displaced-to array)
                      :element-type (array-element-type array)
                      :layout (array-layout array)
                      :dimensions dimensions
                      :strides strides
-                     :offsets offsets
+                     :offset (array-offset array)
                      :total-size (array-total-size array)
                      :rank (array-rank array)
                      :root-array (or (dense-arrays::dense-array-root-array array)
@@ -355,7 +353,7 @@ creating the new array and instead return a view instead. "
                             :dimensions new-shape
                             :strides
                             (dense-arrays::dimensions->strides new-shape (array-layout array))
-                            :offsets (make-list (length new-shape) :initial-element 0)
+                            :offset 0
                             :total-size (array-total-size array)
                             :rank (length new-shape)
                             :root-array (if simple-dense-array-p
@@ -413,8 +411,7 @@ creating the new array and instead return a view instead. "
   (declare (type dense-array array))
   (let ((cl-array (cl:make-array (narray-dimensions array)
                                  :element-type (array-element-type array)
-                                 :initial-element (coerce 0 (array-element-type array))))
-        (index    0))
+                                 :initial-element (coerce 0 (array-element-type array)))))
     (dotimes (index (cl:array-total-size cl-array))
       (setf (cl:row-major-aref cl-array index)
             (row-major-aref array index)))

@@ -55,29 +55,23 @@
     (let ((dimensions  (make-gensym-list rank "DIMENSION"))
           (all-strides (loop :repeat num-arrays
                              :collect (make-gensym-list rank "STRIDE")))
-          (all-offsets (loop :repeat num-arrays
-                             :collect (make-gensym-list rank "OFFSET")))
           (is          (make-gensym-list num-arrays "I"))
           (svs         (make-gensym-list num-arrays "SV")))
-      (labels ((nest-loop (dimensions all-strides all-offsets)
+      (labels ((nest-loop (dimensions all-strides)
                  (let ((d       (first dimensions))
-                       (strides (mapcar #'first all-strides))
-                       (offsets (mapcar #'first all-offsets)))
-                   `(loop :initially ,@(map-collect `(incf ,%1 ,%2)
-                                                    is offsets)
-                          :repeat ,d
+                       (strides (mapcar #'first all-strides)))
+                   `(loop :repeat ,d
                           :do ,(if (and (null (rest dimensions))
                                         (every (compose #'null #'rest) all-strides))
                                    `(locally ,@body)
                                    (nest-loop (rest dimensions)
-                                              (mapcar #'rest all-strides)
-                                              (mapcar #'rest all-offsets)))
+                                              (mapcar #'rest all-strides)))
                           ,@(map-collect `(incf ,%1 ,%2) is strides)
-                          :finally ,@(map-collect `(decf ,%1 (+ ,%2 (the-int-index (* ,d ,%3))))
-                                                  is offsets strides)))))
+                          :finally ,@(map-collect `(decf ,%1 (the-int-index (* ,d ,%2)))
+                                                  is strides)))))
         `(let (,@(map-collect `(,%1 (array-displaced-to ,%2))
                               svs array-vars)
-               ,@(map-collect `(,%1 0) is))
+               ,@(map-collect `(,%1 (array-offset ,%2)) is array-vars))
            (declare (type int-index ,@is)
                     ;; (optimize speed) ; check before finalizing
                     ,@(mapcar (lm st sv `(type ,st ,sv))
@@ -89,34 +83,27 @@
                (destructuring-lists
                    (,@(mapcar (lm strides array-var
                                   `(int-index ,strides (array-strides ,array-var)))
-                              all-strides array-vars)
-                    ,@(mapcar (lm offsets array-var
-                                  `(size ,offsets (array-offsets ,array-var)))
-                              all-offsets array-vars))
+                              all-strides array-vars))
                  ,(if dimensions
-                      (nest-loop dimensions all-strides all-offsets)
+                      (nest-loop dimensions all-strides)
                       `(locally ,@body))))))))))
 
 (define-macro-helper expand-do-arrays-without-rank
     (elt-vars array-vars storage-types storage-accessors body)
   ;; TODO Add rank correctness checks
   (let ((num-arrays (length array-vars)))
-    (let ((offsets      (make-gensym-list num-arrays "OFFSETS"))
-          (dimensions   (gensym "DIMENSIONS"))
+    (let ((dimensions   (gensym "DIMENSIONS"))
           (strides      (make-gensym-list num-arrays "STRIDES"))
           (is           (make-gensym-list num-arrays "I"))
           (svs          (make-gensym-list num-arrays "SV")) ; storage-vector
           (d            (gensym "D"))
-          (ss           (make-gensym-list num-arrays "SS"))
-          (os           (make-gensym-list num-arrays "OS")))
+          (ss           (make-gensym-list num-arrays "SS")))
       `(let (,@(map-collect `(,%1 (array-displaced-to ,%2))
                             svs array-vars)
              (,dimensions (narray-dimensions ,(first array-vars)))
              ,@(map-collect `(,%1 (array-strides ,%2))
                             strides array-vars)
-             ,@(map-collect `(,%1 (array-offsets ,%2))
-                            offsets array-vars)
-             ,@(map-collect `(,%1 0) is))
+             ,@(map-collect `(,%1 (array-offset ,%2)) is array-vars))
          (declare (type int-index ,@is)
                   ;; (optimize speed) ; check before finalizing
                   ,@(mapcar (lm st sv `(type ,st ,sv))
@@ -126,35 +113,26 @@
          ;; handle the UNUPGRADED-ARRAY correctly.
          (symbol-macrolet (,@(mapcar (lm elt-var sa sv i `(,elt-var (,sa ,sv ,i)))
                                      elt-vars storage-accessors svs is))
-           (labels ((nest-loop (,dimensions ,@strides ,@offsets)
+           (labels ((nest-loop (,dimensions ,@strides)
                       (let ((,d  (first ,dimensions))
-                            ,@(map-collect `(,%1 (first ,%2)) ss strides)
-                            ,@(map-collect `(,%1 (first ,%2)) os offsets))
-                        (declare (type int-index ,@os ,@ss)
+                            ,@(map-collect `(,%1 (first ,%2)) ss strides))
+                        (declare (type int-index ,@ss)
                                  (type size ,d))
                         (if (null (rest ,dimensions))
-                            (loop :initially ,@(map-collect `(incf ,%1 ,%2)
-                                                            is os)
-                                  :repeat ,d
+                            (loop :repeat ,d
                                   :do (locally ,@body)
                                   ,@(map-collect `(incf ,%1 ,%2) is ss)
                                   :finally ,@(map-collect `(decf ,%1
-                                                               (+ ,%2
-                                                                  (the-int-index (* ,d ,%3))))
-                                                          is os ss))
-                            (loop :initially ,@(map-collect `(incf ,%1 ,%2)
-                                                            is os)
-                                  :repeat ,d
+                                                               (the-int-index (* ,d ,%2)))
+                                                          is ss))
+                            (loop :repeat ,d
                                   :do (nest-loop (rest ,dimensions)
-                                                 ,@(map-collect `(rest ,%1) strides)
-                                                 ,@(map-collect `(rest ,%1) offsets))
+                                                 ,@(map-collect `(rest ,%1) strides))
                                   ,@(map-collect `(incf ,%1 ,%2) is ss)
-                                  :finally ,@(map-collect `(decf ,%1
-                                                               (+ ,%2
-                                                                  (the-int-index (* ,d ,%3))))
-                                                          is os ss))))))
+                                  :finally ,@(map-collect `(decf ,%1 (the-int-index (* ,d ,%2)))
+                                                          is ss))))))
              (if ,dimensions
-                 (nest-loop ,dimensions ,@strides ,@offsets)
+                 (nest-loop ,dimensions ,@strides)
                  (locally ,@body))))))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
