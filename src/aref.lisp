@@ -41,33 +41,26 @@ and tests for their equality."
   (declare (optimize speed)
            (dynamic-extent subscripts)
            (type dense-array array))
-  (with-slots (storage strides offsets dimensions rank element-type layout) array
-    (multiple-value-bind (class dimensions strides offsets rank)
-        (let ((new-offsets    nil)
+  (with-slots (storage strides offset dimensions rank element-type layout) array
+    (multiple-value-bind (class dimensions strides offset rank)
+        (let ((new-offset    offset)
               (new-dimensions nil)
               (new-strides    nil)
               (rank           rank)
               (dim            dimensions)
-              (strides        strides)
-              (offsets        offsets)
-              (offset-carry   0))
-          (declare (type size rank offset-carry))
+              (strides        strides))
+          (declare (type size rank))
           (loop :repeat rank
                 :do
                    (let ((s  (car strides))
                          (ss (car subscripts))
-                         (d  (car dim))
-                         (o  (car offsets)))
-                     (declare (type size o)
-                              (type int-index s))
+                         (d  (car dim)))
+                     (declare (type int-index s))
                      (cond ((typep ss 'int-index)
                             (setq ss (normalize-index ss d))
                             (decf rank)
-                            (let ((offset (the-size (+ o (the-int-index (* s ss))))))
-                              (declare (type size offset))
-                              (if (first new-offsets)
-                                  (incf (the-size (first new-offsets)) offset)
-                                  (incf offset-carry        offset))))
+                            (incf (the-size new-offset)
+                                  (the-int-index (* s ss))))
                            ((listp ss)
                             (destructuring-bind (&optional (start 0)
                                                  &key (end d endp) (step 1))
@@ -79,25 +72,23 @@ and tests for their equality."
                                 (setq end -1))
                               (push (ceiling (- end start) step) new-dimensions)
                               (push (the-int-index (* s step)) new-strides)
-                              (push (the-size (+ o offset-carry (the-int-index (* start s))))
-                                    new-offsets)
-                              (setq offset-carry 0)))
+                              (incf (the-size new-offset)
+                                    (the-int-index (* start s)))))
                            (t (error 'invalid-array-index :array array :index ss))))
                    (setq dim        (cdr dim)
                          strides    (cdr strides)
-                         subscripts (cdr subscripts)
-                         offsets    (cdr offsets)))
+                         subscripts (cdr subscripts)))
           (values (class-of array)
                   (append (nreverse new-dimensions) dim)
                   (append (nreverse new-strides) strides)
-                  (nreverse new-offsets)
+                  new-offset
                   rank))
       (make-instance class
                      :storage storage
                      :element-type element-type
                      :dimensions dimensions
                      :strides strides
-                     :offsets offsets
+                     :offset offset
                      :layout nil
                      :total-size (apply #'* dimensions)
                      :root-array (or (dense-array-root-array array) array)
@@ -166,13 +157,11 @@ and tests for their equality."
     (funcall (fdefinition (storage-accessor dense-array-class))
              (array-storage array)
              (the size
-                  (let ((index 0))
+                  (let ((index (array-offset array)))
                     (declare (type size index))
                     (loop :for stride :of-type size :in (array-strides array)
                           :for subscript :of-type size :in subscripts
-                          :for offset :of-type size :in (array-offsets array)
-                          :do (incf index (+ offset
-                                             (the-size (* stride subscript)))))
+                          :do (incf index (the-int-index (* stride subscript))))
                     index)))))
 
 (defun aref* (dense-array &rest subscripts)
@@ -221,20 +210,17 @@ of the array are copied over into a new array."
            (funcall (storage-accessor dense-array-class)
                     (array-storage dense-array)
                     (the int-index
-                         (let ((index 0))
+                         (let ((index (array-offset dense-array)))
                            (declare (type int-index index))
                            (loop :for stride :of-type int-index
                                    :in (array-strides dense-array)
                                  :for subscript :of-type int-index :in subscripts
-                                 :for offset :of-type int-index
-                                   :in (array-offsets dense-array)
                                  :for dimension :of-type int-index
                                    :in (narray-dimensions dense-array)
                                  :do (incf index
-                                         (+ offset
-                                            (the-int-index
-                                             (* stride
-                                                (normalize-index subscript dimension))))))
+                                           (the-int-index
+                                            (* stride
+                                               (normalize-index subscript dimension)))))
                            index)))))
         ((or (some #'cl:arrayp subscripts)
              (some #'arrayp subscripts))
@@ -309,21 +295,17 @@ of the array are copied over into a new array."
           :index subscripts
           :array array
           :suggestion "Did you mean to use (SETF DENSE-ARRAYS:AREF*) ?")
-  (with-slots (storage element-type strides offsets dimensions rank) array
+  (with-slots (storage element-type strides offset dimensions rank) array
     (assert-type new-element/s element-type)
     (let* ((dense-array-class (class-of array)))
       (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
                new-element/s
                storage
-               (let ((index 0))
+               (let ((index offset))
                  (declare (type size index))
                  (loop :for stride :of-type int-index :in strides
                        :for subscript :of-type int-index :in subscripts
-                       :for offset :of-type size :in offsets
-                       :do (incf index
-                               (the-size
-                                (+ offset
-                                   (the-int-index (* stride subscript))))))
+                       :do (incf index (the-int-index (* stride subscript))))
                  index))))
   new-element/s)
 
@@ -331,7 +313,7 @@ of the array are copied over into a new array."
   (declare (type dense-array dense-array)
            ;; (optimize speed)
            (dynamic-extent subscripts))
-  (with-slots (storage element-type strides offsets dimensions rank) dense-array
+  (with-slots (storage element-type strides offset dimensions rank) dense-array
     (cond ((and (= rank (length subscripts))
                 (every #'integerp subscripts))
            (assert-type new-element/s (array-element-type dense-array))
@@ -339,19 +321,16 @@ of the array are copied over into a new array."
              (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
                       new-element/s
                       storage
-                      (let ((index 0))
+                      (let ((index offset))
                         (declare (type size index))
                         (loop :for stride :of-type int-index :in strides
                               :for subscript :of-type int-index :in subscripts
-                              :for offset :of-type size :in offsets
                               :for dimension :of-type size
                                 :in (narray-dimensions dense-array)
                               :do (incf index
-                                        (the-size
-                                         (+ offset
-                                            (the-size
-                                             (* stride
-                                                (normalize-index subscript dimension)))))))
+                                        (the-int-index
+                                         (* stride
+                                            (normalize-index subscript dimension)))))
                         index))))
           ((or (some #'cl:arrayp subscripts)
                (some #'arrayp subscripts))
@@ -446,20 +425,19 @@ of the array are copied over into a new array."
 
 (defpolymorph (row-major-aref :inline t) ((array dense-array) index) t
   (declare (type int-index index))
-  (let ((row-major-index   0)
+  (let ((row-major-index   (array-offset array))
         (apparant-strides  (rest (collect-reduce-from-end #'*
                                                           (narray-dimensions array) 1))))
     ;; APPARANT-STRIDES corresponds to the INDEX if DIMENSIONS were the true dimensions.
     ;; A user supplies the INDEX assuming that DIMENSIONS are the true dimensions.
-    ;; But this need not be true due to strides and offsets.
+    ;; But this need not be true due to strides and offset.
     ;; Therefore, we obtain the INDEX from the APPARANT-STRIDES with each dimension
     ;; of calculation.
     (declare (type int-index row-major-index))
     (loop :for s  :of-type int-index :in (array-strides array)
           :for as :of-type int-index :in apparant-strides
-          :for o  :of-type int-index :in (array-offsets array)
-          :do (incf row-major-index (the-int-index (+ o (the-int-index
-                                                         (* s (floor index as))))))
+          :do (incf row-major-index (the-int-index
+                                     (* s (floor index as))))
               (setf index (rem index as)))
     (assert-type (funcall (fdefinition (storage-accessor (class-of array)))
                           (array-storage array)
@@ -469,14 +447,13 @@ of the array are copied over into a new array."
 (defpolymorph ((setf row-major-aref) :inline t) (new-element (array dense-array) index) t
   (declare (type int-index index))
   (assert-type new-element (array-element-type array))
-  (let ((row-major-index   0)
+  (let ((row-major-index   (array-offset array))
         (apparant-strides  (rest (collect-reduce-from-end #'* (narray-dimensions array) 1))))
     (declare (type int-index row-major-index))
     (loop :for s  :of-type int-index :in (array-strides array)
           :for as :of-type int-index :in apparant-strides
-          :for o  :of-type int-index :in (array-offsets array)
-          :do (incf row-major-index (the-int-index (+ o (the-int-index
-                                                         (* s (floor index as))))))
+          :do (incf row-major-index (the-int-index
+                                     (* s (floor index as))))
               (setf index (rem index as)))
     (funcall (fdefinition `(setf ,(storage-accessor (class-of array))))
              new-element

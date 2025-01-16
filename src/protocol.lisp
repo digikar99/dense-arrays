@@ -10,7 +10,7 @@
   ;; For DENSE-ARRAY, this ELEMENT-TYPE depends on the underlying storage itself.
 
   ((strides      :required t :type list)
-   (offsets      :required t)
+   (offset       :required t :type size)
    (layout       :required t
                  ;; LAYOUT can be NIL in the case of a non SIMPLE-ARRAY
                  ;; LAYOUT will be ROW-MAJOR or COLUMN-MAJOR only for SIMPLE-ARRAY
@@ -19,7 +19,7 @@
   (:metaclass dense-array-class)
   (:documentation "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.
-- OFFSETS is a list of offsets along each dimension."))
+- OFFSET is the offset inside array-storage."))
 
 ;;; Below, we are using CLASS instead of CLASS-NAME because the CLASS objects
 ;;; will have a hierarchy, not the CLASS-NAMEs. This allows for partial specialization.

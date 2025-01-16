@@ -50,7 +50,6 @@ If COPY is non-NIL, this copies over the underlying MAGICL::STORAGE"
          (layout       (magicl:layout magicl-tensor))
          (dimensions   (magicl:shape magicl-tensor))
          (strides      (dimensions->strides dimensions layout))
-         (offsets      (make-list rank :initial-element 0))
          (total-size   (magicl:size magicl-tensor)))
     (make-instance 'standard-dense-array
                    :layout layout
@@ -58,7 +57,7 @@ If COPY is non-NIL, this copies over the underlying MAGICL::STORAGE"
                    :rank rank
                    :dimensions dimensions
                    :strides strides
-                   :offsets offsets
+                   :offset 0
                    :total-size total-size
                    :storage storage
                    :root-array nil)))
