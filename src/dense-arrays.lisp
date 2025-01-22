@@ -357,23 +357,26 @@ Also see:
 - https://en.wikipedia.org/wiki/Format_(Common_Lisp)
 - http://www.gigamonkeys.com/book/a-few-format-recipes.html")
 
-(defmethod print-object ((array dense-array) stream)
-  ;; (print (type-of array))
-  (let* ((*print-right-margin* (or *print-right-margin* 80))
-         (sv      (array-storage array))
-         (layout  (array-layout array))
-         (rank    (array-rank array))
-         (index   (array-offset array))
-         (fmt-control (or *array-element-print-format*
-                          (switch ((array-element-type array) :test #'type=)
-                            ('double-float "~,15,3@e")
-                            ('single-float "~,7,2@e")
-                            (t             "~s"))))
-         (*print-level* (if *print-level*
-                            (1+ *print-level*)
-                            *print-level*)))
+(defvar *print-tail-length* nil
+  "Control how many items at the end of each array dimensions to print.")
+
+(defgeneric data-as-lol (object)
+  (:documentation "Generate a list of lists representation of OBJECT's content.
+
+ The output respects *PRINT-LENGTH* and *PRINT-LEVEL* and is suitable for
+ tabular printing."))
+
+(defmethod data-as-lol ((array dense-array))
+  (let ((sv      (array-storage array))
+        (rank    (array-rank array))
+        (index   (array-offset array))
+        (fmt-control (or *array-element-print-format*
+                         (switch ((array-element-type array) :test #'type=)
+                           ('double-float "~,15,3@e")
+                           ('single-float "~,7,2@e")
+                           (t             "~s")))))
     ;; Do variable declarations before just to save some horizontal space
-    (labels ((data-as-lol (&optional (depth 0))
+    (labels ((process (depth)
                ;; Get the relevant data from storage vector as a
                ;; potentially nested list (list of lists)
                (cond ((= depth rank)
@@ -381,25 +384,49 @@ Also see:
                      ((and *print-level* (= depth *print-level*))
                       "#")
                      (t
-                      (loop :with dim := (array-dimension array depth)
-                            :with print-length
-                              := (if *print-length*
-                                     (min dim *print-length*)
-                                     dim)
-                            :with stride := (array-stride array depth)
-                            :repeat print-length
-                            :collect (data-as-lol (1+ depth)) :into data
-                            :do (incf index stride)
-                            :finally
-                               (decf index
-                                   (* stride print-length))
-                               (return (nconc data
-                                              (when (< print-length dim)
-                                                '("..."))))))))
-             (pretty-print-new-line (stream)
+                      (let* ((dim (array-dimension array depth))
+                             (total-length
+                               (if *print-length*
+                                   (min dim *print-length*)
+                                   dim))
+                             (tail-length
+                               (if (and *print-tail-length*
+                                        (< *print-tail-length* total-length))
+                                   *print-tail-length* 0))
+                             (head-length
+                               (- total-length tail-length))
+                             (stride (array-stride array depth))
+                             (head-list
+                               (loop :repeat head-length
+                                     :collect (process (1+ depth))
+                                     :do (incf index stride)
+                                     :finally
+                                        (decf index (* stride head-length))))
+                             (tail-list
+                               (loop :initially
+                                 (incf index (* stride (- dim tail-length)))
+                                     :repeat tail-length
+                                     :collect (process (1+ depth))
+                                     :do (incf index stride)
+                                     :finally
+                                        (decf index (* stride dim)))))
+                        (nconc head-list
+                               (when (< total-length dim) (list "..."))
+                               tail-list))))))
+      (process 0))))
+
+(defmethod print-object ((array dense-array) stream)
+  ;; (print (type-of array))
+  (let* ((*print-right-margin* (or *print-right-margin* 80))
+         (layout  (array-layout array))
+         (rank    (array-rank array))
+         (*print-level* (if *print-level*
+                            (1+ *print-level*)
+                            *print-level*)))
+    (labels ((pretty-print-new-line (stream)
                #-ccl (pprint-newline :mandatory stream)
                #+ccl (format stream "~%  ")))
-      (let* ((items (ensure-list (data-as-lol)))
+      (let* ((items (ensure-list (data-as-lol array)))
              (len   (length items))
              (num-lines 3))
         (pprint-logical-block (stream items)
@@ -427,7 +454,12 @@ Also see:
               ;; print the array elements
               (loop :for item :in items
                     :for i :below len
-                    :do (let* ((printed-item (format nil "~A" item))
+                    ;; We temporarily rebind *print-length* to NIl to avoid
+                    ;; FORMAT converting our last items to ..., because if
+                    ;; *print-tail-length* > 0, we generate lists with ...  in
+                    ;; the middle and length = *print-length* + 1
+                    :do (let* (*print-length*
+                               (printed-item (format nil "~A" item))
                                (newline-count (1+ (count #\newline printed-item)))
                                (printed-lines
                                  (uiop:split-string printed-item
