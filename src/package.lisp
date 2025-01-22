@@ -58,7 +58,8 @@
              #:alexandria
              #:5am)
        (:export ,@shadow-symbols
-                ,@abstract-array-symbols)
+                ,@abstract-array-symbols
+                #:*print-tail-length*)
        (:shadow ,@shadow-symbols)
        (:shadowing-import-from #:cl #:ftype)
        (:shadowing-import-from #:peltadot
