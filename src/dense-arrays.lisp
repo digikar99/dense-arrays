@@ -267,8 +267,7 @@ Additionally takes
 (defun array-displacement (array)
   "Returns two values:
 - ARRAY-STORAGE
-- OFFSET
-Consequences are undefined if ARRAY is displaced along multiple axis."
+- OFFSET"
   (declare (type dense-array array))
   (values (array-storage array)
           (array-offset array)))
