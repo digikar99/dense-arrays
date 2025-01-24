@@ -75,7 +75,7 @@
                      (layout *array-layout*)
 
                      (displaced-to nil displaced-to-p)
-                     (offset 0))
+                     (displaced-index-offset 0))
   "Like CL:MAKE-ARRAY but returns a DENSE-ARRAYS::DENSE-ARRAY instead of CL:ARRAY.
 Additionally takes
 
@@ -145,7 +145,7 @@ Additionally takes
                                          :element-type element-type
                                          :dimensions dimensions
                                          :strides strides
-                                         :offset offset
+                                         :offset displaced-index-offset
                                          :total-size (apply #'* dimensions)
                                          :root-array nil
                                          :rank (length dimensions)
