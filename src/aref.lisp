@@ -41,7 +41,8 @@ and tests for their equality."
   (declare (optimize speed)
            (dynamic-extent subscripts)
            (type dense-array array))
-  (with-slots (storage strides offset dimensions rank element-type layout) array
+  ;; Guidelines: https://numpy.org/doc/stable/user/basics.indexing.html
+  (with-slots (storage strides offset dimensions rank element-type layout metadata) array
     (multiple-value-bind (class dimensions strides offset rank)
         (let ((new-offset    offset)
               (new-dimensions nil)
@@ -84,16 +85,17 @@ and tests for their equality."
                   (append (nreverse new-strides) strides)
                   new-offset
                   rank))
-      (make-instance class
-                     :storage storage
-                     :element-type element-type
-                     :dimensions dimensions
-                     :strides strides
-                     :offset offset
-                     :layout nil
-                     :total-size (apply #'* dimensions)
-                     :root-array (or (dense-array-root-array array) array)
-                     :rank rank))))
+      (funcall (dam-dense-array-constructor metadata)
+               :storage storage
+               :element-type element-type
+               :dimensions dimensions
+               :strides strides
+               :offset offset
+               :layout nil
+               :total-size (apply #'* dimensions)
+               :root-array (or (dense-array-root-array array) array)
+               :rank rank
+               :metadata metadata))))
 
 (defun %aref (array &rest subscripts)
   "Returns a copy of the subscripted array."
@@ -107,7 +109,8 @@ and tests for their equality."
         (apply #'broadcast-arrays
                (iter (for subscript in subscripts)
                  ;; TYPE-EXPAND is required for CCL and ECL
-                 (if (typep subscript (typexpand '(%dense-array bit)))
+                 (if (and (typep subscript 'abstract-arrays:array)
+                          (type= 'bit (array-element-type subscript)))
                      (appending (nonzero subscript))
                      (collect   subscript)))))
   (cond
@@ -154,16 +157,15 @@ and tests for their equality."
           :index subscripts
           :array array
           :suggestion "Did you mean to use DENSE-ARRAYS:AREF* ?")
-  (let* ((dense-array-class (class-of array)))
-    (funcall (fdefinition (storage-accessor dense-array-class))
-             (array-storage array)
-             (the size
-                  (let ((index (array-offset array)))
-                    (declare (type size index))
-                    (loop :for stride :of-type size :in (array-strides array)
-                          :for subscript :of-type size :in subscripts
-                          :do (incf index (the-int-index (* stride subscript))))
-                    index)))))
+  (funcall (fdefinition (dam-storage-accessor (dense-array-metadata array)))
+           (array-storage array)
+           (the size
+                (let ((index (array-offset array)))
+                  (declare (type size index))
+                  (loop :for stride :of-type size :in (array-strides array)
+                        :for subscript :of-type size :in subscripts
+                        :do (incf index (the-int-index (* stride subscript))))
+                  index))))
 
 (defun aref* (dense-array &rest subscripts)
   "Accessor function for DENSE-ARRAYS::DENSE-ARRAY with semantics
@@ -207,22 +209,21 @@ of the array are copied over into a new array."
    (dynamic-extent subscripts))
   (cond ((and (= (array-rank dense-array) (length subscripts))
               (every #'integerp subscripts))
-         (let* ((dense-array-class (class-of dense-array)))
-           (funcall (storage-accessor dense-array-class)
-                    (array-storage dense-array)
-                    (the int-index
-                         (let ((index (array-offset dense-array)))
-                           (declare (type int-index index))
-                           (loop :for stride :of-type int-index
-                                   :in (array-strides dense-array)
-                                 :for subscript :of-type int-index :in subscripts
-                                 :for dimension :of-type int-index
-                                   :in (narray-dimensions dense-array)
-                                 :do (incf index
-                                           (the-int-index
-                                            (* stride
-                                               (normalize-index subscript dimension)))))
-                           index)))))
+         (funcall (dam-storage-accessor (dense-array-metadata dense-array))
+                  (array-storage dense-array)
+                  (the int-index
+                       (let ((index (array-offset dense-array)))
+                         (declare (type int-index index))
+                         (loop :for stride :of-type int-index
+                                 :in (array-strides dense-array)
+                               :for subscript :of-type int-index :in subscripts
+                               :for dimension :of-type int-index
+                                 :in (narray-dimensions dense-array)
+                               :do (incf index
+                                         (the-int-index
+                                          (* stride
+                                             (normalize-index subscript dimension)))))
+                         index))))
         ((or (some #'cl:arrayp subscripts)
              (some #'arrayp subscripts))
          (apply #'%aref dense-array subscripts))
@@ -248,7 +249,8 @@ of the array are copied over into a new array."
       (apply #'broadcast-arrays
              new-array
              (iter (for subscript in subscripts)
-               (if (typep subscript (typexpand '(%dense-array bit)))
+               (if (and (typep subscript 'abstract-arrays:array)
+                        (type= 'bit (array-element-type subscript)))
                    (appending (nonzero subscript))
                    (collect   subscript))))
     (cond
@@ -298,16 +300,15 @@ of the array are copied over into a new array."
           :suggestion "Did you mean to use (SETF DENSE-ARRAYS:AREF*) ?")
   (with-slots (storage element-type strides offset dimensions rank) array
     (assert-type new-element/s element-type)
-    (let* ((dense-array-class (class-of array)))
-      (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
-               new-element/s
-               storage
-               (let ((index offset))
-                 (declare (type size index))
-                 (loop :for stride :of-type int-index :in strides
-                       :for subscript :of-type int-index :in subscripts
-                       :do (incf index (the-int-index (* stride subscript))))
-                 index))))
+    (funcall (fdefinition `(setf ,(dam-storage-accessor (dense-array-metadata array))))
+             new-element/s
+             storage
+             (let ((index offset))
+               (declare (type size index))
+               (loop :for stride :of-type int-index :in strides
+                     :for subscript :of-type int-index :in subscripts
+                     :do (incf index (the-int-index (* stride subscript))))
+               index)))
   new-element/s)
 
 (defun (setf aref*) (new-element/s dense-array &rest subscripts)
@@ -318,21 +319,20 @@ of the array are copied over into a new array."
     (cond ((and (= rank (length subscripts))
                 (every #'integerp subscripts))
            (assert-type new-element/s (array-element-type dense-array))
-           (let* ((dense-array-class (class-of dense-array)))
-             (funcall (fdefinition `(setf ,(storage-accessor dense-array-class)))
-                      new-element/s
-                      storage
-                      (let ((index offset))
-                        (declare (type size index))
-                        (loop :for stride :of-type int-index :in strides
-                              :for subscript :of-type int-index :in subscripts
-                              :for dimension :of-type size
-                                :in (narray-dimensions dense-array)
-                              :do (incf index
-                                        (the-int-index
-                                         (* stride
-                                            (normalize-index subscript dimension)))))
-                        index))))
+           (funcall (fdefinition `(setf ,(dam-storage-accessor (dense-array-metadata dense-array))))
+                    new-element/s
+                    storage
+                    (let ((index offset))
+                      (declare (type size index))
+                      (loop :for stride :of-type int-index :in strides
+                            :for subscript :of-type int-index :in subscripts
+                            :for dimension :of-type size
+                              :in (narray-dimensions dense-array)
+                            :do (incf index
+                                      (the-int-index
+                                       (* stride
+                                          (normalize-index subscript dimension)))))
+                      index)))
           ((or (some #'cl:arrayp subscripts)
                (some #'arrayp subscripts))
            (apply #'(setf %aref) new-element/s dense-array subscripts))
@@ -423,7 +423,7 @@ of the array are copied over into a new array."
                 (setf (aref* a (make-array '(2 3)
                                            :element-type 'bit
                                            :initial-contents '((1 0 1) (0 0 1))
-                                           :class 'standard-dense-array))
+                                           :metadata 'standard-dense-array))
                       2)
                 a))))
 
@@ -443,7 +443,7 @@ of the array are copied over into a new array."
           :do (incf row-major-index (the-int-index
                                      (* s (floor index as))))
               (setf index (rem index as)))
-    (assert-type (funcall (fdefinition (storage-accessor (class-of array)))
+    (assert-type (funcall (fdefinition (dam-storage-accessor (dense-array-metadata array)))
                           (array-storage array)
                           row-major-index)
                  (array-element-type array))))
@@ -459,7 +459,7 @@ of the array are copied over into a new array."
           :do (incf row-major-index (the-int-index
                                      (* s (floor index as))))
               (setf index (rem index as)))
-    (funcall (fdefinition `(setf ,(storage-accessor (class-of array))))
+    (funcall (fdefinition `(setf ,(dam-storage-accessor (dense-array-metadata array))))
              new-element
              (array-storage array)
              row-major-index)))

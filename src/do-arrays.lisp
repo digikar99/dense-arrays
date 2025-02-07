@@ -153,7 +153,7 @@
 
   Otherwise, the first argument is treated as if they are BINDINGS.
   Each BINDING is of the form
-    (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (CLASS-NAME *DENSE-ARRAY-CLASS*))
+    (ELT-VAR ARRAY &OPTIONAL (ELEMENT-TYPE *) &KEY (METADATA *DENSE-ARRAY-METADATA*))
   Here, only ARRAY is evaluated.
 
 Examples
@@ -194,21 +194,21 @@ Either of the two cases might be faster depending on the number of dimensions."
                                             (dense-array-type-element-type array-type)
                                             'cl:*)))
                            ;; Could there be a case where a user wants to specify
-                           ;; the class but not the element-type?
+                           ;; the metadata but not the element-type?
                            ;; Well, they could just specify the *
-                           &key (class *dense-array-class*))
+                           &key (metadata *dense-array-metadata*))
                           binding
                         (when (and (eq element-type '*))
                           (signal 'do-arrays/element-type-failure
                                   :binding-form (list elt-var array)))
-                        (unless (typep class 'class)
-                          (setq class (find-class class)))
+                        (unless (typep metadata 'dense-array-metadata)
+                          (setq metadata (dam-object metadata)))
                         (push elt-var      elt-vars)
                         (push array        arrays)
-                        (push (funcall (storage-type-inferrer-from-array-type class)
-                                       `(%dense-array ,element-type))
+                        (push (funcall (dam-storage-type-inferrer-from-element-type metadata)
+                                       element-type)
                               storage-types)
-                        (push (storage-accessor class) storage-accessors))))
+                        (push (dam-storage-accessor metadata) storage-accessors))))
           ;; Reverse - so same as given order - because, see the test below
           (list (nreverse elt-vars)
                 (nreverse arrays)

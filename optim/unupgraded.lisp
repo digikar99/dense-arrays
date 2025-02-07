@@ -8,7 +8,7 @@
       (progn
         (with-output-to-string (*error-output*)
           (handler-bind ((warning #'muffle-warning))
-            (eval `(let ((*dense-array-class* 'unupgraded-dense-array))
+            (eval `(let ((*dense-array-metadata* 'unupgraded-dense-array))
                      (let ((a (let ((a (make-array 2 :initial-element "" :element-type 'string)))
                                 (funcall #'(setf aref) 0 (array-storage a) 0)
                                 (funcall #'(setf aref) 0 (array-storage a) 1)
@@ -19,7 +19,7 @@
                        (signals error (funcall #'(setf aref) 1 a 0))
                        (signals error (row-major-aref a 0))
                        (signals error (funcall #'(setf row-major-aref) 1 a 0)))))))
-        (eval `(let ((*dense-array-class* 'standard-dense-array))
+        (eval `(let ((*dense-array-metadata* 'standard-dense-array))
                  (let ((a (make-array 2 :initial-element 0 :element-type 'string)))
                    (declare (optimize speed)
                             ;; This does not even let (array string 1) declaration pass!

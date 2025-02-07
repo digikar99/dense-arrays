@@ -7,7 +7,7 @@
     (setq array (make-array 1 :initial-element array :element-type (type-of array))))
   (when (equalp broadcast-dimensions (narray-dimensions array))
     (return-from broadcast-array array))
-  (with-slots (dimensions element-type strides offset storage) array
+  (with-slots (dimensions element-type strides offset storage metadata) array
     (let ((total-size (apply #'* broadcast-dimensions))
           (strides
             (let* ((blen (length broadcast-dimensions))
@@ -28,16 +28,17 @@
                            0)
                           (t (error "~D of dim ~D cannot be broadcasted to dim ~D"
                                     array dim broadcast-dimensions)))))))
-      (make-instance (class-of array)
-                     :dimensions broadcast-dimensions
-                     :layout nil
-                     :element-type element-type
-                     :strides strides
-                     :offset offset
-                     :total-size total-size
-                     :root-array (or (dense-array-root-array array) array)
-                     :rank (length broadcast-dimensions)
-                     :storage (array-storage array)))))
+      (funcall (dam-dense-array-constructor metadata)
+               :dimensions broadcast-dimensions
+               :layout nil
+               :element-type element-type
+               :strides strides
+               :offset offset
+               :total-size total-size
+               :root-array (or (dense-array-root-array array) array)
+               :rank (length broadcast-dimensions)
+               :storage (array-storage array)
+               :metadata metadata))))
 
 (defun %broadcast-compatible-p (dimensions-a dimensions-b)
   "Returns two values:

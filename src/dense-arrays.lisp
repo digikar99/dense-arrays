@@ -60,7 +60,8 @@
             (t
              whole)))))
 
-(declaim (ftype (function * dense-array) make-array))
+;; FIXME: dense-array is a trait not a regular type
+;; (declaim (ftype (function * dense-array) make-array))
 (defun make-array (dimensions &rest args
                    &key (element-type default-element-type)
 
@@ -71,7 +72,7 @@
                      (strides nil strides-p)
                      (adjustable nil adjustable-p)
                      (fill-pointer nil fill-pointer-p)
-                     (class *dense-array-class*)
+                     (metadata *dense-array-metadata*)
                      (layout *array-layout*)
 
                      (displaced-to nil displaced-to-p)
@@ -97,10 +98,10 @@ Additionally takes
   ;; TODO: Handle adjustable
   ;; TODO: Handle fill-pointer
   ;; TODO: Sanitize displaced-to
-  (declare ;; (optimize speed)
-   (ignore args adjustable fill-pointer displaced-to-p)
-   (type function-designator constructor)
-   (type (member :row-major :column-major) layout))
+  (declare (optimize debug)
+           (ignore args adjustable fill-pointer displaced-to-p)
+           (type function-designator constructor)
+           (type (member :row-major :column-major) layout))
   (ensure-single initial-element-p
                  initial-contents-p
                  constructor-p)
@@ -116,10 +117,10 @@ Additionally takes
                               strides
                               (dimensions->strides dimensions layout)))
 
-         (class           (typecase class
-                            (class class)
-                            (t (find-class class))))
-         (element-type    (funcall (storage-element-type-upgrader class)
+         (metadata        (etypecase metadata
+                            (dense-array-metadata metadata)
+                            (symbol (dam-object metadata))))
+         (element-type    (funcall (dam-storage-element-type-upgrader metadata)
                                    element-type))
          (initial-element (let ((elt (cond (initial-element-p initial-element)
                                            (t (switch (element-type :test #'type=)
@@ -135,23 +136,24 @@ Additionally takes
                                            elt element-type))
                             elt))
          (storage         (or displaced-to
-                              (funcall (storage-allocator class)
+                              (funcall (dam-storage-allocator metadata)
                                        total-size
                                        :initial-element initial-element
                                        :element-type element-type)))
 
-         (dense-array     (make-instance class
-                                         :storage storage
-                                         :element-type element-type
-                                         :dimensions dimensions
-                                         :strides strides
-                                         :offset displaced-index-offset
-                                         :total-size (apply #'* dimensions)
-                                         :root-array nil
-                                         :rank (length dimensions)
-                                         :layout layout))
-         (storage-accessor (storage-accessor class))
-         (storage-deallocator (storage-deallocator class)))
+         (dense-array     (funcall (dam-dense-array-constructor metadata)
+                                   :storage storage
+                                   :element-type element-type
+                                   :dimensions dimensions
+                                   :strides strides
+                                   :offset displaced-index-offset
+                                   :total-size (apply #'* dimensions)
+                                   :root-array nil
+                                   :rank (length dimensions)
+                                   :layout layout
+                                   :metadata metadata))
+         (storage-accessor (dam-storage-accessor metadata))
+         (storage-deallocator (dam-storage-deallocator metadata)))
     (when storage-deallocator
       (trivial-garbage:finalize dense-array
                                 (lambda () (funcall storage-deallocator storage))))
@@ -230,12 +232,13 @@ Additionally takes
               (array-storage (make-array '(2 3) :constructor #'+ :element-type 'int32
                                          :layout :column-major))))
 
-  (symbol-macrolet ((a (make-array 0 :element-type 'int32)))
-    (is (typep a '(%dense-array int32)))
-    (is (typep a '(%dense-array (signed-byte 32)))))
+  (symbol-macrolet ((a (make-array 0 :element-type 'int32
+                                   :metadata 'standard-dense-array)))
+    (is (typep a '(array int32)))
+    (is (typep a '(array (signed-byte 32)))))
   (is (equalp #("hello" "goodbye")
               (array-storage (make-array 2 :initial-contents '("hello" "goodbye")
-                                           :class 'standard-dense-array)))))
+                                           :metadata 'standard-dense-array)))))
 
 ;; trivial function definitions
 
@@ -271,14 +274,6 @@ Additionally takes
   (declare (type dense-array array))
   (values (array-storage array)
           (array-offset array)))
-
-(declaim (inline array-dimension))
-(defun array-dimension (array axis-number)
-  "Return the length of dimension AXIS-NUMBER of ARRAY."
-  (declare (type dense-array array)
-           (type fixnum axis-number))
-  (the (mod #.array-dimension-limit)
-       (elt (narray-dimensions array) axis-number)))
 
 (declaim (inline array-strides))
 (defun array-strides (array)
@@ -365,7 +360,8 @@ Also see:
  The output respects *PRINT-LENGTH* and *PRINT-LEVEL* and is suitable for
  tabular printing."))
 
-(defmethod data-as-lol ((array dense-array))
+(defmethod data-as-lol ((array standard-dense-array))
+  (declare (optimize debug))
   (let ((sv      (array-storage array))
         (rank    (array-rank array))
         (index   (array-offset array))
@@ -414,8 +410,8 @@ Also see:
                                tail-list))))))
       (process 0))))
 
-(defmethod print-object ((array dense-array) stream)
-  ;; (print (type-of array))
+(defun print-dense-array (array stream)
+  (declare (type dense-array array))
   (let* ((*print-right-margin* (or *print-right-margin* 80))
          (layout  (array-layout array))
          (rank    (array-rank array))
@@ -483,6 +479,10 @@ Also see:
                             (pretty-print-new-line stream)
                             (return)))))))))))
 
+(defmethod print-object ((array standard-dense-array) stream)
+  ;; (print (type-of array))
+  (print-dense-array array stream))
+
 (defun print-array (array &optional array-element-print-format &key level length
                                                                  (stream nil streamp))
   "Prints ARRAY as if by CL:PRINT.
@@ -501,7 +501,7 @@ Format recipes: http://www.gigamonkeys.com/book/a-few-format-recipes.html."
         (*print-length* nil)
         (*print-level*  nil))
     (symbol-macrolet ((array (make-array '(5 5) :initial-element 'hello
-                                                :class 'standard-dense-array)))
+                                                :metadata 'standard-dense-array)))
       (macrolet ((lines (n)
                    `(with-output-to-string (*standard-output*)
                       (let ((*print-lines* ,n))

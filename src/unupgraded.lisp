@@ -1,20 +1,14 @@
 (in-package :dense-arrays)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-
-  (defclass unupgraded-dense-array-class (standard-dense-array-class) ())
-
-  (defclass unupgraded-dense-array (dense-array)
-    ()
-    (:metaclass unupgraded-dense-array-class))
-
-  (defmethod storage-element-type-upgrader ((class unupgraded-dense-array-class))
-    'identity))
+  (setf (dam-object 'unupgraded-dense-array)
+        (let ((dam-object (copy-dense-array-metadata (dam-object 'standard-dense-array))))
+          (setf (dam-storage-element-type-upgrader dam-object) 'identity)
+          dam-object))
+  (define-dense-array-types standard-dense-array unupgraded-dense-array
+    unupgraded-array simple-unupgraded-array))
 
 ;; TODO: Prepare a SIMPLE-UNUPGRADED-ARRAY type
-(define-dense-array-types unupgraded-dense-array unupgraded-dense-array
-  unupgraded-array simple-unupgraded-array)
-
 (define-array-specializations (string) ())
 
 (def-suite unupgraded-array :in :dense-arrays)
@@ -22,7 +16,7 @@
 
 (def-test unupgraded-array/make-array ()
 
-  (let ((*dense-array-class* 'unupgraded-dense-array))
+  (let ((*dense-array-metadata* 'unupgraded-dense-array))
 
     (is-true (make-array 2 :element-type 'string
                            :initial-element ""))
@@ -43,7 +37,7 @@
                                                          0)))))
 
 (def-test unupgraded-array/aref ()
-  (let ((*dense-array-class* 'unupgraded-dense-array))
+  (let ((*dense-array-metadata* 'unupgraded-dense-array))
     (let ((array (make-array 2 :element-type 'string :initial-element "")))
       (signals error
         (setf (aref* array 0) 0))

@@ -41,7 +41,6 @@
 (defun nonzero (bit-array)
   (declare (optimize speed)
            ;; TODO: Optimize
-           (type (%dense-array bit) bit-array)
            (compiler-macro-notes:muffle compiler-macro-notes:note))
   (let ((elt-count 0)
         (rank      (array-rank bit-array))

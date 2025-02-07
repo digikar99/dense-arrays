@@ -13,7 +13,9 @@
    #:simple-dense-array
    #:array-offset
    #:array-strides
-   #:array-root-array)
+   #:array-root-array
+   #:dense-array-metadata
+   #:dam-dense-array-constructor)
   (:import-from
    #:peltadot-traits-library
    #:array-like
@@ -117,9 +119,10 @@
 ;; MISC ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun transpose (array-like &key axes)
-  (let ((array (typecase array-like
-                 (dense-array array-like)
-                 (t (asarray array-like)))))
+  (let* ((array (typecase array-like
+                  (dense-array array-like)
+                  (t (asarray array-like))))
+         (metadata (dense-array-metadata (the dense-array array))))
     (declare (type dense-array array)
              (optimize speed))
     (multiple-value-bind (dimensions strides)
@@ -131,17 +134,18 @@
                   :finally (return (values dimensions strides)))
             (values (reverse (narray-dimensions array))
                     (reverse (array-strides    array))))
-      (make-instance (class-of array)
-                     :storage (array-displaced-to array)
-                     :element-type (array-element-type array)
-                     :layout (array-layout array)
-                     :dimensions dimensions
-                     :strides strides
-                     :offset (array-offset array)
-                     :total-size (array-total-size array)
-                     :rank (array-rank array)
-                     :root-array (or (dense-arrays::dense-array-root-array array)
-                                     array)))))
+      (funcall (dam-dense-array-constructor metadata)
+               :storage (array-displaced-to array)
+               :element-type (array-element-type array)
+               :layout (array-layout array)
+               :dimensions dimensions
+               :strides strides
+               :offset (array-offset array)
+               :total-size (array-total-size array)
+               :rank (array-rank array)
+               :root-array (or (dense-arrays::dense-array-root-array array)
+                               array)
+               :metadata metadata))))
 
 (defun split-at-keywords (args)
   "Example: (1 2 3 :a 2 :b 3) => ((1 2 3) :a 2 :b 3)"
@@ -222,7 +226,6 @@
   (let ((a     (zeros shape :type type :layout layout))
         (range (- max min))
         (min   (coerce min type)))
-    (declare (type dense-array a))
     (do-arrays ((a-elt a))
       (setf a-elt (+ min (random range))))
     a))
@@ -326,18 +329,19 @@ If ARRAY-LIKE is a SIMPLE-DENSE-ARRAY, it is guaranteed that when VIEW is suppli
 What is not guaranteed: if ARRAY-LIKE is not a SIMPLE-DENSE-ARRAY,
 then a new array is created. In the future, an attempt may be made to avoid
 creating the new array and instead return a view instead. "
-  (let ((simple-dense-array-p (typep array-like 'simple-dense-array))
-        (array (typecase array-like
-                 (simple-dense-array (cond ((and layoutp
-                                                 (eq layout (array-layout array-like)))
-                                            array-like)
-                                           (t
-                                            array-like)))
-                 (dense-array (copy-array array-like :layout (if layoutp
-                                                                 layout
-                                                                 (array-layout array-like))))
-                 (t (asarray array-like))))
-        (new-shape (alexandria:ensure-list new-shape)))
+  (let* ((simple-dense-array-p (typep array-like 'simple-dense-array))
+         (array (typecase array-like
+                  (simple-dense-array (cond ((and layoutp
+                                                  (eq layout (array-layout array-like)))
+                                             array-like)
+                                            (t
+                                             array-like)))
+                  (dense-array (copy-array array-like :layout (if layoutp
+                                                                  layout
+                                                                  (array-layout array-like))))
+                  (t (asarray array-like))))
+         (new-shape (alexandria:ensure-list new-shape))
+         (metadata (dense-array-metadata array)))
     (declare (type simple-dense-array array))
     (assert (= (array-total-size array)
                (reduce #'* new-shape :initial-value 1))
@@ -346,25 +350,26 @@ creating the new array and instead return a view instead. "
             :array-like array-like
             :new-shape new-shape)
     (let* ((maybe-view-array
-             (make-instance (class-of array)
-                            :storage (array-displaced-to array)
-                            :layout nil
-                            :element-type (array-element-type array)
-                            :dimensions new-shape
-                            :strides
-                            (dense-arrays::dimensions->strides new-shape (array-layout array))
-                            :offset 0
-                            :total-size (array-total-size array)
-                            :rank (length new-shape)
-                            :root-array (if simple-dense-array-p
-                                            ;; In other cases, we are guaranteed
-                                            ;; that the ARRAY object created here
-                                            ;; will not be accessible from outside
-                                            ;; FIXME: Debugger?
-                                            (or (dense-arrays::dense-array-root-array
-                                                 array)
-                                                array)
-                                            nil))))
+             (funcall (dam-dense-array-constructor metadata)
+                      :storage (array-displaced-to array)
+                      :layout nil
+                      :element-type (array-element-type array)
+                      :dimensions new-shape
+                      :strides
+                      (dense-arrays::dimensions->strides new-shape (array-layout array))
+                      :offset 0
+                      :total-size (array-total-size array)
+                      :rank (length new-shape)
+                      :root-array (if simple-dense-array-p
+                                      ;; In other cases, we are guaranteed
+                                      ;; that the ARRAY object created here
+                                      ;; will not be accessible from outside
+                                      ;; FIXME: Debugger?
+                                      (or (dense-arrays::dense-array-root-array
+                                           array)
+                                          array)
+                                      nil)
+                      :metadata metadata)))
       (cond ((and viewp simple-dense-array-p)
              (if view
                  maybe-view-array

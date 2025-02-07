@@ -3,17 +3,16 @@
 (defun primary-form-type (form env)
   (nth-form-type form env 0 t t))
 
-(defun dense-array-type-class (array-type &optional env) ; backend-name
-  (let ((array-type (introspect-environment:typexpand array-type env)))
+(defun dense-array-type-metadata (array-type &optional env) ; backend-name
+  (let ((array-type (peltadot:typexpand array-type env)))
     (assert (subtypep array-type 'dense-array)
             ()
             "Expected ARRAY-TYPE to be a subtype of DENSE-ARRAY but is~%  ~S"
             array-type)
-    (loop :for class :in (closer-mop:class-direct-subclasses
-                          (find-class 'dense-array))
-          :if (subtypep array-type (class-name class))
-            :do (return-from dense-array-type-class class)
-          :finally (return-from dense-array-type-class 'cl:*))))
+    (optima:ematch array-type
+      ((list 'specializing _ _ _ _ _ _ metadata-name)
+       (or (dam-object metadata-name nil)
+           'cl:*)))))
 
 (define-symbol-macro optim-speed (and (/= 3 (policy-quality 'debug env))
                                       (= 3 (policy-quality 'speed env))))

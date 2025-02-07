@@ -31,7 +31,7 @@
       ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
       (let* ((array-type   (simplify-and-type `(and ,(primary-form-type array env) t)
                                               env))
-             (class        (dense-array-type-class array-type env))
+             (metadata        (dense-array-type-metadata array-type env))
              (elt-type     (dense-array-type-element-type array-type))
              (rank         (dense-array-type-rank array-type))
              ;; FIXME on extensible-compound-types: This should work with simple-dense-array
@@ -39,15 +39,15 @@
                                (subtypep array-type 'simple-array)
                                (subtypep array-type 'simple-dense-array)))
              (safety-zero-p (zerop (policy-quality 'safety env))))
-        (when (eq 'cl:* class)
+        (when (eq 'cl:* metadata)
           ;; Don't have much hope of optimization
           (signal 'backend-failure :form array :form-type array-type)
           (return-from aref form))
         (let*
-            ((storage-accessor (storage-accessor class))
-             (storage-type     (funcall (storage-type-inferrer-from-array-type
-                                         class)
-                                        `(%dense-array ,elt-type ,rank)))
+            ((storage-accessor (dam-storage-accessor metadata))
+             (storage-type     (funcall (dam-storage-type-inferrer-from-element-type
+                                         metadata)
+                                        elt-type))
              (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
              (ds              (make-gensym-list (length subscripts) "DIMENSION"))
              (ss              (make-gensym-list (length subscripts) "STRIDE"))
@@ -55,7 +55,7 @@
                (once-only (array)
                  (cond
                    (simple-p
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type standard-dense-array ,array))
                        (destructuring-lists ((int-index ,ss (array-strides ,array)
                                                         :dynamic-extent nil)
                                              (size      ,ds (narray-dimensions ,array)
@@ -74,7 +74,7 @@
                                                             (* ,ss ,sub)))
                                                       ss subscripts)))))))
                    (t
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type standard-dense-array ,array))
                        (destructuring-lists ((size      ,ds (narray-dimensions ,array)
                                                         :dynamic-extent nil)
                                              (int-index ,ss (array-strides ,array)
@@ -130,21 +130,21 @@
       ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
       (let* ((array-type (simplify-and-type `(and ,(primary-form-type array env) t)
                                             env))
-             (class      (dense-array-type-class array-type env))
+             (metadata      (dense-array-type-class array-type env))
              (elt-type   (dense-array-type-element-type array-type))
              (rank       (dense-array-type-rank array-type))
              (simple-p   (if (member :extensible-compound-types cl:*features*)
                              (subtypep array-type 'simple-array)
                              (subtypep array-type 'simple-dense-array))))
-        (when (eq 'cl:* class)
+        (when (eq 'cl:* metadata)
           ;; Don't have much hope of optimization
           (signal 'backend-failure :form array :form-type array-type)
           (return-from aref form))
         (let*
-            ((storage-accessor (storage-accessor class))
-             (storage-type    (funcall (storage-type-inferrer-from-array-type
-                                        class)
-                                       `(%dense-array ,elt-type ,rank)))
+            ((storage-accessor (dam-storage-accessor metadata))
+             (storage-type    (funcall (dam-storage-type-inferrer-from-element-type
+                                        metadata)
+                                       elt-type))
              (subscript-types (mapcar (lm form (primary-form-type form env)) subscripts))
              (new-value-type  (primary-form-type new-value env))
              (ds              (make-gensym-list (length subscripts) "DIMENSION"))
@@ -154,7 +154,7 @@
                (once-only (array)
                  (cond
                    (simple-p
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type standard-dense-array ,array))
                        (destructuring-lists ((int-index ,ss (array-strides ,array)
                                                         :dynamic-extent nil)
                                              (size      ,ds (narray-dimensions ,array)
@@ -174,7 +174,7 @@
                                                             ss subscripts))))
                                (the ,elt-type ,new-value)))))
                    (t
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type standard-dense-array ,array))
                        (destructuring-lists ((size      ,ds (narray-dimensions ,array)
                                                         :dynamic-extent nil)
                                              (int-index ,ss (array-strides ,array)
