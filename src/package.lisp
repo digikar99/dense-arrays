@@ -51,9 +51,9 @@
                              "UNUPGRADED-ARRAY"
                              "SIMPLE-UNUPGRADED-ARRAY")))
     `(peltadot/utils:defpackage :dense-arrays
-       (:shadowing-import-exported-symbols #:abstract-arrays
-                                           #:iterate)
-       (:use #:peltadot
+       (:shadowing-import-exported-symbols #:iterate)
+       (:use #:abstract-arrays
+             #:peltadot
              #:iterate
              #:alexandria
              #:5am)
@@ -67,13 +67,32 @@
                                #:type=
                                #:named-lambda)
        (:shadowing-import-from #:abstract-arrays
+
                                #:+abstract-array-slot-order+
                                #:define-ordered-class-with-required-slots
+
                                #:storage
                                #:dimensions
                                #:rank
                                #:element-type
-                               #:index)
+                               #:index
+
+                               #:array-dimension
+                               #:array-dimensions
+                               #:array-rank
+                               #:array-element-type
+                               #:array-total-size
+                               #:array-storage
+
+                               #:abstract-array-dimensions
+                               #:abstract-array-rank
+                               #:abstract-array-element-type
+                               #:abstract-array-total-size
+                               #:abstract-array-storage
+
+                               #:arrayp
+                               #:aref
+                               #:row-major-aref)
        (:import-from #:trivial-types
                      #:function-designator)
        (:local-nicknames

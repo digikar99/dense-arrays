@@ -19,15 +19,15 @@
 
 ;; TODO: Consider the per-axis information to further optimize without (SAFETY 0)
 
-(defpolymorph-compiler-macro aref (dense-array &rest)
+(defpolymorph-compiler-macro aref (abstract-dense-array &rest)
     (&whole form array &rest subscripts &environment env)
   (let ((original-form `(aref ,@(rest form))))
     (compiler-macro-notes:with-notes (original-form
                                       env
-                                      :name (find-polymorph 'aref '(dense-array &rest))
+                                      :name (find-polymorph 'aref '(abstract-dense-array &rest))
                                       :unwind-on-signal nil
                                       :optimization-note-condition optim-speed)
-      ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
+      ;; The fact that we are here means the type of ARRAY is at least ABSTRACT-DENSE-ARRAY
       ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
       (let* ((array-type   (simplify-and-type `(and ,(primary-form-type array env) t)
                                               env))
@@ -55,7 +55,7 @@
                (once-only (array)
                  (cond
                    (simple-p
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type abstract-dense-array ,array))
                        (destructuring-lists ((int-index ,ss (array-strides ,array)
                                                         :dynamic-extent nil)
                                              (size      ,ds (narray-dimensions ,array)
@@ -74,7 +74,7 @@
                                                             (* ,ss ,sub)))
                                                       ss subscripts)))))))
                    (t
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type abstract-dense-array ,array))
                        (destructuring-lists ((size      ,ds (narray-dimensions ,array)
                                                         :dynamic-extent nil)
                                              (int-index ,ss (array-strides ,array)
@@ -118,15 +118,15 @@
 
 
 
-(defpolymorph-compiler-macro (setf aref) (t dense-array &rest)
+(defpolymorph-compiler-macro (setf aref) (t abstract-dense-array &rest)
     (&whole form new-value array &rest subscripts &environment env)
   (let ((original-form `(funcall #'(setf aref) ,@(rest form))))
     (compiler-macro-notes:with-notes (original-form
                                       env
-                                      :name (find-polymorph 'aref '(dense-array &rest))
+                                      :name (find-polymorph 'aref '(abstract-dense-array &rest))
                                       :unwind-on-signal nil
                                       :optimization-note-condition optim-speed)
-      ;; The fact that we are here means the type of ARRAY is at least DENSE-ARRAY
+      ;; The fact that we are here means the type of ARRAY is at least ABSTRACT-DENSE-ARRAY
       ;; Therefore, we ignore the second return value of PRIMARY-FORM-TYPE
       (let* ((array-type (simplify-and-type `(and ,(primary-form-type array env) t)
                                             env))
@@ -154,7 +154,7 @@
                (once-only (array)
                  (cond
                    (simple-p
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type abstract-dense-array ,array))
                        (destructuring-lists ((int-index ,ss (array-strides ,array)
                                                         :dynamic-extent nil)
                                              (size      ,ds (narray-dimensions ,array)
@@ -174,7 +174,7 @@
                                                             ss subscripts))))
                                (the ,elt-type ,new-value)))))
                    (t
-                    `(locally (declare (type dense-array ,array))
+                    `(locally (declare (type abstract-dense-array ,array))
                        (destructuring-lists ((size      ,ds (narray-dimensions ,array)
                                                         :dynamic-extent nil)
                                              (int-index ,ss (array-strides ,array)

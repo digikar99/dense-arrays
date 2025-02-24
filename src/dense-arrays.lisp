@@ -239,28 +239,28 @@ Additionally takes
 
 ;; trivial function definitions
 
-(declaim (ftype (function (dense-array) (member :row-major :column-major nil))
+(declaim (ftype (function (abstract-dense-array) (member :row-major :column-major nil))
                 array-layout))
 (declaim (inline array-layout))
 (defun array-layout (array)
-  (declare (type dense-array array))
-  (dense-array-layout array))
+  (declare (type abstract-dense-array array))
+  (abstract-dense-array-layout array))
 
-(declaim (ftype (function (dense-array) list)
+(declaim (ftype (function (abstract-dense-array) list)
                 narray-dimensions
                 array-strides))
 
-(declaim (ftype (function (dense-array) size)
+(declaim (ftype (function (abstract-dense-array) size)
                 array-offset))
 
 (declaim (inline array-offset))
 (defun array-offset (array)
-  (declare (type dense-array array))
-  (dense-array-offset array))
+  (declare (type abstract-dense-array array))
+  (abstract-dense-array-offset array))
 
 (declaim (inline array-displaced-to))
 (defun array-displaced-to (array)
-  (declare (type dense-array array))
+  (declare (type abstract-dense-array array))
   (array-storage array))
 
 (declaim (inline array-displacement))
@@ -268,33 +268,25 @@ Additionally takes
   "Returns two values:
 - ARRAY-STORAGE
 - OFFSET"
-  (declare (type dense-array array))
+  (declare (type abstract-dense-array array))
   (values (array-storage array)
           (array-offset array)))
 
-(declaim (inline array-dimension))
-(defun array-dimension (array axis-number)
-  "Return the length of dimension AXIS-NUMBER of ARRAY."
-  (declare (type dense-array array)
-           (type fixnum axis-number))
-  (the (mod #.array-dimension-limit)
-       (elt (narray-dimensions array) axis-number)))
-
 (declaim (inline array-strides))
 (defun array-strides (array)
-  (declare (type dense-array array))
-  (dense-array-strides array))
+  (declare (type abstract-dense-array array))
+  (abstract-dense-array-strides array))
 
 (declaim (inline array-stride))
 (defun array-stride (array axis-number)
   "Return the length of stride corresponding to AXIS-NUMBER of ARRAY."
-  (declare (type dense-array array)
+  (declare (type abstract-dense-array array)
            (type fixnum axis-number))
   (elt (array-strides array) axis-number))
 
 (defun 1d-storage-array (array)
   "Returns the storage-vector underlying the ARRAY. This is equivalent to ARRAY-DISPLACED-TO."
-  (declare (type dense-array array))
+  (declare (type abstract-dense-array array))
   (array-displaced-to array))
 
 (defun array-view-p (array)
@@ -302,8 +294,8 @@ Additionally takes
 have a known layout, and is useful as a window into certain elements of the larger array.
 A VIEW provides a way to obtain sub-arrays or reshapes or transposes out of ARRAY
 without copying."
-  (declare (type dense-array array))
-  (if (dense-array-root-array array) t nil))
+  (declare (type abstract-dense-array array))
+  (if (abstract-dense-array-root-array array) t nil))
 
 (defun collect-reduce-from-end (function list initial-element)
   (declare (type list list)
@@ -365,7 +357,7 @@ Also see:
  The output respects *PRINT-LENGTH* and *PRINT-LEVEL* and is suitable for
  tabular printing."))
 
-(defmethod data-as-lol ((array dense-array))
+(defmethod data-as-lol ((array abstract-dense-array))
   (let ((sv      (array-storage array))
         (rank    (array-rank array))
         (index   (array-offset array))
@@ -414,7 +406,7 @@ Also see:
                                tail-list))))))
       (process 0))))
 
-(defmethod print-object ((array dense-array) stream)
+(defmethod print-object ((array abstract-dense-array) stream)
   ;; (print (type-of array))
   (let* ((*print-right-margin* (or *print-right-margin* 80))
          (layout  (array-layout array))

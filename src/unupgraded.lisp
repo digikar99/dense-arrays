@@ -4,7 +4,7 @@
 
   (defclass unupgraded-dense-array-class (standard-dense-array-class) ())
 
-  (defclass unupgraded-dense-array (dense-array)
+  (defclass unupgraded-dense-array (standard-dense-array)
     ()
     (:metaclass unupgraded-dense-array-class))
 

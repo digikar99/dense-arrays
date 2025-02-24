@@ -40,7 +40,7 @@ and tests for their equality."
   "Returns a VIEW of the subscripted ARRAY (without copying the contents)"
   (declare (optimize speed)
            (dynamic-extent subscripts)
-           (type dense-array array))
+           (type abstract-dense-array array))
   (with-slots (storage strides offset dimensions rank element-type layout) array
     (multiple-value-bind (class dimensions strides offset rank)
         (let ((new-offset    offset)
@@ -99,7 +99,7 @@ and tests for their equality."
   "Returns a copy of the subscripted array."
   (declare ;; (optimize speed)
            (dynamic-extent subscripts)
-           (type dense-array array))
+           (type abstract-dense-array array))
   ;; TODO: Optimize this
   ;; TODO: Combining basic and advanced indexing - raise an issue if this is needed
   ;; Reference: https://numpy.org/doc/stable/reference/arrays.indexing.html#advanced-indexing
@@ -113,7 +113,7 @@ and tests for their equality."
   (cond
     ((= (length subscripts) (array-rank array))
      (let ((subscript (first subscripts)))
-       (declare (type dense-array subscript))
+       (declare (type abstract-dense-array subscript))
        (let ((result (make-array (array-dimensions subscript)
                                  :element-type (array-element-type array)))
              (rank   (array-rank subscript))
@@ -138,7 +138,7 @@ and tests for their equality."
      (error "Only implemented (= (length subscripts) (array-rank array)) case"))))
 
 (defpolymorph (aref :inline t :static-dispatch-name da-ref)
-    ((array dense-array) &rest subscripts) t
+    ((array abstract-dense-array) &rest subscripts) t
   (declare (optimize speed)
            (type list subscripts))
   (assert (and (= (the-size (array-rank array))
@@ -203,7 +203,7 @@ The SUBSCRIPTS can also be integer or boolean arrays, denoting which elements
 to select from each of the axes. But in this case the corresponding elements
 of the array are copied over into a new array."
   (declare ;; (optimize speed)
-   (type dense-array dense-array)
+   (type abstract-dense-array dense-array)
    (dynamic-extent subscripts))
   (cond ((and (= (array-rank dense-array) (length subscripts))
               (every #'integerp subscripts))
@@ -242,7 +242,7 @@ of the array are copied over into a new array."
 (defun (setf %aref) (new-array array &rest subscripts)
   (declare ;; (optimize speed)
            (dynamic-extent subscripts)
-           (type dense-array array))
+           (type abstract-dense-array array))
   ;; TODO: Optimize this
   (destructuring-bind (new-array &rest subscripts)
       (apply #'broadcast-arrays
@@ -277,9 +277,9 @@ of the array are copied over into a new array."
   new-array)
 
 (defpolymorph ((setf aref) :inline t)
-    (new-element/s (array dense-array) &rest subscripts)
+    (new-element/s (array abstract-dense-array) &rest subscripts)
     t
-  (declare (type dense-array array)
+  (declare (type abstract-dense-array array)
            (type list subscripts)
            (optimize speed)
            (dynamic-extent subscripts))
@@ -311,7 +311,7 @@ of the array are copied over into a new array."
   new-element/s)
 
 (defun (setf aref*) (new-element/s dense-array &rest subscripts)
-  (declare (type dense-array dense-array)
+  (declare (type abstract-dense-array dense-array)
            ;; (optimize speed)
            (dynamic-extent subscripts))
   (with-slots (storage element-type strides offset dimensions rank) dense-array
@@ -427,7 +427,7 @@ of the array are copied over into a new array."
                       2)
                 a))))
 
-(defpolymorph (row-major-aref :inline t) ((array dense-array) index) t
+(defpolymorph (row-major-aref :inline t) ((array abstract-dense-array) index) t
   (declare (type int-index index))
   (let ((row-major-index   (array-offset array))
         (apparant-strides  (rest (collect-reduce-from-end #'*
@@ -448,7 +448,7 @@ of the array are copied over into a new array."
                           row-major-index)
                  (array-element-type array))))
 
-(defpolymorph ((setf row-major-aref) :inline t) (new-element (array dense-array) index) t
+(defpolymorph ((setf row-major-aref) :inline t) (new-element (array abstract-dense-array) index) t
   (declare (type int-index index))
   (assert-type new-element (array-element-type array))
   (let ((row-major-index   (array-offset array))

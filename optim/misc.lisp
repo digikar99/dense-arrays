@@ -5,12 +5,12 @@
 
 (defun dense-array-type-class (array-type &optional env) ; backend-name
   (let ((array-type (introspect-environment:typexpand array-type env)))
-    (assert (subtypep array-type 'dense-array)
+    (assert (subtypep array-type 'abstract-dense-array)
             ()
-            "Expected ARRAY-TYPE to be a subtype of DENSE-ARRAY but is~%  ~S"
+            "Expected ARRAY-TYPE to be a subtype of ABSTRACT-DENSE-ARRAY but is~%  ~S"
             array-type)
     (loop :for class :in (closer-mop:class-direct-subclasses
-                          (find-class 'dense-array))
+                          (find-class 'abstract-dense-array))
           :if (subtypep array-type (class-name class))
             :do (return-from dense-array-type-class class)
           :finally (return-from dense-array-type-class 'cl:*))))
@@ -24,7 +24,7 @@
    (slot :initarg :slot))
   (:report (lambda (c s)
              (with-slots (form form-type slot) c
-               (format s "Unable to identify the DENSE-ARRAY ~S of FORM~%  ~S~%derived to be of type ~S"
+               (format s "Unable to identify the ABSTRACT-DENSE-ARRAY ~S of FORM~%  ~S~%derived to be of type ~S"
                        slot form form-type)))))
 
 (define-condition backend-failure (slot-type-failure)

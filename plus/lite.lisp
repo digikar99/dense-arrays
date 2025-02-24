@@ -10,10 +10,12 @@
    #:make-dense-array
    #:storage-accessor
    #:dense-array
+   #:abstract-dense-array
    #:simple-dense-array
    #:array-offset
    #:array-strides
-   #:array-root-array)
+   #:array-root-array
+   #:abstract-dense-array-root-array)
   (:import-from
    #:peltadot-traits-library
    #:array-like
@@ -47,7 +49,7 @@
   (trivial-package-local-nicknames:add-package-local-nickname
    :coerce :peltadot/coerce))
 
-(define-trait-implementation array-like dense-array ()
+(define-trait-implementation array-like abstract-dense-array ()
   (defun dimensions-and-strides (array)
     (values (array-dimensions array)
             (array-strides array)))
@@ -69,7 +71,7 @@
   "TYPE can also be :AUTO"
   (let* ((dimensions (dimensions-and-strides array-like)))
     (when outp
-      (check-type out dense-array)
+      (check-type out abstract-dense-array)
       (assert (equalp dimensions (narray-dimensions out)) (out))
       (if typep
           (assert (type= type (array-element-type out)) (out))
@@ -118,9 +120,9 @@
 
 (defun transpose (array-like &key axes)
   (let ((array (typecase array-like
-                 (dense-array array-like)
+                 (abstract-dense-array array-like)
                  (t (asarray array-like)))))
-    (declare (type dense-array array)
+    (declare (type abstract-dense-array array)
              (optimize speed))
     (multiple-value-bind (dimensions strides)
         (if axes
@@ -140,7 +142,7 @@
                      :offset (array-offset array)
                      :total-size (array-total-size array)
                      :rank (array-rank array)
-                     :root-array (or (dense-arrays::dense-array-root-array array)
+                     :root-array (or (abstract-dense-array-root-array array)
                                      array)))))
 
 (defun split-at-keywords (args)
@@ -222,7 +224,7 @@
   (let ((a     (zeros shape :type type :layout layout))
         (range (- max min))
         (min   (coerce min type)))
-    (declare (type dense-array a))
+    (declare (type abstract-dense-array a))
     (do-arrays ((a-elt a))
       (setf a-elt (+ min (random range))))
     a))
@@ -317,7 +319,7 @@
                (format s "Cannot reshape~%  ~S~%into shape ~S"
                        array-like new-shape)))))
 
-(declaim (ftype (function * dense-array) reshape))
+(declaim (ftype (function * abstract-dense-array) reshape))
 (defun reshape (array-like new-shape &key (view nil viewp) (layout nil layoutp))
   "VIEW argument is considered only if ARRAY-LIKE is a SIMPLE-DENSE-ARRAY.
 If ARRAY-LIKE is a SIMPLE-DENSE-ARRAY, it is guaranteed that when VIEW is supplied,
@@ -361,7 +363,7 @@ creating the new array and instead return a view instead. "
                                             ;; that the ARRAY object created here
                                             ;; will not be accessible from outside
                                             ;; FIXME: Debugger?
-                                            (or (dense-arrays::dense-array-root-array
+                                            (or (abstract-dense-array-root-array
                                                  array)
                                                 array)
                                             nil))))
@@ -408,7 +410,7 @@ creating the new array and instead return a view instead. "
     (is (array= expected-value actual-value))))
 
 (defun as-cl-array (array)
-  (declare (type dense-array array))
+  (declare (type abstract-dense-array array))
   (let ((cl-array (cl:make-array (narray-dimensions array)
                                  :element-type (array-element-type array)
                                  :initial-element (coerce 0 (array-element-type array)))))
@@ -428,7 +430,7 @@ creating the new array and instead return a view instead. "
       `(let (,@(loop :for sym :in array-syms
                      :for array-expr :in arrays
                      :collect `(,sym ,array-expr)))
-         (declare (type dense-array ,@array-syms))
+         (declare (type abstract-dense-array ,@array-syms))
          ;; TODO: Optimize this
          (let* ((,result (or ,result-array (zeros-like ,(first array-syms))))
                 (,result-type (array-element-type ,result)))

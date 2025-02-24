@@ -2,7 +2,7 @@
   :author "Shubhamkar B. Ayare"
   :description "Numpy like array objects for Common Lisp"
   :license "MIT"
-  :version "0.4.0" ; beta
+  :version "0.5.0" ; beta
   :defsystem-depends-on ("alternate-asdf-system-connections")
   :depends-on ("abstract-arrays"
                "alexandria"

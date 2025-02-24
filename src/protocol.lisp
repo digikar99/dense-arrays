@@ -3,7 +3,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass dense-array-class (abstract-array-class) ()))
 
-(define-array-class dense-array
+(define-array-class abstract-dense-array
   ;; TODO: Add more documentation with a proper example
   ;; Like CL:ARRAY, DENSE-ARRAY can actually never be instantiated.
   ;; What can be instantiated is a CL:ARRAY with an ELEMENT-TYPE specified.
@@ -20,6 +20,23 @@
   (:documentation "- DIMENSIONS is a list of dimensions.
 - STRIDES is a list of strides along each dimension.
 - OFFSET is the offset inside array-storage."))
+
+(define-trait dense-array (abstract-arrays:array) ()
+
+  "- DIMENSIONS is a list of dimensions.
+- STRIDES is a list of strides along each dimension.
+- OFFSET is the offset inside array-storage."
+  ;; TODO: Add more documentation with a proper example
+  ;; Like CL:ARRAY, DENSE-ARRAY can actually never be instantiated.
+  ;; What can be instantiated is a CL:ARRAY with an ELEMENT-TYPE specified.
+  ;; For DENSE-ARRAY, this ELEMENT-TYPE depends on the underlying storage itself.
+
+  (dense-array-strides (dense-array) list)
+  (dense-array-offset (dense-array) size)
+  (dense-array-layout (dense-array) (member nil :row-major :column-major))
+  ;; LAYOUT can be NIL in the case of a non SIMPLE-ARRAY
+  ;; LAYOUT will be ROW-MAJOR or COLUMN-MAJOR only for SIMPLE-ARRAY
+  (dense-array-root-array (dense-array) (or null dense-array)))
 
 ;;; Below, we are using CLASS instead of CLASS-NAME because the CLASS objects
 ;;; will have a hierarchy, not the CLASS-NAMEs. This allows for partial specialization.
@@ -91,9 +108,11 @@ subclass of DENSE-ARRAY." ',name))))))
 ;;; STANDARD-DENSE-ARRAY
 
 (defclass standard-dense-array-class (dense-array-class) ())
-(defclass standard-dense-array (dense-array)
+(defclass standard-dense-array (abstract-dense-array)
   ()
   (:metaclass standard-dense-array-class))
+
+
 
 (defvar *dense-array-class* (find-class 'standard-dense-array)
   "Specifies the default value of CLASS in DENSE-ARRAYS:MAKE-ARRAY

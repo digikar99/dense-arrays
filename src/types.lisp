@@ -2,6 +2,21 @@
 
 (in-suite :dense-arrays)
 
+(define-trait-implementation dense-array standard-dense-array ()
+
+  (defun dense-array-strides (array) (abstract-dense-array-strides array))
+  (defun dense-array-offset (array) (abstract-dense-array-offset array))
+  (defun dense-array-layout (array) (abstract-dense-array-layout array))
+  (defun dense-array-root-array (array) (abstract-dense-array-root-array array))
+
+  (defun array-dimensions (array) (copy-list (abstract-array-dimensions array)))
+  (defun array-dimension (array axis-number)
+    (nth axis-number (abstract-array-dimensions array)))
+  (defun array-rank (array) (abstract-array-rank array))
+  (defun array-element-type (array) (abstract-array-element-type array))
+  (defun array-total-size (array) (abstract-array-total-size array))
+  (defun array-storage (array) (abstract-array-storage array)))
+
 (defun simple-dense-array-p (object)
   (declare (optimize speed))
   (and (typep object 'dense-array)
@@ -99,11 +114,11 @@
 
 ;; For internal usage
 
-(define-dense-array-types dense-array
-  dense-array %dense-array simple-dense-array)
+(define-dense-array-types abstract-dense-array
+  abstract-dense-array %dense-array simple-dense-array)
 
 (defun dense-array-type-element-type (type-spec)
-  (assert (subtypep type-spec 'dense-array))
+  (assert (subtypep type-spec 'abstract-dense-array))
   (optima:match (typexpand type-spec)
     ((list* 'specializing _ element-type _)
      element-type)
@@ -111,7 +126,7 @@
      (array-type-element-type type-spec))))
 
 (defun dense-array-type-rank (type-spec)
-  (assert (subtypep type-spec 'dense-array))
+  (assert (subtypep type-spec 'abstract-dense-array))
   (optima:match (typexpand type-spec)
     ((list* 'specializing _ _ _ rank _)
      rank)
