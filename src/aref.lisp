@@ -125,8 +125,10 @@ and tests for their equality."
                         (let ((ss-elt (mapcar (lambda (array)
                                                 (apply #'aref array ss-idx))
                                               subscripts)))
-                          (setf (apply #'aref result ss-idx)
-                                (apply #'aref array ss-elt)))
+                          (apply #'(setf aref)
+                                 (apply #'aref array ss-elt)
+                                 result
+                                 ss-idx))
                         (loop :for i :from 0 :below (the size (nth depth dims))
                               :do (setf (nth depth ss-idx) i)
                                   (ss-iter (1+ depth) ss-idx)
