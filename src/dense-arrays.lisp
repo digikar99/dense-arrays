@@ -134,7 +134,8 @@ Additionally takes
                                            "The initial element ~S is not of type ~S"
                                            elt element-type))
                             elt))
-         (storage         (or displaced-to
+         (storage         (if displaced-to
+                              (array-storage displaced-to)
                               (funcall (storage-allocator class)
                                        total-size
                                        :initial-element initial-element
