@@ -74,8 +74,6 @@
                                #:rank
                                #:element-type
                                #:index)
-       (:import-from #:trivial-types
-                     #:function-designator)
        (:local-nicknames
         (:cl-form-types #:peltadot/form-types))))
 

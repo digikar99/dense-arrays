@@ -12,7 +12,6 @@
                "peltadot"
                "peltadot-traits-library"
                "trivial-garbage"
-               "trivial-types"
                "uiop"
                "float-features")
   :serial t
